@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  L'API Laravel de developpement est en HTTP sur la machine hote, pas en
+  HTTPS. Android bloque par defaut le trafic HTTP en clair, donc on
+  l'autorise uniquement pour les hotes de developpement locaux, et on le
+  refuse partout ailleurs. 10.0.2.2 est l'alias de loopback visible depuis
+  l'emulateur Android ; localhost et 127.0.0.1 servent au test sur appareil
+  physique via adb reverse.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
