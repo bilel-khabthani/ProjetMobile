@@ -35,8 +35,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
-  String _messageOf(Object error) =>
-      error is ApiException ? error.message : 'Connexion impossible. Reessayez.';
+  String _messageOf(Object error) => error is ApiException
+      ? error.message
+      : 'Connexion impossible. Reessayez.';
 
   Future<void> _submit() async {
     final valid = _formKey.currentState?.validate() ?? false;
@@ -44,10 +45,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
     setState(() => _loading = true);
     try {
-      await ref.read(sessionProvider.notifier).signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .signIn(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
       if (!mounted) return;
       // La garde du routeur impose /verify-phone si le numero n'est pas
       // verifie (CDC 6.1), sinon ouvre l'application.

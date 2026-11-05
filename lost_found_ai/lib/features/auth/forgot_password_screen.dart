@@ -87,15 +87,19 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      await ref.read(sessionProvider.notifier).resetPassword(
-        email: _emailController.text.trim(),
-        code: _codeController.text.trim(),
-        password: _passwordController.text,
-        passwordConfirmation: _confirmController.text,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .resetPassword(
+            email: _emailController.text.trim(),
+            code: _codeController.text.trim(),
+            password: _passwordController.text,
+            passwordConfirmation: _confirmController.text,
+          );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mot de passe reinitialise. Connectez-vous.')),
+        const SnackBar(
+          content: Text('Mot de passe reinitialise. Connectez-vous.'),
+        ),
       );
       context.go(AppRoutes.signIn);
     } on Object catch (error) {
@@ -211,7 +215,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ],
                 const SizedBox(height: AppSpacing.xl),
                 AppButton(
-                  label: _codeSent ? 'Reinitialiser le mot de passe' : 'Envoyer le code',
+                  label: _codeSent
+                      ? 'Reinitialiser le mot de passe'
+                      : 'Envoyer le code',
                   loading: _loading,
                   onPressed: _codeSent ? _reset : _requestCode,
                 ),

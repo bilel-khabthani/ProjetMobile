@@ -2,15 +2,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../data/models/item.dart';
 import '../data/providers.dart';
+import '../features/activity/activity_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/auth/sign_up_screen.dart';
 import '../features/auth/verify_phone_screen.dart';
 import '../features/auth/welcome_screen.dart';
 import '../features/claim/claim_screen.dart';
+import '../features/chat/chat_screen.dart';
+import '../features/explore/explore_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/match/match_detail_screen.dart';
+import '../features/messages/messages_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/publish/publish_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -24,15 +29,21 @@ abstract final class AppRoutes {
   static const String verifyPhone = '/verify-phone';
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
+  static const String explore = '/explore';
+  static const String messages = '/messages';
+  static const String activity = '/activity';
   static const String publish = '/publish';
   static const String match = '/match/:id';
+  static const String chat = '/chat/:id';
   static const String trust = '/trust';
   static const String claim = '/claim';
   static const String claimWithId = '/claim/:id';
   static const String profile = '/profile';
 
   static String matchDetail(String id) => '/match/$id';
-  static String claimDetail([String? id]) => id == null ? '/claim' : '/claim/$id';
+  static String chatDetail(String id) => '/chat/$id';
+  static String claimDetail([String? id]) =>
+      id == null ? '/claim' : '/claim/$id';
 }
 
 /// Ecrans atteignables sans session (parcours d'authentification).
@@ -104,14 +115,38 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
+        path: AppRoutes.explore,
+        builder: (context, state) => const ExploreScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.messages,
+        builder: (context, state) => const MessagesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.activity,
+        builder: (context, state) => const ActivityScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.publish,
-        builder: (context, state) => const PublishScreen(),
+        builder: (context, state) {
+          final type = state.uri.queryParameters['type'];
+          return PublishScreen(
+            initialType: type == 'found' ? ItemType.found : ItemType.lost,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.match,
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? 'match-sac';
           return MatchDetailScreen(matchId: id);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.chat,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ChatScreen(matchId: id);
         },
       ),
       GoRoute(

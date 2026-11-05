@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -6,10 +6,13 @@ import 'package:http/http.dart' as http;
 /// Erreur renvoyee par l'API, avec le code HTTP pour permettre a l'appelant
 /// de distinguer un 401 (session expiree) d'un 422 (regle de metier).
 class ApiException implements Exception {
-  ApiException(this.statusCode, this.message);
+  ApiException(this.statusCode, this.message, [this.body]);
 
   final int statusCode;
   final String message;
+
+  /// Corps JSON de la reponse d'erreur (code metier, details de validation).
+  final Map<String, dynamic>? body;
 
   @override
   String toString() => 'ApiException($statusCode): $message';
@@ -116,7 +119,11 @@ class ApiClient {
         ? (body['message']?.toString() ?? 'Erreur ${response.statusCode}')
         : 'Erreur ${response.statusCode}';
 
-    throw ApiException(response.statusCode, message);
+    throw ApiException(
+      response.statusCode,
+      message,
+      body is Map<String, dynamic> ? body : null,
+    );
   }
 
   void close() => _client.close();

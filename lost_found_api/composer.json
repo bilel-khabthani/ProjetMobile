@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.3",
         "laravel/framework": "^13.17",
+        "laravel/reverb": "^1.12",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0"
     },
@@ -81,6 +82,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.3.35"
         }
     },
     "minimum-stability": "stable",

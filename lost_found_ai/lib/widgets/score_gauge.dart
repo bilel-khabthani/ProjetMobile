@@ -10,7 +10,7 @@ class ScoreGauge extends StatelessWidget {
     super.key,
     required this.value,
     this.size = 96,
-    this.strokeWidth = 10,
+    this.strokeWidth = 8,
     this.color = AppColors.primary,
     this.secondaryColor,
     this.label,

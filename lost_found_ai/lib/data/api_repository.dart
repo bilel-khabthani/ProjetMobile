@@ -1,5 +1,6 @@
-﻿import '../core/app_config.dart';
+import '../core/app_config.dart';
 import 'api_client.dart';
+import 'models/chat_message.dart';
 import 'models/item.dart';
 import 'models/item_match.dart';
 import 'models/trust.dart';
@@ -7,9 +8,16 @@ import 'models/trust.dart';
 /// Repository branche sur l'API Laravel.
 class ApiRepository {
   ApiRepository({ApiClient? client})
-      : _client = client ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
+    : _client = client ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
 
   final ApiClient _client;
+
+  /// Identifiant de l'utilisateur connecte, renseigne par [_toUser].
+  int? currentUserId;
+
+  String? get token => _client.token;
+
+  String get baseUrl => _client.baseUrl;
 
   /// Dernier code OTP recu de l'API (demo sans passerelle SMS : le serveur
   /// renvoie le code pour permettre un test immediat). Lu puis efface par
@@ -63,7 +71,10 @@ class ApiRepository {
   }
 
   /// Valide le code et retourne le profil rafraichi (phone_verified=true).
-  Future<AppUser> verifyOtp({required String phone, required String code}) async {
+  Future<AppUser> verifyOtp({
+    required String phone,
+    required String code,
+  }) async {
     final json = await _client.post('/auth/otp/verify', {
       'phone': phone,
       'code': code,
@@ -148,7 +159,8 @@ class ApiRepository {
     if (phone != null && phone.isNotEmpty) {
       payload['phone'] = phone;
     }
-    final json = await _client.patch('/auth/me', payload) as Map<String, dynamic>;
+    final json =
+        await _client.patch('/auth/me', payload) as Map<String, dynamic>;
     // Un changement de numero re-definit phone_verified=false : le serveur
     // renvoie alors un nouveau code a saisir sur l'ecran de verification.
     lastDemoOtp = json['demo_otp'] as String?;
@@ -157,14 +169,60 @@ class ApiRepository {
 
   Future<List<ItemMatch>> fetchMatches() async {
     final matches = await _client.get('/matches') as List<dynamic>;
-    return matches
-        .map((raw) => _toMatch(raw as Map<String, dynamic>))
-        .toList();
+    return matches.map((raw) => _toMatch(raw as Map<String, dynamic>)).toList();
   }
 
   Future<ItemMatch> fetchMatch(String id) async {
     final json = await _client.get('/matches/$id') as Map<String, dynamic>;
     return _toMatch(json);
+  }
+
+  /// Messages de la correspondance, tries du plus ancien au plus recent.
+  Future<List<ChatMessage>> fetchMessages(
+    String matchId, {
+    DateTime? after,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (after != null) {
+      query['after'] = after.toUtc().toIso8601String();
+    }
+    final suffix = Uri(queryParameters: query).query;
+    final json = await _client.get(
+      '/matches/$matchId/messages?$suffix',
+    ) as List<dynamic>;
+    return json
+        .map(
+          (raw) => ChatMessage.fromJson(
+            raw as Map<String, dynamic>,
+            currentUserId: currentUserId,
+          ),
+        )
+        .toList();
+  }
+
+  Future<ChatMessage> sendMessage({
+    required String matchId,
+    required String body,
+  }) async {
+    final json = await _client.post('/matches/$matchId/messages', {
+      'body': body,
+    }) as Map<String, dynamic>;
+    return ChatMessage.fromJson(json, currentUserId: currentUserId);
+  }
+
+  Future<void> markMessagesRead(String matchId) async {
+    await _client.post('/matches/$matchId/messages/read', {});
+  }
+
+  Future<void> reportMessage({
+    required String matchId,
+    required String messageId,
+    String? reason,
+  }) async {
+    await _client.post('/matches/$matchId/messages/$messageId/report', {
+      'reason': reason ?? '',
+    });
   }
 
   Future<bool> verifyAnswer({
@@ -177,17 +235,18 @@ class ApiRepository {
       'NON' || 'NO' || '0' => 'NO',
       _ => 'UNSURE',
     };
-    final json = await _client.post(
-      '/matches/$matchId/answer',
-      {'answer': decision},
-    ) as Map<String, dynamic>;
+    final json = await _client.post('/matches/$matchId/answer', {
+      'answer': decision,
+    }) as Map<String, dynamic>;
     return json['status'] != 'PENDING';
   }
 
   Future<void> publishItem({
     required ItemType type,
     required ItemCategory category,
+    required String title,
     required String description,
+    String? secretDetail,
     required String place,
     required DateTime occurredAt,
     double? latitude,
@@ -195,12 +254,14 @@ class ApiRepository {
   }) async {
     final payload = <String, dynamic>{
       'type': type == ItemType.lost ? 'LOST' : 'FOUND',
-      'category': _categoryCode(category),
-      'title': _titleFrom(description),
-      'description': description,
+      'category': itemCategoryToCode(category),
+      'title': title.trim(),
+      'description': description.trim(),
       'place_label': place,
       'occurred_at': occurredAt.toUtc().toIso8601String(),
     };
+    final secret = secretDetail?.trim() ?? '';
+    if (secret.isNotEmpty) payload['secret_detail'] = secret;
     if (latitude != null) payload['latitude'] = latitude;
     if (longitude != null) payload['longitude'] = longitude;
     await _client.post('/items', payload);
@@ -209,8 +270,8 @@ class ApiRepository {
     if (mine.isNotEmpty) {
       final last = mine.first as Map<String, dynamic>;
       try {
-      await _client.get('/items/${last['id']}/matches');
-    } catch (_) {}
+        await _client.get('/items/${last['id']}/matches');
+      } catch (_) {}
     }
   }
 
@@ -237,7 +298,8 @@ class ApiRepository {
             (raw) => TrustEvent(
               label: _eventLabel(raw['type'] as String? ?? ''),
               points: (raw['points'] as num?)?.toInt() ?? 0,
-              at: DateTime.tryParse(raw['created_at'] as String? ?? '') ??
+              at:
+                  DateTime.tryParse(raw['created_at'] as String? ?? '') ??
                   DateTime.now(),
               automatic: raw['validated_by'] == 'SYSTEME',
             ),
@@ -261,13 +323,16 @@ class ApiRepository {
   Item _toItem(Map<String, dynamic> json) {
     return Item(
       id: json['id'] as String? ?? '',
-      type: (json['type'] as String?) == 'LOST' ? ItemType.lost : ItemType.found,
-      category: _categoryFromCode(json['category'] as String?),
+      type: (json['type'] as String?) == 'LOST'
+          ? ItemType.lost
+          : ItemType.found,
+      category: itemCategoryFromCode(json['category'] as String?),
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       place: json['place_label'] as String? ?? '',
       occurredAt:
-          DateTime.tryParse(json['occurred_at'] as String? ?? '') ?? DateTime.now(),
+          DateTime.tryParse(json['occurred_at'] as String? ?? '') ??
+          DateTime.now(),
       distanceMeters: 0,
       status: ItemStatus.active,
     );
@@ -277,7 +342,18 @@ class ApiRepository {
     final date = DateTime.tryParse(iso ?? '');
     if (date == null) return 'Date inconnue';
     const months = [
-      'janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre',
+      'janvier',
+      'fevrier',
+      'mars',
+      'avril',
+      'mai',
+      'juin',
+      'juillet',
+      'aout',
+      'septembre',
+      'octobre',
+      'novembre',
+      'decembre',
     ];
     final local = date.toLocal();
     final day = local.day.toString().padLeft(2, '0');
@@ -291,21 +367,34 @@ class ApiRepository {
     final found = json['found_item'] as Map<String, dynamic>?;
     final scores = json['scores'] as Map<String, dynamic>? ?? {};
     final dims = scores['dimensions'] as Map<String, dynamic>? ?? {};
+    final lostUser = lost?['user'] as Map<String, dynamic>?;
     final foundUser = found?['user'] as Map<String, dynamic>?;
+
+    // Le serveur indique le role de l'utilisateur connecte : le proprietaire
+    // voit son annonce perdue en premier, celui qui a trouve voit l'inverse.
+    final iAmFinder = json['viewer_role'] == 'finder';
+    final myItem = iAmFinder ? found : lost;
+    final otherItem = iAmFinder ? lost : found;
+    final otherUser = iAmFinder ? lostUser : foundUser;
+
     return ItemMatch(
       id: json['id'] as String? ?? '',
-      myItemTitle: lost?['title'] as String? ?? '',
-      myItemPlace: lost?['place_label'] as String? ?? '',
-      myItemTimeLabel: _timeLabel(lost?['occurred_at'] as String?),
-      myItemCategory: _categoryFromCode(lost?['category'] as String?),
-      foundItemTitle: found?['title'] as String? ?? '',
-      foundItemPlace: found?['place_label'] as String? ?? '',
-      foundItemTimeLabel: _timeLabel(found?['occurred_at'] as String?),
-      foundItemCategory: _categoryFromCode(found?['category'] as String?),
-      finderName: foundUser?['name'] as String? ?? 'Trouveur',
-      finderInitials: _initials(foundUser?['name'] as String? ?? 'T'),
-      finderReputation: (foundUser?['trust_score'] as num?)?.toDouble() ?? 50,
-      finderRecoveredCount: (foundUser?['recovered_count'] as num?)?.toInt() ?? 0,
+      myItemTitle: myItem?['title'] as String? ?? '',
+      myItemPlace: myItem?['place_label'] as String? ?? '',
+      myItemTimeLabel: _timeLabel(myItem?['occurred_at'] as String?),
+      myItemCategory: itemCategoryFromCode(myItem?['category'] as String?),
+      foundItemTitle: otherItem?['title'] as String? ?? '',
+      foundItemPlace: otherItem?['place_label'] as String? ?? '',
+      foundItemTimeLabel: _timeLabel(otherItem?['occurred_at'] as String?),
+      foundItemCategory: itemCategoryFromCode(otherItem?['category'] as String?),
+      finderName: otherUser?['name'] as String? ?? 'Utilisateur',
+      finderInitials: _initials(otherUser?['name'] as String? ?? 'U'),
+      finderReputation: (otherUser?['trust_score'] as num?)?.toDouble() ?? 50,
+      finderRecoveredCount:
+          (otherUser?['recovered_count'] as num?)?.toInt() ?? 0,
+      viewerRole: iAmFinder ? 'finder' : 'owner',
+      myItemType: iAmFinder ? ItemType.found : ItemType.lost,
+      otherItemType: iAmFinder ? ItemType.lost : ItemType.found,
       scores: MatchScores(
         image: (dims['photo'] as num?)?.toDouble() ?? 0,
         location: (dims['location'] as num?)?.toDouble() ?? 0,
@@ -316,37 +405,8 @@ class ApiRepository {
       verificationQuestion:
           'Confirmez-vous que cet objet correspond a votre declaration ?',
       minutesAgo: _minutesAgo(json['created_at'] as String?),
+      status: json['status'] as String? ?? 'PENDING',
     );
-  }
-
-
-  String _categoryCode(ItemCategory category) => switch (category) {
-        ItemCategory.bag => 'sac',
-        ItemCategory.phone => 'telephone',
-        ItemCategory.keys => 'cles',
-        ItemCategory.documents => 'papiers',
-        ItemCategory.clothing => 'vetement',
-        ItemCategory.glasses => 'lunettes',
-        ItemCategory.wallet => 'portefeuille',
-        ItemCategory.other => 'autre',
-      };
-
-  ItemCategory _categoryFromCode(String? code) => switch (code) {
-        'sac' => ItemCategory.bag,
-        'telephone' => ItemCategory.phone,
-        'cles' => ItemCategory.keys,
-        'papiers' => ItemCategory.documents,
-        'vetement' => ItemCategory.clothing,
-        'lunettes' => ItemCategory.glasses,
-        'portefeuille' => ItemCategory.wallet,
-        _ => ItemCategory.other,
-      };
-
-  String _titleFrom(String description) {
-    final trimmed = description.trim();
-    if (trimmed.isEmpty) return 'Annonce';
-    final sentence = trimmed.split(RegExp(r'[\.\!\?]')).first;
-    return sentence.length > 60 ? '${sentence.substring(0, 57)}...' : sentence;
   }
 
   int _minutesAgo(String? iso) {
@@ -356,16 +416,19 @@ class ApiRepository {
   }
 
   String _eventLabel(String type) => switch (type) {
-        'RESTITUTION_CONFIRMEE' => 'Restitution confirmee',
-        'DECLARATION_FAUSSE' => 'Declaration fausse',
-        'ABSENCE_RDV' => 'Absence au rendez-vous',
-        _ => type,
-      };
+    'RESTITUTION_CONFIRMEE' => 'Restitution confirmee',
+    'DECLARATION_FAUSSE' => 'Declaration fausse',
+    'ABSENCE_RDV' => 'Absence au rendez-vous',
+    _ => type,
+  };
 
   AppUser _toUser(Map<String, dynamic> json) {
+    final id = json['id']?.toString() ?? '';
+    currentUserId = int.tryParse(id);
     final name = json['name'] as String? ?? 'Utilisateur';
     final trust = (json['trust_score'] as num?)?.toDouble() ?? 50;
     return AppUser(
+      id: id,
       name: name,
       email: json['email'] as String? ?? '',
       initials: _initials(name),
@@ -375,7 +438,6 @@ class ApiRepository {
       phoneVerified: json['phone_verified'] as bool? ?? false,
     );
   }
-
 
   String _initials(String name) {
     final parts = name
@@ -387,9 +449,3 @@ class ApiRepository {
     return letters.isEmpty ? 'LF' : letters;
   }
 }
-
-
-
-
-
-

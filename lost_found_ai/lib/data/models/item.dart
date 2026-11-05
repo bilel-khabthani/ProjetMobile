@@ -24,6 +24,28 @@ extension ItemCategoryX on ItemCategory {
   };
 }
 
+String itemCategoryToCode(ItemCategory category) => switch (category) {
+  ItemCategory.bag => 'sac',
+  ItemCategory.phone => 'telephone',
+  ItemCategory.keys => 'cles',
+  ItemCategory.documents => 'papiers',
+  ItemCategory.clothing => 'vetement',
+  ItemCategory.glasses => 'lunettes',
+  ItemCategory.wallet => 'portefeuille',
+  ItemCategory.other => 'autre',
+};
+
+ItemCategory itemCategoryFromCode(String? code) => switch (code) {
+  'sac' => ItemCategory.bag,
+  'telephone' => ItemCategory.phone,
+  'cles' => ItemCategory.keys,
+  'papiers' => ItemCategory.documents,
+  'vetement' => ItemCategory.clothing,
+  'lunettes' => ItemCategory.glasses,
+  'portefeuille' => ItemCategory.wallet,
+  _ => ItemCategory.other,
+};
+
 enum ItemStatus { active, matched, recovered, closed }
 
 extension ItemStatusX on ItemStatus {

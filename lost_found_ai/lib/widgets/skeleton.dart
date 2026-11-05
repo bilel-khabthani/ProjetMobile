@@ -18,6 +18,21 @@ class SkeletonBox extends StatefulWidget {
   State<SkeletonBox> createState() => _SkeletonBoxState();
 }
 
+class SkeletonCircle extends StatelessWidget {
+  const SkeletonCircle({super.key, required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonBox(
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+    );
+  }
+}
+
 class _SkeletonBoxState extends State<SkeletonBox>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
@@ -46,7 +61,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
               end: Alignment(1 - 2 * _controller.value, 0),
               colors: const [
                 AppColors.surfaceAlt,
-                Color(0xFFF6EFE7),
+                Color(0xFFE9E2D5),
                 AppColors.surfaceAlt,
               ],
               stops: const [0.1, 0.5, 0.9],

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatSécurisé</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;200;300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+    <style type="text/tailwindcss">
+      @theme inline {
+        --color-background: var(--background);
+        --color-foreground: var(--foreground);
+        --color-primary: var(--primary);
+        --color-primary-foreground: var(--primary-foreground);
+        --color-secondary: var(--secondary);
+        --color-secondary-foreground: var(--secondary-foreground);
+        --color-muted: var(--muted);
+        --color-muted-foreground: var(--muted-foreground);
+        --color-accent: var(--accent);
+        --color-accent-foreground: var(--accent-foreground);
+        --color-destructive: var(--destructive);
+        --color-destructive-foreground: var(--destructive-foreground);
+        --color-card: var(--card);
+        --color-card-foreground: var(--card-foreground);
+        --color-popover: var(--popover);
+        --color-popover-foreground: var(--popover-foreground);
+        --color-border: var(--border);
+        --color-input: var(--input);
+        --color-ring: var(--ring);
+        --color-chart-1: var(--chart-1);
+        --color-chart-2: var(--chart-2);
+        --color-chart-3: var(--chart-3);
+        --color-chart-4: var(--chart-4);
+        --color-chart-5: var(--chart-5);
+
+        --font-sans: var(--font-sans);
+        --font-heading: var(--font-heading, var(--font-sans));
+        --font-serif: var(--font-serif);
+        --font-mono: var(--font-mono);
+      }
+
+      @theme {
+        --radius-xs: calc(var(--radius) - 8px);
+        --radius-sm: calc(var(--radius) - 4px);
+        --radius-md: calc(var(--radius) - 2px);
+        --radius-lg: var(--radius);
+        --radius-xl: calc(var(--radius) + 4px);
+        --radius-2xl: calc(var(--radius) + 8px);
+        --radius-3xl: calc(var(--radius) + 16px);
+        --radius-4xl: calc(var(--radius) + 24px);
+      }
+
+      * {
+        corner-shape: var(--shape, round);
+      }
+
+      .rounded-full,
+      .rounded-none,
+      .rounded-t-full,
+      .rounded-t-none,
+      .rounded-r-full,
+      .rounded-r-none,
+      .rounded-b-full,
+      .rounded-b-none,
+      .rounded-l-full,
+      .rounded-l-none,
+      .rounded-s-full,
+      .rounded-s-none,
+      .rounded-e-full,
+      .rounded-e-none,
+      .rounded-tl-full,
+      .rounded-tl-none,
+      .rounded-tr-full,
+      .rounded-tr-none,
+      .rounded-bl-full,
+      .rounded-bl-none,
+      .rounded-br-full,
+      .rounded-br-none,
+      .rounded-ss-full,
+      .rounded-ss-none,
+      .rounded-se-full,
+      .rounded-se-none,
+      .rounded-es-full,
+      .rounded-es-none,
+      .rounded-ee-full,
+      .rounded-ee-none {
+        corner-shape: round;
+      }
+
+      @utility rounded-* {
+        border-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-t-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-r-* {
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-b-* {
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-l-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-tl-* {
+        border-top-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-tr-* {
+        border-top-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-bl-* {
+        border-bottom-left-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-br-* {
+        border-bottom-right-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-s-* {
+        border-start-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-end-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-e-* {
+        border-start-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+        border-end-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-ss-* {
+        border-start-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-se-* {
+        border-start-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-es-* {
+        border-end-start-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+      @utility rounded-ee-* {
+        border-end-end-radius: calc(
+          --value(--radius-*, [length], [percentage]) * var(--shape-multiplier, 1)
+        );
+      }
+
+      @layer base {
+        * {
+          @apply border-border outline-ring/50;
+        }
+        body {
+          @apply bg-background text-foreground font-sans;
+        }
+      }
+
+      :root {
+        --shape: squircle;
+        --shape-multiplier: 1;
+
+        --background: #fbf7f0;
+        --foreground: #141b3d;
+        --primary: #4338e8;
+        --primary-foreground: #ffffff;
+        --secondary: #eceafb;
+        --secondary-foreground: #2e2a8f;
+        --muted: #f2eee7;
+        --muted-foreground: #5b6180;
+        --accent: #ddf5ec;
+        --accent-foreground: #0b6b4f;
+        --destructive: #c92a3f;
+        --destructive-foreground: #ffffff;
+        --card: #fffdf9;
+        --card-foreground: #141b3d;
+        --popover: #fffdf9;
+        --popover-foreground: #141b3d;
+        --border: #e8e1d4;
+        --input: #fffcf6;
+        --ring: #4338e8;
+        --chart-1: #f2705f;
+        --chart-2: #12a07a;
+        --chart-3: #4338e8;
+        --chart-4: #a9a3f0;
+        --chart-5: #f6c3b8;
+
+        --font-sans: "Manrope", sans-serif;
+        --font-heading: "Plus Jakarta Sans", sans-serif;
+        --font-serif: "Playfair Display", serif;
+        --font-mono: "JetBrains Mono", monospace;
+
+        --radius: 1rem;
+      }
+
+      @supports (corner-shape: squircle) {
+        :root {
+          --shape-multiplier: 2.5;
+        }
+      }
+
+      /* Prevent layout shift for icons without explicit dimensions */
+      iconify-icon:not([width]):not([height]) {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+      }
+
+      /* Hide scrollbars */
+      *,
+      *::before,
+      *::after {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      class="min-h-[844px] w-[390px] bg-background text-foreground font-sans relative flex flex-col"
+    >
+      <div class="px-5 pt-14 pb-3 bg-card border-b border-border flex items-center gap-3">
+        <div class="size-11 rounded-full bg-muted flex items-center justify-center">
+          <iconify-icon icon="solar:alt-arrow-left-linear" width="20" height="20"></iconify-icon>
+        </div>
+        <img
+          alt="Hugo"
+          src="https://randomuser.me/api/portraits/men/44.jpg"
+          class="size-11 rounded-full object-cover"
+        />
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <p class="font-heading font-bold truncate">Hugo M.</p>
+            <iconify-icon
+              icon="solar:verified-check-bold"
+              class="text-chart-2"
+              width="16"
+              height="16"
+            ></iconify-icon>
+          </div>
+          <p class="text-xs text-muted-foreground truncate">Sac à dos bleu · Bibliothèque</p>
+        </div>
+        <div class="size-11 rounded-full bg-muted flex items-center justify-center">
+          <iconify-icon icon="solar:flag-linear" width="20" height="20"></iconify-icon>
+        </div>
+      </div>
+      <div class="mx-5 mt-4 rounded-2xl bg-accent p-3.5 flex items-start gap-3">
+        <iconify-icon
+          icon="solar:shield-check-linear"
+          class="text-accent-foreground mt-0.5 shrink-0"
+          width="20"
+          height="20"
+        ></iconify-icon>
+        <p class="text-sm text-accent-foreground">
+          Chat modéré. Ne partagez jamais de paiement ni de code. Rencontrez-vous sur le campus.
+        </p>
+      </div>
+      <div class="flex-1 px-5 pt-5 pb-44 space-y-3">
+        <p class="text-center text-xs text-muted-foreground">
+          Vérification réussie · aujourd'hui 14:32
+        </p>
+        <div class="flex items-end gap-2 max-w-[78%]">
+          <div class="rounded-2xl rounded-bl-md bg-card border border-border px-4 py-3 text-sm">
+            Bonjour ! J'ai bien retrouvé votre sac, il est à la bibliothèque.
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <div
+            class="max-w-[78%] rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-3 text-sm"
+          >
+            Super, merci ! Je peux passer dans l'heure ?
+            <div class="mt-1 flex justify-end items-center gap-1 text-[11px] opacity-80">
+              14:34
+              <iconify-icon icon="solar:check-read-linear" width="14" height="14"></iconify-icon>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-end gap-2 max-w-[78%]">
+          <div class="rounded-2xl rounded-bl-md bg-card border border-border px-4 py-3 text-sm">
+            Oui, je suis au 2e étage, près des casiers.
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <div
+            class="max-w-[78%] rounded-2xl rounded-br-md bg-primary text-primary-foreground px-4 py-3 text-sm"
+          >
+            Parfait, j'arrive. À tout de suite !
+            <div class="mt-1 flex justify-end items-center gap-1 text-[11px] opacity-80">
+              14:36
+              <iconify-icon
+                icon="solar:check-read-linear"
+                class="text-chart-5"
+                width="14"
+                height="14"
+              ></iconify-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="absolute bottom-0 inset-x-0 bg-card border-t border-border px-4 pt-3 pb-8">
+        <div class="flex gap-2 overflow-x-auto pb-3">
+          <span
+            class="shrink-0 rounded-full bg-secondary text-secondary-foreground text-sm font-semibold px-4 py-2"
+            >Je suis en route</span
+          ><span
+            class="shrink-0 rounded-full bg-card border border-border text-sm font-medium px-4 py-2"
+            >Merci !</span
+          ><span
+            class="shrink-0 rounded-full bg-card border border-border text-sm font-medium px-4 py-2"
+            >On se retrouve où ?</span
+          >
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="size-12 rounded-full bg-muted flex items-center justify-center shrink-0">
+            <iconify-icon icon="solar:paperclip-linear" width="20" height="20"></iconify-icon>
+          </div>
+          <div
+            class="flex-1 h-12 rounded-full border border-border bg-input px-4 flex items-center"
+          >
+            <span class="text-sm text-muted-foreground">Écrire un message…</span>
+          </div>
+          <div
+            class="size-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0 active:scale-[0.97] transition"
+          >
+            <iconify-icon icon="solar:plain-linear" width="20" height="20"></iconify-icon>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

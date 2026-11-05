@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withBroadcasting(
+        __DIR__.'/../routes/channels.php',
+        ['middleware' => ['auth:sanctum']],
+    )
     ->withMiddleware(function (Middleware $middleware): void {
         // Pas de route web "login" : les clients non-JSON sont rediriges vers
         // la page d'accueil au lieu de lever une RouteNotFoundException (500).

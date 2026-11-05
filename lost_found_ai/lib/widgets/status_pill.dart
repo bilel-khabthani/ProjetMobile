@@ -4,12 +4,19 @@ import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
 import '../data/models/item.dart';
+import 'app_icon.dart';
 
 class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.type, this.compact = false});
+  const StatusPill({
+    super.key,
+    required this.type,
+    this.compact = false,
+    this.onTap,
+  });
 
   final ItemType type;
   final bool compact;
+  final GestureTapCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -18,30 +25,76 @@ class StatusPill extends StatelessWidget {
     final background = isLost ? AppColors.lostSoft : AppColors.foundSoft;
     final label = isLost ? 'Perdu' : 'Trouvé';
 
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 10,
+            vertical: compact ? 4 : 5,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: AppText.tiny.copyWith(
+                  color: Color.lerp(color, AppColors.textPrimary, 0.28),
+                  fontWeight: FontWeight.w800,
+                  fontSize: compact ? 10 : 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class VerifiedPill extends StatelessWidget {
+  const VerifiedPill({super.key, this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
         vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
-        color: background,
+        color: AppColors.foundSoft,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          AppIcon(
+            'verified-check-bold',
+            size: compact ? 12 : 14,
+            color: AppColors.mintDark,
           ),
-          SizedBox(width: compact ? 5 : 6),
+          const SizedBox(width: 4),
           Text(
-            label,
-            style: AppText.caption.copyWith(
-              color: Color.lerp(color, Colors.black, 0.22),
+            'Vérifié',
+            style: AppText.tiny.copyWith(
+              color: AppColors.mintDark,
               fontWeight: FontWeight.w800,
-              fontSize: compact ? 11 : 12,
+              fontSize: compact ? 10 : 11,
             ),
           ),
         ],
@@ -50,8 +103,8 @@ class StatusPill extends StatelessWidget {
   }
 }
 
-class ScorePill extends StatelessWidget {
-  const ScorePill({super.key, required this.score});
+class MatchScoreBadge extends StatelessWidget {
+  const MatchScoreBadge({super.key, required this.score});
 
   final double score;
 
@@ -69,20 +122,47 @@ class ScorePill extends StatelessWidget {
         : AppColors.surfaceAlt;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
-      child: Text(
-        '${score.round()} % de correspondance',
-        style: AppText.caption.copyWith(
-          color: Color.lerp(color, Colors.black, 0.2),
-          fontWeight: FontWeight.w800,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppIcon(
+            score >= 80
+                ? 'star-linear'
+                : score >= 65
+                ? 'bolt-linear'
+                : 'question-circle-linear',
+            size: 13,
+            color: color,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '${score.round()} %',
+            style: AppText.tiny.copyWith(
+              color: Color.lerp(color, AppColors.textPrimary, 0.3),
+              fontWeight: FontWeight.w800,
+              fontSize: 11.5,
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+// Alias for backwards compatibility
+@Deprecated('Use MatchScoreBadge instead')
+class ScorePill extends StatelessWidget {
+  const ScorePill({super.key, required this.score});
+
+  final double score;
+
+  @override
+  Widget build(BuildContext context) => MatchScoreBadge(score: score);
 }
 
 class Avatar extends StatelessWidget {
@@ -105,14 +185,21 @@ class Avatar extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: color.withValues(alpha: 0.14),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(color, Colors.white, 0.72)!,
+            Color.lerp(color, Colors.white, 0.5)!,
+          ],
+        ),
+        border: Border.all(color: color.withValues(alpha: 0.28), width: 1.4),
       ),
       child: Text(
         initials,
         style: AppText.label.copyWith(
-          color: Color.lerp(color, Colors.black, 0.15),
-          fontSize: size * 0.34,
+          color: Color.lerp(color, AppColors.textPrimary, 0.4),
+          fontSize: size * 0.32,
           fontWeight: FontWeight.w800,
         ),
       ),

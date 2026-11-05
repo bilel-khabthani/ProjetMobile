@@ -37,6 +37,10 @@ class ItemMatch {
     required this.verificationQuestion,
     required this.minutesAgo,
     this.verification = MatchVerification.pending,
+    this.status = 'PENDING',
+    this.viewerRole = 'owner',
+    this.myItemType = ItemType.lost,
+    this.otherItemType = ItemType.found,
   });
 
   final String id;
@@ -59,6 +63,26 @@ class ItemMatch {
   final String verificationQuestion;
   final int minutesAgo;
   final MatchVerification verification;
+
+  /// Statut serveur : PENDING, VERIFIED, CONTACTED, RECOVERED, REJECTED.
+  final String status;
+
+  /// Role de l'utilisateur connecte dans cette correspondance : owner | finder.
+  final String viewerRole;
+
+  /// Type de l'annonce de l'utilisateur connecte (perdue ou trouvee).
+  final ItemType myItemType;
+
+  /// Type de l'annonce de l'autre partie.
+  final ItemType otherItemType;
+
+  bool get isVerified =>
+      status == 'VERIFIED' || status == 'CONTACTED' || status == 'RECOVERED';
+
+  bool get iAmFinder => viewerRole == 'finder';
+
+  /// Nom de la personne avec qui l'utilisateur connecte discute.
+  String get counterpartName => finderName;
 }
 
 class AppUser {
@@ -68,11 +92,14 @@ class AppUser {
     required this.initials,
     required this.reputation,
     required this.recoveredCount,
+    this.id = '',
     this.phone = '',
     // La demonstration hors ligne simule un compte deja verifie.
     this.phoneVerified = true,
   });
 
+  /// Identifiant serveur : sert notamment a distinguer ses propres messages.
+  final String id;
   final String name;
   final String email;
   final String initials;

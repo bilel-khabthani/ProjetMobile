@@ -101,8 +101,11 @@ abstract final class AppStrings {
       'Quatre critères sont analysés puis pondérés : ressemblance visuelle, distance géographique, écart horaire et proximité des descriptions.';
   static const String matchFoundBy = 'Trouvé par';
   static String matchFoundAt(String place) => 'Trouvé $place';
+  static String matchLostAt(String place) => 'Perdu $place';
   static const String matchYourItem = 'Votre annonce';
+  static const String matchOwnerLabel = 'Propriétaire de l\'objet';
   static const String matchOtherItem = 'Annonce trouvée';
+  static const String matchOtherLostItem = 'Annonce perdue';
   static String distanceMeters(int m) => '$m m de distance';
   static const String answerQuestion = 'Répondre à la question';
   static const String verificationTitle = 'Vérification';
@@ -120,6 +123,82 @@ abstract final class AppStrings {
   static const String continue_ = 'Continuer';
   static const String demoHint =
       'Démo : saisissez « bleue » pour valider la réponse.';
+
+  static const String exploreTitle = 'Explorer';
+  static const String exploreSubtitle = 'Les objets trouvés autour de vous.';
+  static const String exploreSearchHint = 'Rechercher un objet, un lieu…';
+  static const String exploreEmptyTitle = 'Rien à proximité pour le moment';
+  static const String exploreEmptyBody =
+      'Les objets trouvés correspondant à votre annonce apparaîtront ici.';
+  static const String exploreNeedsLostTitle = 'Activez la recherche';
+  static const String exploreNeedsLostBody =
+      'Publiez une annonce « J’ai perdu » pour voir les objets trouvés qui vous correspondent.';
+
+  static const String messagesTitle = 'Messages';
+  static const String messagesSubtitle = 'Vos échanges sécurisés.';
+  static const String messagesEmptyTitle = 'Aucune conversation';
+  static const String messagesEmptyBody =
+      'Une conversation s’ouvre après vérification d’une correspondance.';
+  static const String messagesLocked = 'Vérification requise';
+
+  static const String activityTitle = 'Activité';
+  static const String activitySubtitle = 'Tout ce qui bouge sur votre compte.';
+
+  static const String homeTrustTitle = 'Votre fiabilité';
+  static const String homeTrustSubtitle = 'Score de confiance';
+  static const String homeTrustCta = 'Voir le détail';
+  static const String homeNearbyTitle = 'Objets trouvés près de vous';
+  static const String homeSeeAll = 'Tout voir';
+
+  static const String publishTitle = 'Publier une annonce';
+  static const String publishSubtitle =
+      'Quelques détails suffisent pour lancer la recherche.';
+  static const String fieldTitle = 'Titre de l’annonce';
+  static const String fieldTitleHint = 'Ex. : Sac Nike noir';
+  static const String fieldSecret = 'Détail secret';
+  static const String fieldSecretHint =
+      'Un détail que seul le propriétaire connaît (couleur du lining, gravure…).';
+  static const String fieldSecretHelp =
+      'Ce détail n’est jamais affiché publiquement. Il sert à vérifier le propriétaire.';
+  static const String fieldPlace = 'Lieu';
+  static const String fieldPlaceHint = 'Ex. : Bibliothèque, 2e étage';
+  static const String photoDemo = 'Photo de démonstration';
+  static const String addPhoto = 'Ajouter une photo';
+  static const String changePhoto = 'Changer';
+
+  static const String verificationChoicesTitle = 'Est-ce bien votre objet ?';
+  static const String verificationYes = 'Oui, c’est à moi';
+  static const String verificationNo = 'Non, ce n’est pas le mien';
+  static const String verificationUnsure = 'Je ne suis pas sûr';
+  static const String verificationHelp =
+      'Répondez honnêtement. Une réponse positive ouvre la messagerie sécurisée.';
+  static const String verifiedNoticeTitle = 'Correspondance vérifiée';
+  static const String verifiedNoticeBody =
+      'Vous pouvez maintenant discuter en toute sécurité.';
+  static const String waitingOwnerTitle = 'En attente du propriétaire';
+  static const String waitingOwnerBody =
+      'Le propriétaire doit confirmer que l’objet lui appartient pour ouvrir la messagerie.';
+  static const String answerRecordedUnsure =
+      'Réponse enregistrée. Prenez le temps de comparer les deux annonces.';
+  static const String answerRecordedNo =
+      'Réponse enregistrée. Cette correspondance reste en attente.';
+  static const String matchComparisonTitle = 'Les deux annonces';
+  static const String matchComparisonSubtitle =
+      'Le moteur les a rapprochées.';
+  static const String chatLocked = 'Messagerie verrouillée';
+
+  static const String chatSafety =
+      'Vos échanges sont analysés pour votre sécurité. Ne partagez jamais vos mots de passe.';
+  static const String chatQuickHello = 'Bonjour, merci de m’avoir contacté !';
+  static const String chatQuickMeet = 'Où et quand pouvons-nous nous retrouver ?';
+  static const String chatQuickProof = 'Puis-je vous montrer une preuve ?';
+  static const String chatAttachSoon = 'L’envoi de photos arrive bientôt.';
+
+  static const String profileTitle = 'Mon profil';
+  static const String profileSubtitle = 'Votre compte et votre réputation.';
+  static const String profileEdit = 'Modifier mes informations';
+  static const String profileSettings = 'Réglages';
+  static const String profileLogout = 'Se déconnecter';
 
   static const String notifNewMatch = 'Nouvelle correspondance';
   static const String justNow = 'à l’instant';

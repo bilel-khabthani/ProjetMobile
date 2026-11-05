@@ -59,7 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Module 5 : restitution et chat
         Route::post('/matches/{match}/confirm-restitution', [MatchController::class, 'confirmRestitution']);
         Route::get('/matches/{match}/messages', [MatchController::class, 'messages']);
-        Route::post('/matches/{match}/messages', [MatchController::class, 'sendMessage']);
+        Route::post('/matches/{match}/messages', [MatchController::class, 'sendMessage'])->middleware('throttle:chat');
+        Route::post('/matches/{match}/messages/read', [MatchController::class, 'markMessagesRead']);
+        Route::post('/matches/{match}/messages/{message}/report', [MatchController::class, 'reportMessage']);
         Route::get('/claims', [ClaimController::class, 'index']);
         Route::post('/claims', [ClaimController::class, 'store']);
         Route::post('/claims/{claim}/respond', [ClaimController::class, 'respond']);

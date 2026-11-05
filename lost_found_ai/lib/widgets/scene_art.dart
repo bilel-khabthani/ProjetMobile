@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import 'app_icon.dart';
 
 enum SceneVariant { search, link, shield }
 
@@ -36,9 +37,9 @@ class SceneArt extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(
-              _iconFor(variant),
-              size: size * 0.24,
+            child: AppIcon(
+              _iconNameFor(variant),
+              size: size * 0.23,
               color: palette.primary,
             ),
           ),
@@ -65,26 +66,26 @@ class SceneArt extends StatelessWidget {
     );
   }
 
-  static IconData _iconFor(SceneVariant variant) => switch (variant) {
-    SceneVariant.search => Icons.travel_explore_rounded,
-    SceneVariant.link => Icons.auto_awesome_rounded,
-    SceneVariant.shield => Icons.verified_user_rounded,
+  static String _iconNameFor(SceneVariant variant) => switch (variant) {
+    SceneVariant.search => 'magnifer-linear',
+    SceneVariant.link => 'link-round-linear',
+    SceneVariant.shield => 'shield-check-linear',
   };
 
   static _ScenePalette _paletteFor(SceneVariant variant) => switch (variant) {
     SceneVariant.search => const _ScenePalette(
       AppColors.lost,
-      Color(0xFFFFE0D3),
+      AppColors.lostSoft,
       AppColors.accent,
     ),
     SceneVariant.link => const _ScenePalette(
       AppColors.primary,
-      Color(0xFFE0E4FF),
+      AppColors.primarySoft,
       AppColors.found,
     ),
     SceneVariant.shield => const _ScenePalette(
       AppColors.found,
-      Color(0xFFD8F2E5),
+      AppColors.foundSoft,
       AppColors.accent,
     ),
   };

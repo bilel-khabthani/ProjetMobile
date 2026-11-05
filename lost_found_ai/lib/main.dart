@@ -13,7 +13,7 @@ Future<void> main() async {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFFFFF9F4),
+      systemNavigationBarColor: Color(0xFFFBF7F0),
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
@@ -23,7 +23,12 @@ Future<void> main() async {
   final container = ProviderContainer();
   await container.read(sessionProvider.notifier).restore();
 
-  runApp(UncontrolledProviderScope(container: container, child: const LostAndFoundApp()));
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const LostAndFoundApp(),
+    ),
+  );
 }
 
 class LostAndFoundApp extends ConsumerWidget {

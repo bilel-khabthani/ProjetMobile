@@ -58,12 +58,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
     setState(() => _loading = true);
     try {
-      await ref.read(sessionProvider.notifier).signUp(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        password: _passwordController.text,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .signUp(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            phone: _phoneController.text.trim(),
+            password: _passwordController.text,
+          );
       if (!mounted) return;
       // La garde du routeur impose /verify-phone tant que le numero n'est
       // pas verifie (CDC 6.1), puis mene a l'accueil.
@@ -158,8 +160,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     prefixIcon: Icon(Icons.phone_android_rounded),
                   ),
                   validator: (value) {
-                    final digits = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-                    return digits.length >= 8 ? null : AppStrings.errorPhoneInvalid;
+                    final digits = (value ?? '').replaceAll(
+                      RegExp(r'[^0-9]'),
+                      '',
+                    );
+                    return digits.length >= 8
+                        ? null
+                        : AppStrings.errorPhoneInvalid;
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),

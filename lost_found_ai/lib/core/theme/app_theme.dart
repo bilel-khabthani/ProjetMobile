@@ -10,14 +10,14 @@ ThemeData buildAppTheme() {
     onPrimary: Colors.white,
     primaryContainer: AppColors.primarySoft,
     onPrimaryContainer: AppColors.primaryDark,
-    secondary: AppColors.accent,
-    onSecondary: AppColors.textPrimary,
-    secondaryContainer: AppColors.accentSoft,
-    onSecondaryContainer: AppColors.textPrimary,
-    tertiary: AppColors.found,
+    secondary: AppColors.found,
+    onSecondary: Colors.white,
+    secondaryContainer: AppColors.foundSoft,
+    onSecondaryContainer: AppColors.mintDark,
+    tertiary: AppColors.lost,
     onTertiary: Colors.white,
-    tertiaryContainer: AppColors.foundSoft,
-    onTertiaryContainer: Color(0xFF1D6B4A),
+    tertiaryContainer: AppColors.lostSoft,
+    onTertiaryContainer: Color(0xFF8E2B21),
     error: AppColors.danger,
     onError: Colors.white,
     surface: AppColors.surface,
@@ -55,7 +55,7 @@ ThemeData buildAppTheme() {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: AppText.h2,
+      titleTextStyle: AppText.h3,
     ),
     dividerTheme: const DividerThemeData(
       color: AppColors.divider,
@@ -73,13 +73,72 @@ ThemeData buildAppTheme() {
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
+      modalBackgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
     ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      titleTextStyle: AppText.h3,
+      contentTextStyle: AppText.body,
+    ),
+    dividerColor: AppColors.divider,
+    progressIndicatorTheme: const ProgressIndicatorThemeData(
+      color: AppColors.primary,
+      linearTrackColor: AppColors.surfaceAlt,
+      circularTrackColor: AppColors.primarySoft,
+    ),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.primary
+            : Colors.transparent,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      side: const BorderSide(color: AppColors.border, width: 1.6),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? Colors.white
+            : AppColors.surface,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.primary
+            : AppColors.surfaceAlt,
+      ),
+      trackOutlineColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? AppColors.primary
+            : AppColors.border,
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(54),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        textStyle: AppText.button,
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.primary,
+        textStyle: AppText.label.copyWith(fontWeight: FontWeight.w700),
+      ),
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surfaceAlt,
+      fillColor: AppColors.input,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.md,
@@ -87,25 +146,27 @@ ThemeData buildAppTheme() {
       hintStyle: AppText.body.copyWith(color: AppColors.textTertiary),
       labelStyle: AppText.label,
       floatingLabelStyle: AppText.label.copyWith(color: AppColors.primary),
+      prefixIconColor: AppColors.textTertiary,
+      suffixIconColor: AppColors.textTertiary,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.4),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.border, width: 1.4),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.4),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.danger, width: 2),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.8),
       ),
     ),
   );

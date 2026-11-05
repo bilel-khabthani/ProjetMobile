@@ -1,47 +1,101 @@
-﻿import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_config.dart';
 import '../../core/app_strings.dart';
+import '../../core/router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../data/models/item.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_icon.dart';
 import '../../widgets/photo_placeholder.dart';
 import '../../widgets/pressable_scale.dart';
 
 class PublishScreen extends ConsumerStatefulWidget {
-  const PublishScreen({super.key});
+  const PublishScreen({super.key, this.initialType = ItemType.lost});
+
+  final ItemType initialType;
 
   @override
   ConsumerState<PublishScreen> createState() => _PublishScreenState();
 }
 
 class _PublishScreenState extends ConsumerState<PublishScreen> {
-  final PageController _controller = PageController();
-  int _step = 0;
-
-  bool _photoAdded = false;
+  late ItemType _type = widget.initialType;
   ItemCategory? _category;
-  final _descriptionController = TextEditingController();
-  bool _useCurrentPosition = false;
-  bool _publishing = false;
-  int _publishPhase = 0;
 
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _secretController = TextEditingController();
+  final _placeController = TextEditingController();
+
+  bool _useCurrentPosition = false;
   Position? _currentPosition;
-  String _placeLabel = 'Position actuelle';
   DateTime _occurredAt = DateTime.now();
+  bool _publishing = false;
+  bool _published = false;
 
   @override
   void dispose() {
-    _controller.dispose();
+    _titleController.dispose();
     _descriptionController.dispose();
+    _secretController.dispose();
+    _placeController.dispose();
     super.dispose();
+  }
+
+  bool get _canSubmit =>
+      _category != null &&
+      _titleController.text.trim().length >= 3 &&
+      _descriptionController.text.trim().length >= 10 &&
+      (_placeController.text.trim().length >= 2 || _useCurrentPosition);
+
+  Future<bool> _getCurrentLocation() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return false;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: AndroidSettings(accuracy: LocationAccuracy.high),
+      );
+      if (!mounted) return true;
+      setState(() {
+        _currentPosition = position;
+        _useCurrentPosition = true;
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _toggleGps(bool value) async {
+    if (!value) {
+      setState(() => _useCurrentPosition = false);
+      return;
+    }
+    final ok = await _getCurrentLocation();
+    if (!ok && mounted) {
+      setState(() => _useCurrentPosition = false);
+      _showMessage('Localisation indisponible. Autorisez l’accès puis réessayez.');
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _pickDay(int daysAgo) {
@@ -57,667 +111,439 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     });
   }
 
-  bool get _canContinue => switch (_step) {
-    0 => _photoAdded,
-    1 => _category != null && _descriptionController.text.trim().length >= 5,
-    _ => _useCurrentPosition,
-  };
-
-  void _goTo(int step) {
-    setState(() => _step = step);
-    _controller.animateToPage(
-      step,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _occurredAt,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now(),
     );
-  }
-
-  Future<void> _next() async {
-    HapticFeedback.mediumImpact();
-    if (_step < 2) {
-      _goTo(_step + 1);
-      return;
-    }
-    await _publish();
-  }
-
-  Future<void> _getCurrentLocation() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.deniedForever ||
-          permission == LocationPermission.denied) {
-        return;
-      }
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: AndroidSettings(
-          accuracy: LocationAccuracy.best,
-        ),
+    if (picked == null) return;
+    setState(() {
+      _occurredAt = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        _occurredAt.hour,
+        _occurredAt.minute,
       );
-      setState(() {
-        _currentPosition = pos;
-        _placeLabel =
-            'Position (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
-      });
-    } catch (_) {}
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+    );
+    if (picked == null) return;
+    setState(() {
+      _occurredAt = DateTime(
+        _occurredAt.year,
+        _occurredAt.month,
+        _occurredAt.day,
+        picked.hour,
+        picked.minute,
+      );
+    });
   }
 
   Future<void> _publish() async {
+    if (!_canSubmit || _publishing) return;
+    HapticFeedback.mediumImpact();
+    FocusScope.of(context).unfocus();
     setState(() => _publishing = true);
 
-    // Envoi reel de la declaration (Module 2). Si l'API est injoignable, la
-    // publication reste simulee : la demonstration ne doit jamais bloquer.
+    final place = _placeController.text.trim();
+    final useGps = _useCurrentPosition && _currentPosition != null;
+
     if (!AppConfig.useMockData) {
       try {
-        await ref.read(repositoryProvider).publishItem(
-          type: ItemType.lost,
-          category: _category ?? ItemCategory.other,
-          description: _descriptionController.text.trim(),
-          place: _useCurrentPosition && _currentPosition != null
-              ? _placeLabel
-              : (_placeLabel.isNotEmpty ? _placeLabel : 'Campus, universite'),
-          occurredAt: _occurredAt,
-          latitude: _useCurrentPosition && _currentPosition != null ? _currentPosition!.latitude : null,
-          longitude: _useCurrentPosition && _currentPosition != null ? _currentPosition!.longitude : null,
-        );
-        // La liste des correspondances peut avoir change : on la recharge.
-        ref.invalidate(matchesProvider);
+        await ref
+            .read(repositoryProvider)
+            .publishItem(
+              type: _type,
+              category: _category!,
+              title: _titleController.text.trim(),
+              description: _descriptionController.text.trim(),
+              secretDetail: _secretController.text.trim(),
+              place: place.isNotEmpty
+                  ? place
+                  : (useGps ? 'Position actuelle' : 'Campus'),
+              occurredAt: _occurredAt,
+              latitude: useGps ? _currentPosition!.latitude : null,
+              longitude: useGps ? _currentPosition!.longitude : null,
+            );
         ref.invalidate(myItemsProvider);
-      } on Object {
-        // Serveur indisponible : on poursuit en mode demonstration.
+        ref.invalidate(matchesProvider);
+        ref.invalidate(nearbyFoundProvider);
+      } catch (_) {
+        if (mounted) {
+          _showMessage(
+            'Publication hors ligne : l’annonce sera synchronisée plus tard.',
+          );
+        }
       }
+    } else {
+      ref.invalidate(myItemsProvider);
+      ref.invalidate(matchesProvider);
     }
 
     if (!mounted) return;
-    setState(() => _publishPhase = 1);
-    await Future<void>.delayed(const Duration(milliseconds: 2000));
-    if (!mounted) return;
-    setState(() => _publishPhase = 2);
+    setState(() {
+      _publishing = false;
+      _published = true;
+    });
+  }
+
+  void _reset() {
+    setState(() {
+      _published = false;
+      _category = null;
+      _titleController.clear();
+      _descriptionController.clear();
+      _secretController.clear();
+      _placeController.clear();
+      _useCurrentPosition = false;
+      _occurredAt = DateTime.now();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_publishing) {
-      return _PublishStatusScreen(
-        phase: _publishPhase,
-        onDone: () {
-          setState(() {
-            _publishing = false;
-            _publishPhase = 0;
-            _photoAdded = false;
-            _category = null;
-            _descriptionController.clear();
-            _useCurrentPosition = false;
-          });
-          _goTo(0);
-        },
+    if (_published) {
+      return _PublishSuccess(
+        type: _type,
+        onHome: () => context.go(AppRoutes.home),
+        onMatches: () => context.go(AppRoutes.messages),
+        onAgain: _reset,
       );
     }
 
+    final accent = _type == ItemType.lost ? AppColors.lost : AppColors.found;
+    final accentSoft =
+        _type == ItemType.lost ? AppColors.lostSoft : AppColors.foundSoft;
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(AppStrings.stepOf(_step + 1, 3)),
+      backgroundColor: AppColors.background,
+      bottomNavigationBar: _PublishBottomBar(
+        enabled: _canSubmit,
+        loading: _publishing,
+        type: _type,
+        onPressed: _publish,
       ),
       body: SafeArea(
-        child: Column(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
           children: [
-            _ProgressBar(step: _step),
-            Expanded(
-              child: PageView(
-                controller: _controller,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _PhotoStep(
-                    added: _photoAdded,
-                    onAdd: () => setState(() => _photoAdded = true),
-                    onRemove: () => setState(() => _photoAdded = false),
+            Row(
+              children: [
+                _CircleClose(onTap: () => context.pop()),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
                   ),
-                  _DetailsStep(
-                    category: _category,
-                    descriptionController: _descriptionController,
-                    onCategory: (value) => setState(() => _category = value),
-                    onDescription: (_) => setState(() {}),
+                  decoration: BoxDecoration(
+                    color: accentSoft,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
-                  _PlaceStep(
-                    useCurrentPosition: _useCurrentPosition,
-                    onTogglePosition: (value) async {
-                        setState(() => _useCurrentPosition = value);
-                        if (value) await _getCurrentLocation();
-                      },
-                    occurredAt: _occurredAt,
-                    onPickDay: _pickDay,
-                  ),
-                ],
-              ),
-            ),
-            _BottomBar(
-              step: _step,
-              canContinue: _canContinue,
-              onContinue: _next,
-              onBack: _step == 0 ? null : () => _goTo(_step - 1),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.step});
-
-  final int step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.md,
-      ),
-      child: Row(
-        children: List.generate(3, (index) {
-          final active = index <= step;
-          return Expanded(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-              height: 6,
-              margin: EdgeInsets.only(right: index == 2 ? 0 : 6),
-              decoration: BoxDecoration(
-                color: active ? AppColors.primary : AppColors.border,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _StepScaffold extends StatelessWidget {
-  const _StepScaffold({
-    required this.title,
-    required this.subtitle,
-    required this.children,
-  });
-
-  final String title;
-  final String subtitle;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.md,
-        AppSpacing.xl,
-        AppSpacing.xl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: AppText.h1),
-          const SizedBox(height: AppSpacing.xs),
-          Text(subtitle, style: AppText.body),
-          const SizedBox(height: AppSpacing.xl),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-class _PhotoStep extends StatelessWidget {
-  const _PhotoStep({
-    required this.added,
-    required this.onAdd,
-    required this.onRemove,
-  });
-
-  final bool added;
-  final VoidCallback onAdd;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return _StepScaffold(
-      title: AppStrings.stepPhotoTitle,
-      subtitle: AppStrings.stepPhotoSubtitle,
-      children: [
-        PressableScale(
-          onTap: onAdd,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
-            height: 260,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: added ? AppColors.primarySoft : AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              border: Border.all(
-                color: added ? AppColors.primary : AppColors.border,
-                width: 2,
-              ),
-            ),
-            child: added
-                ? Stack(
-                    children: [
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadius.xl - 4),
-                          child: const PhotoPlaceholder(
-                            category: ItemCategory.bag,
-                            showLabel: false,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: AppSpacing.sm,
-                        right: AppSpacing.sm,
-                        child: PressableScale(
-                          onTap: onRemove,
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.92),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close_rounded,
-                              size: 20,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: AppSpacing.md,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.found,
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.pill,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Photo ajoutée',
-                                  style: AppText.caption.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Row(
                     children: [
                       Container(
-                        width: 78,
-                        height: 78,
+                        width: 6,
+                        height: 6,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: accent,
                           shape: BoxShape.circle,
-                          boxShadow: AppShadows.card,
-                        ),
-                        child: const Icon(
-                          Icons.add_a_photo_rounded,
-                          size: 32,
-                          color: AppColors.primary,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(width: 6),
                       Text(
-                        AppStrings.photoDropzone,
-                        style: AppText.h3,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(AppStrings.photoHint, style: AppText.caption),
-                    ],
-                  ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.lightbulb_outline_rounded,
-              size: 16,
-              color: AppColors.accent,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                'Une photo similaire suffit si vous n\'avez plus l\'originale.',
-                style: AppText.caption,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _DetailsStep extends StatelessWidget {
-  const _DetailsStep({
-    required this.category,
-    required this.descriptionController,
-    required this.onCategory,
-    required this.onDescription,
-  });
-
-  final ItemCategory? category;
-  final TextEditingController descriptionController;
-  final ValueChanged<ItemCategory?> onCategory;
-  final ValueChanged<String> onDescription;
-
-  @override
-  Widget build(BuildContext context) {
-    return _StepScaffold(
-      title: AppStrings.stepDetailsTitle,
-      subtitle: AppStrings.stepDetailsSubtitle,
-      children: [
-        Text(AppStrings.fieldCategory, style: AppText.label),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: ItemCategory.values.map((item) {
-            final selected = item == category;
-            return PressableScale(
-              onTap: () => onCategory(selected ? null : item),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: selected ? AppColors.primary : AppColors.border,
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      categoryIcon(item),
-                      size: 17,
-                      color: selected ? Colors.white : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      item.label,
-                      style: AppText.label.copyWith(
-                        color: selected ? Colors.white : AppColors.textPrimary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        Text(AppStrings.fieldDescription, style: AppText.label),
-        const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: descriptionController,
-          maxLines: 4,
-          onChanged: onDescription,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            hintText: AppStrings.fieldDescriptionHint,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PlaceStep extends StatelessWidget {
-  const _PlaceStep({
-    required this.useCurrentPosition,
-    required this.onTogglePosition,
-    required this.occurredAt,
-    required this.onPickDay,
-  });
-
-  final bool useCurrentPosition;
-  final ValueChanged<bool> onTogglePosition;
-  final DateTime occurredAt;
-
-  /// Jours a soustraire a aujourd'hui (0 = aujourd'hui, 1 = hier, 2 = avant-hier).
-  final ValueChanged<int> onPickDay;
-
-  /// Ecart en jours entre une date et aujourd'hui (0 = aujourd'hui).
-  int _dayDelta(DateTime dt) {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day)
-        .difference(DateTime(dt.year, dt.month, dt.day))
-        .inDays;
-  }
-
-  String _dateLabel(DateTime dt) {
-    switch (_dayDelta(dt)) {
-      case 0:
-        return 'Aujourd\'hui';
-      case 1:
-        return 'Hier';
-      case 2:
-        return 'Il y a 2 jours';
-      default:
-        final day = dt.day.toString().padLeft(2, '0');
-        final month = dt.month.toString().padLeft(2, '0');
-        return '$day/$month/${dt.year}';
-    }
-  }
-
-  String _timeLabel(DateTime dt) =>
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-
-  @override
-  Widget build(BuildContext context) {
-    return _StepScaffold(
-      title: AppStrings.stepPlaceTitle,
-      subtitle: AppStrings.stepPlaceSubtitle,
-      children: [
-        PressableScale(
-          onTap: () => onTogglePosition(!useCurrentPosition),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: useCurrentPosition
-                  ? AppColors.primarySoft
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: useCurrentPosition
-                    ? AppColors.primary
-                    : AppColors.border,
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: useCurrentPosition
-                        ? AppColors.primary
-                        : AppColors.surfaceAlt,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(
-                    Icons.my_location_rounded,
-                    color: useCurrentPosition
-                        ? Colors.white
-                        : AppColors.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(AppStrings.useCurrentPosition, style: AppText.h3),
-                      const SizedBox(height: 2),
-                      Text(
-                        useCurrentPosition
-                            ? 'Bloc A · Position enregistrée'
-                            : 'Touchez pour utiliser votre position',
-                        style: AppText.caption,
+                        _type == ItemType.lost ? 'Objet perdu' : 'Objet trouvé',
+                        style: AppText.tiny.copyWith(
+                          color: Color.lerp(accent, AppColors.textPrimary, 0.3),
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: useCurrentPosition
-                      ? const Icon(
-                          Icons.check_circle_rounded,
-                          key: ValueKey('on'),
-                          color: AppColors.primary,
-                        )
-                      : const Icon(
-                          Icons.radio_button_unchecked_rounded,
-                          key: ValueKey('off'),
-                          color: AppColors.textTertiary,
-                        ),
                 ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        Row(
-          children: [
-            Expanded(
-              child: _FakeField(
-                icon: Icons.calendar_today_rounded,
-                label: AppStrings.fieldDate,
-                value: _dateLabel(occurredAt),
+            const SizedBox(height: 18),
+            Text(
+              'NOUVELLE ANNONCE',
+              style: AppText.eyebrow.copyWith(color: AppColors.primary),
+            ),
+            const SizedBox(height: 6),
+            Text(AppStrings.publishTitle, style: AppText.h1),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.publishSubtitle,
+              style: AppText.body.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 20),
+            _TypeSelector(
+              value: _type,
+              onChanged: (value) => setState(() => _type = value),
+            ),
+            const SizedBox(height: 20),
+            ItemArtwork(
+              category: _category ?? ItemCategory.other,
+              height: 168,
+              width: double.infinity,
+              borderRadius: 24,
+              showLabel: _category != null,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const AppIcon(
+                  'camera-linear',
+                  size: 14,
+                  color: AppColors.textTertiary,
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'Visuel de démonstration · l’ajout de photos arrive bientôt.',
+                    style: AppText.tiny.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            Text('Catégorie', style: AppText.label),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final category in ItemCategory.values)
+                  _CategoryChip(
+                    category: category,
+                    selected: _category == category,
+                    onTap: () => setState(() => _category = category),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _LabeledField(
+              label: AppStrings.fieldTitle,
+              child: TextField(
+                controller: _titleController,
+                onChanged: (_) => setState(() {}),
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.next,
+                maxLength: 120,
+                style: AppText.body,
+                decoration: InputDecoration(
+                  hintText: AppStrings.fieldTitleHint,
+                  counterText: '',
+                ),
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: _FakeField(
-                icon: Icons.schedule_rounded,
-                label: AppStrings.fieldTime,
-                value: _timeLabel(occurredAt),
+            const SizedBox(height: 14),
+            _LabeledField(
+              label: 'Description',
+              child: TextField(
+                controller: _descriptionController,
+                onChanged: (_) => setState(() {}),
+                minLines: 3,
+                maxLines: 6,
+                maxLength: 600,
+                textCapitalization: TextCapitalization.sentences,
+                style: AppText.body,
+                decoration: InputDecoration(
+                  hintText:
+                      'Couleur, marque, signes particuliers, contenu…',
+                  counterText: '',
+                ),
               ),
+            ),
+            const SizedBox(height: 14),
+            _SecretField(controller: _secretController),
+            const SizedBox(height: 14),
+            _LabeledField(
+              label: AppStrings.fieldPlace,
+              child: TextField(
+                controller: _placeController,
+                onChanged: (_) => setState(() {}),
+                textCapitalization: TextCapitalization.sentences,
+                style: AppText.body,
+                maxLength: 160,
+                decoration: InputDecoration(
+                  hintText: AppStrings.fieldPlaceHint,
+                  counterText: '',
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(left: 12, right: 8),
+                    child: AppIcon(
+                      'map-point-linear',
+                      size: 19,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 0),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _GpsCard(
+              active: _useCurrentPosition,
+              onChanged: _toggleGps,
+            ),
+            const SizedBox(height: 20),
+            Text('Quand ?', style: AppText.label),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _DayChip(
+                  label: 'Aujourd’hui',
+                  selected: _isSameDay(_occurredAt, DateTime.now()),
+                  onTap: () => _pickDay(0),
+                ),
+                const SizedBox(width: 8),
+                _DayChip(
+                  label: 'Hier',
+                  selected: _isSameDay(
+                    _occurredAt,
+                    DateTime.now().subtract(const Duration(days: 1)),
+                  ),
+                  onTap: () => _pickDay(1),
+                ),
+                const SizedBox(width: 8),
+                _DayChip(
+                  label: 'Avant-hier',
+                  selected: _isSameDay(
+                    _occurredAt,
+                    DateTime.now().subtract(const Duration(days: 2)),
+                  ),
+                  onTap: () => _pickDay(2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _PickerButton(
+                    icon: 'calendar-linear',
+                    label: _formatDate(_occurredAt),
+                    onTap: _pickDate,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _PickerButton(
+                    icon: 'clock-circle-linear',
+                    label: _formatTime(_occurredAt),
+                    onTap: _pickTime,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            _QuickChip(
-              label: 'Aujourd\'hui',
-              selected: _dayDelta(occurredAt) == 0,
-              onTap: () => onPickDay(0),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            _QuickChip(
-              label: 'Hier',
-              selected: _dayDelta(occurredAt) == 1,
-              onTap: () => onPickDay(1),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            _QuickChip(
-              label: 'Il y a 2 jours',
-              selected: _dayDelta(occurredAt) == 2,
-              onTap: () => onPickDay(2),
-            ),
-          ],
+      ),
+    );
+  }
+
+  static bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  static String _formatDate(DateTime date) {
+    const months = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  static String _formatTime(DateTime date) =>
+      '${date.hour.toString().padLeft(2, '0')}:'
+      '${date.minute.toString().padLeft(2, '0')}';
+}
+
+class _CircleClose extends StatelessWidget {
+  const _CircleClose({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.divider),
+          boxShadow: AppShadows.card,
         ),
-      ],
+        child: const AppIcon(
+          'close-circle-linear',
+          size: 21,
+          color: AppColors.textPrimary,
+        ),
+      ),
     );
   }
 }
 
-class _FakeField extends StatelessWidget {
-  const _FakeField({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+class _TypeSelector extends StatelessWidget {
+  const _TypeSelector({required this.value, required this.onChanged});
 
-  final IconData icon;
-  final String label;
-  final String value;
+  final ItemType value;
+  final ValueChanged<ItemType> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.sm,
-      ),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: AppColors.surfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border, width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textSecondary),
-          const SizedBox(width: AppSpacing.xs),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppText.caption.copyWith(fontSize: 11)),
-                Text(
-                  value,
-                  style: AppText.label.copyWith(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+            child: _TypeOption(
+              label: AppStrings.actionLostTitle,
+              icon: 'magnifer-linear',
+              selected: value == ItemType.lost,
+              color: AppColors.lost,
+              background: AppColors.lostSoft,
+              onTap: () => onChanged(ItemType.lost),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: _TypeOption(
+              label: AppStrings.actionFoundTitle,
+              icon: 'hand-heart-linear',
+              selected: value == ItemType.found,
+              color: AppColors.found,
+              background: AppColors.foundSoft,
+              onTap: () => onChanged(ItemType.found),
             ),
           ),
         ],
@@ -726,8 +552,299 @@ class _FakeField extends StatelessWidget {
   }
 }
 
-class _QuickChip extends StatelessWidget {
-  const _QuickChip({
+class _TypeOption extends StatelessWidget {
+  const _TypeOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+
+  final String label;
+  final String icon;
+  final bool selected;
+  final Color color;
+  final Color background;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
+        decoration: BoxDecoration(
+          color: selected ? background : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? color.withValues(alpha: 0.4) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AppIcon(
+              icon,
+              size: 17,
+              color: selected ? color : AppColors.textTertiary,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.label.copyWith(
+                  color: selected ? color : AppColors.textSecondary,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
+    required this.category,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ItemCategory category;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = categoryColor(category);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.12) : AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? color : AppColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(
+              categoryIconName(category),
+              size: 16,
+              color: selected ? color : AppColors.textTertiary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              category.label,
+              style: AppText.label.copyWith(
+                color: selected ? color : AppColors.textSecondary,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 12.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  const _LabeledField({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppText.label),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+}
+
+class _SecretField extends StatelessWidget {
+  const _SecretField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.foundSoft,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.found.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const AppIcon(
+                  'lock-keyhole-linear',
+                  size: 16,
+                  color: AppColors.mintDark,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  AppStrings.fieldSecret,
+                  style: AppText.bodyStrong.copyWith(color: AppColors.mintDark),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  'Privé',
+                  style: AppText.tiny.copyWith(
+                    color: AppColors.mintDark,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            maxLines: 2,
+            maxLength: 300,
+            style: AppText.body.copyWith(color: AppColors.textPrimary),
+            decoration: InputDecoration(
+              hintText: AppStrings.fieldSecretHint,
+              counterText: '',
+              filled: true,
+              fillColor: Colors.white,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide(
+                  color: AppColors.found.withValues(alpha: 0.2),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(
+                  color: AppColors.mintDark,
+                  width: 1.6,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            AppStrings.fieldSecretHelp,
+            style: AppText.tiny.copyWith(
+              color: AppColors.mintDark.withValues(alpha: 0.75),
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GpsCard extends StatelessWidget {
+  const _GpsCard({required this.active, required this.onChanged});
+
+  final bool active;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: active ? AppColors.primary : AppColors.border,
+          width: active ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: active ? AppColors.primarySoft : AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: AppIcon(
+              'map-point-linear',
+              size: 17,
+              color: active ? AppColors.primary : AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Utiliser ma position',
+                  style: AppText.bodyStrong.copyWith(fontSize: 13.5),
+                ),
+                Text(
+                  active ? 'Position partagée' : 'Optionnel · plus précis',
+                  style: AppText.tiny.copyWith(
+                    color: active ? AppColors.primary : AppColors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: active,
+            onChanged: onChanged,
+            activeThumbColor: AppColors.primary,
+            activeTrackColor: AppColors.primarySoft,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -739,27 +856,28 @@ class _QuickChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primarySoft : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-            width: 1.5,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: AppText.caption.copyWith(
-            color: selected ? AppColors.primaryDark : AppColors.textSecondary,
-            fontSize: 13,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.tiny.copyWith(
+              color: selected ? Colors.white : AppColors.textSecondary,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+            ),
           ),
         ),
       ),
@@ -767,174 +885,181 @@ class _QuickChip extends StatelessWidget {
   }
 }
 
-class _BottomBar extends StatelessWidget {
-  const _BottomBar({
-    required this.step,
-    required this.canContinue,
-    required this.onContinue,
-    required this.onBack,
+class _PickerButton extends StatelessWidget {
+  const _PickerButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
   });
 
-  final int step;
-  final bool canContinue;
-  final VoidCallback onContinue;
-  final VoidCallback? onBack;
+  final String icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            AppIcon(icon, size: 17, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: AppText.label.copyWith(fontSize: 12.5),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PublishBottomBar extends StatelessWidget {
+  const _PublishBottomBar({
+    required this.enabled,
+    required this.loading,
+    required this.type,
+    required this.onPressed,
+  });
+
+  final bool enabled;
+  final bool loading;
+  final ItemType type;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.md,
-        AppSpacing.xl,
-        AppSpacing.lg,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.divider)),
+        boxShadow: AppShadows.nav,
       ),
-      child: Row(
-        children: [
-          if (onBack != null) ...[
-            SizedBox(
-              width: 56,
-              child: AppButton(
-                label: 'Retour',
-                variant: AppButtonVariant.secondary,
-                onPressed: onBack,
-                height: 56,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-          ],
-          Expanded(
-            child: AppButton(
-              label: step == 2 ? AppStrings.publish : AppStrings.onboardingNext,
-              icon: step == 2
-                  ? Icons.check_rounded
-                  : Icons.arrow_forward_rounded,
-              onPressed: canContinue ? onContinue : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PublishStatusScreen extends StatelessWidget {
-  const _PublishStatusScreen({required this.phase, required this.onDone});
-
-  final int phase;
-  final VoidCallback onDone;
-
-  @override
-  Widget build(BuildContext context) {
-    if (phase == 2) return _PublishSuccess(onDone: onDone);
-
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(
-                width: 84,
-                height: 84,
-                child: CircularProgressIndicator(
-                  strokeWidth: 5,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              Text(
-                AppStrings.searching,
-                style: AppText.h1,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                AppStrings.searchingSubtitle,
-                style: AppText.body,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              const _SearchStepRow(
-                icon: Icons.photo_rounded,
-                label: 'Image analysée',
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              const _SearchStepRow(
-                icon: Icons.place_rounded,
-                label: 'Localisation comparée',
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              const _SearchStepRow(
-                icon: Icons.schedule_rounded,
-                label: 'Horodatage vérifié',
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              const _SearchStepRow(
-                icon: Icons.text_snippet_rounded,
-                label: 'Description analysée',
-              ),
-            ],
-          ),
+      child: SafeArea(
+        top: false,
+        child: AppButton(
+          label: type == ItemType.lost
+              ? 'Lancer la recherche'
+              : 'Publier l’objet trouvé',
+          iconName: type == ItemType.lost
+              ? 'magnifer-linear'
+              : 'hand-heart-linear',
+          loading: loading,
+          onPressed: enabled ? onPressed : null,
         ),
       ),
-    );
-  }
-}
-
-class _SearchStepRow extends StatelessWidget {
-  const _SearchStepRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 16, color: AppColors.found),
-        const SizedBox(width: AppSpacing.xs),
-        Text(label, style: AppText.label),
-      ],
     );
   }
 }
 
 class _PublishSuccess extends StatelessWidget {
-  const _PublishSuccess({required this.onDone});
+  const _PublishSuccess({
+    required this.type,
+    required this.onHome,
+    required this.onMatches,
+    required this.onAgain,
+  });
 
-  final VoidCallback onDone;
+  final ItemType type;
+  final VoidCallback onHome;
+  final VoidCallback onMatches;
+  final VoidCallback onAgain;
 
   @override
   Widget build(BuildContext context) {
+    final accent = type == ItemType.lost ? AppColors.lost : AppColors.found;
+
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const _SuccessBadge(),
-              const SizedBox(height: AppSpacing.xl),
+              const Spacer(),
+              Container(
+                width: 104,
+                height: 104,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.3),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const AppIcon(
+                      'check-circle-bold',
+                      size: 34,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Text(
-                AppStrings.publishedTitle,
+                type == ItemType.lost
+                    ? 'Votre recherche est lancée'
+                    : 'Merci pour votre geste',
                 style: AppText.h1,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: 8),
               Text(
-                AppStrings.publishedSubtitle,
-                style: AppText.body,
+                type == ItemType.lost
+                    ? 'Notre moteur analyse les objets trouvés et vous préviendra dès qu’une correspondance apparaît.'
+                    : 'Votre annonce est en ligne. Le propriétaire pourra la retrouver et la vérifier.',
+                style: AppText.body.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: AppSpacing.huge),
-              AppButton(label: AppStrings.backHome, onPressed: onDone),
+              const SizedBox(height: 28),
+              AppButton(
+                label: 'Voir mes correspondances',
+                iconName: 'link-round-linear',
+                onPressed: onMatches,
+              ),
+              const SizedBox(height: 10),
+              AppButton(
+                label: 'Retour à l’accueil',
+                variant: AppButtonVariant.secondary,
+                onPressed: onHome,
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: onAgain,
+                child: Text(
+                  'Publier une autre annonce',
+                  style: AppText.label.copyWith(color: AppColors.textSecondary),
+                ),
+              ),
+              const Spacer(),
             ],
           ),
         ),
@@ -942,54 +1067,3 @@ class _PublishSuccess extends StatelessWidget {
     );
   }
 }
-
-class _SuccessBadge extends StatefulWidget {
-  const _SuccessBadge();
-
-  @override
-  State<_SuccessBadge> createState() => _SuccessBadgeState();
-}
-
-class _SuccessBadgeState extends State<_SuccessBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..forward();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-      child: Container(
-        width: 116,
-        height: 116,
-        decoration: const BoxDecoration(
-          color: AppColors.foundSoft,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(
-          Icons.check_rounded,
-          size: 60,
-          color: AppColors.found,
-        ),
-      ),
-    );
-  }
-}
-
-
-
-
-
-
-
-
-
-

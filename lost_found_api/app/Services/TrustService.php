@@ -24,6 +24,7 @@ class TrustService
         'ABSENCE_RDV' => -5,
         'RECLAMATION_FONDEE' => -10,
         'RECLAMATION_ABUSIVE' => -5,
+        'MESSAGE_INAPPROPRIE' => -5,
         'BON_REPORT' => 2,
     ];
 
@@ -44,12 +45,23 @@ class TrustService
     }
 
     /**
-     * Chat autorise seulement si le proprietaire a verifie le match et si
-     * son score de confiance est suffisant (CDC 6.4.3).
+     * Chat autorise seulement si l'utilisateur est partie au match, que le
+     * proprietaire a verifie la correspondance et que son score est suffisant.
+     * Le controle de participation est indispensable : sans lui, tout compte
+     * verifie pourrait lire n'importe quelle conversation (IDOR).
      */
     public function canOpenChat(User $user, ItemMatch $match): bool
     {
-        return $match->status !== ItemMatch::STATUS_PENDING
+        $isParticipant = $match->lostItem?->user_id === $user->id
+            || $match->foundItem?->user_id === $user->id;
+
+        return $isParticipant
+            && $user->phone_verified
+            && in_array($match->status, [
+                ItemMatch::STATUS_VERIFIED,
+                ItemMatch::STATUS_CONTACTED,
+                ItemMatch::STATUS_RECOVERED,
+            ], true)
             && $user->trust_score >= self::MIN_SCORE_TO_CHAT;
     }
 

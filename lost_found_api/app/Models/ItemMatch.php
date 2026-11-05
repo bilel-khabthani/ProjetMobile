@@ -66,7 +66,7 @@ class ItemMatch extends Model
 
     public function messages(): HasMany
     {
-        return $this->hasMany(Message::class);
+        return $this->hasMany(Message::class, 'match_id');
     }
 
     /** Evenements de score rattaches a cette correspondance (Module 4). */

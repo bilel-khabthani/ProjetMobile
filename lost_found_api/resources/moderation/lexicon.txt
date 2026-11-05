@@ -1,0 +1,205 @@
+# Lexique de moderation Lost&Found AI
+# Format : terme|catégorie
+# Les termes sont normalisés (minuscules, sans accents, sans leetspeak) par
+# TextNormalizer avant comparaison. Une entrée par ligne ; # = commentaire.
+# Categories : profanity, insult, hate, sexual, violence, threat.
+
+# --- Français : insultes et grossièretés ---
+merde|profanity
+putain|profanity
+bordel|profanity
+foutre|profanity
+enculer|profanity
+enculé|profanity
+encule|profanity
+niquer|profanity
+nique|profanity
+fdp|insult
+fils de pute|insult
+fils de pute|hate
+connard|insult
+connasse|insult
+con|insult
+salaud|insult
+salope|insult
+pute|insult
+pétasse|insult
+petasse|insult
+garce|insult
+truie|insult
+abruti|insult
+debile|insult
+débile|insult
+cretin|insult
+crétin|insult
+imbecile|insult
+imbécile|insult
+bite|sexual
+couille|sexual
+couilles|sexual
+nique ta mere|insult
+nique ta mère|insult
+ta mere la pute|insult
+suce ma bite|sexual
+va te faire foutre|insult
+
+# --- Français : discours haineux ---
+pede|hate
+pédé|hate
+pd|hate
+tapette|hate
+travelo|hate
+bougnoule|hate
+negre|hate
+nègre|hate
+bamboula|hate
+youpin|hate
+feuj|hate
+raton|hate
+bicot|hate
+crouille|hate
+sale arabe|hate
+sale juif|hate
+sale noir|hate
+sale blanc|hate
+mort aux arabes|hate
+mort aux juifs|hate
+mort aux noirs|hate
+
+# --- Français : menaces et violence ---
+je vais te tuer|threat
+je vais te frapper|threat
+tue toi|threat
+tuez le|threat
+brûle en enfer|threat
+brule en enfer|threat
+je vais te retrouver|threat
+attaque terroriste|violence
+egorger|violence
+égorger|violence
+violer|sexual
+viol|sexual
+
+# --- English : profanity and insults ---
+fuck|profanity
+fucking|profanity
+fucked|profanity
+motherfucker|profanity
+shit|profanity
+bullshit|profanity
+bitch|insult
+son of a bitch|insult
+asshole|insult
+bastard|insult
+cunt|insult
+dick|insult
+pussy|sexual
+whore|insult
+slut|insult
+retard|insult
+moron|insult
+idiot|insult
+stupid|insult
+
+# --- English : hate speech ---
+nigger|hate
+nigga|hate
+faggot|hate
+fag|hate
+tranny|hate
+kike|hate
+spic|hate
+chink|hate
+wetback|hate
+raghead|hate
+towelhead|hate
+white trash|hate
+go back to your country|hate
+
+# --- English : threats, violence, sexual ---
+kill yourself|threat
+kys|threat
+i will kill you|threat
+i'll kill you|threat
+i will hurt you|threat
+rape|sexual
+raped|sexual
+porn|sexual
+child porn|sexual
+terrorist attack|violence
+behead|violence
+
+# --- Arabizi / tunisien (translittéré) ---
+zbi|profanity
+zebi|profanity
+zebb|profanity
+zabbour|profanity
+kos|profanity
+koss|profanity
+kess|profanity
+nik|profanity
+nayek|insult
+nyaek|insult
+nyeck|insult
+nayka|insult
+kahba|insult
+qahba|insult
+9ahba|insult
+9a7ba|insult
+9hba|insult
+sharmouta|insult
+charmouta|insult
+3arsa|insult
+arsa|insult
+3ars|insult
+zamel|insult
+tiz|sexual
+tize|sexual
+hmar|insult
+kelb|insult
+kelba|insult
+ibn el kelb|insult
+wled el kelb|insult
+weld el kelb|insult
+wled el kahba|insult
+weld el 9ahba|insult
+miboun|insult
+m9awed|insult
+9awad|insult
+kafir|hate
+murtad|hate
+
+# --- Arabe (script) ---
+كس|profanity
+زب|profanity
+زبي|profanity
+نيك|profanity
+شرموط|insult
+شرموطة|insult
+قحبة|insult
+قحبه|insult
+عرص|insult
+عرصة|insult
+خول|hate
+لوطي|hate
+كلب|insult
+كلبة|insult
+ابن الكلب|insult
+ولد الكلب|insult
+ولد القحبة|insult
+حمار|insult
+حمارة|insult
+حقير|insult
+غبي|insult
+تافه|insult
+طيز|sexual
+ملعون|insult
+يهودي|hate
+نصراني|hate
+كفار|hate
+موت العرب|hate
+اقتل نفسك|threat
+سأقتلك|threat
+سوف أقتلك|threat
+اغتصاب|sexual
+إبادة|violence
