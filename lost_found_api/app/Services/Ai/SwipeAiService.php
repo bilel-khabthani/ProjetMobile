@@ -294,7 +294,7 @@ PROMPT;
 
         $foundTitle = $found['titre'] ?? 'cet objet';
         $icebreaker = "Bonjour, votre annonce « {$foundTitle} » ressemble à l’objet que j’ai perdu. "
-            ."Pourriez-vous me confirmer un détail distinctif avant que nous convenions d’un rendez-vous ?";
+            .'Pourriez-vous me confirmer un détail distinctif avant que nous convenions d’un rendez-vous ?';
 
         return [
             'verdict' => $verdict,
