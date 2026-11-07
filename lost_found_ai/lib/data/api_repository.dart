@@ -181,11 +181,15 @@ class ApiRepository {
   Future<List<ChatMessage>> fetchMessages(
     String matchId, {
     DateTime? after,
+    DateTime? before,
     int limit = 50,
   }) async {
     final query = <String, String>{'limit': '$limit'};
     if (after != null) {
       query['after'] = after.toUtc().toIso8601String();
+    }
+    if (before != null) {
+      query['before'] = before.toUtc().toIso8601String();
     }
     final suffix = Uri(queryParameters: query).query;
     final json = await _client.get(
@@ -386,7 +390,9 @@ class ApiRepository {
       foundItemTitle: otherItem?['title'] as String? ?? '',
       foundItemPlace: otherItem?['place_label'] as String? ?? '',
       foundItemTimeLabel: _timeLabel(otherItem?['occurred_at'] as String?),
-      foundItemCategory: itemCategoryFromCode(otherItem?['category'] as String?),
+      foundItemCategory: itemCategoryFromCode(
+        otherItem?['category'] as String?,
+      ),
       finderName: otherUser?['name'] as String? ?? 'Utilisateur',
       finderInitials: _initials(otherUser?['name'] as String? ?? 'U'),
       finderReputation: (otherUser?['trust_score'] as num?)?.toDouble() ?? 50,
@@ -406,7 +412,21 @@ class ApiRepository {
           'Confirmez-vous que cet objet correspond a votre declaration ?',
       minutesAgo: _minutesAgo(json['created_at'] as String?),
       status: json['status'] as String? ?? 'PENDING',
+      canChat: json['can_chat'] as bool? ?? _statusAllowsChat(json['status']),
+      chatLockedReason: json['chat_locked_reason'] as String?,
+      lastMessage: json['last_message'] as String?,
+      lastMessageAt: DateTime.tryParse(
+        json['last_message_at'] as String? ?? '',
+      ),
+      lastMessageIsMine: json['last_message_is_mine'] as bool? ?? false,
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  bool _statusAllowsChat(Object? status) {
+    return status == 'VERIFIED' ||
+        status == 'CONTACTED' ||
+        status == 'RECOVERED';
   }
 
   int _minutesAgo(String? iso) {

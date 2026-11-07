@@ -109,7 +109,8 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   ),
                   const SizedBox(width: 8),
                   _Segment(
-                    label: 'À vérifier${pendingCount > 0 ? ' · $pendingCount' : ''}',
+                    label:
+                        'À vérifier${pendingCount > 0 ? ' · $pendingCount' : ''}',
                     selected: _onlyPending,
                     onTap: () => setState(() => _onlyPending = true),
                   ),
@@ -131,12 +132,18 @@ class _MessagesScreenState extends ConsumerState<MessagesScreen> {
                   if (i > 0) const SizedBox(height: 10),
                   _ConversationTile(
                     match: visible[i],
-                    onTap: () {
-                      if (visible[i].isVerified) {
-                        context.push(AppRoutes.chatDetail(visible[i].id));
+                    onTap: () async {
+                      if (visible[i].canChat) {
+                        await context.push(AppRoutes.chatDetail(visible[i].id));
                       } else {
-                        context.push(AppRoutes.matchDetail(visible[i].id));
+                        await context.push(
+                          AppRoutes.matchDetail(visible[i].id),
+                        );
                       }
+                      if (!mounted) return;
+                      // Le chat a pu marquer des messages comme lus : on
+                      // rafraichit les apercus et compteurs au retour.
+                      ref.invalidate(matchesProvider);
                     },
                   ),
                 ],
@@ -276,12 +283,18 @@ class _ConversationTile extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         relativeTime(
-                          DateTime.now().subtract(
-                            Duration(minutes: match.minutesAgo),
-                          ),
+                          match.lastMessageAt ??
+                              DateTime.now().subtract(
+                                Duration(minutes: match.minutesAgo),
+                              ),
                         ),
                         style: AppText.tiny.copyWith(
-                          color: AppColors.textTertiary,
+                          color: match.unreadCount > 0
+                              ? AppColors.primary
+                              : AppColors.textTertiary,
+                          fontWeight: match.unreadCount > 0
+                              ? FontWeight.w800
+                              : FontWeight.w500,
                         ),
                       ),
                     ],
@@ -314,8 +327,18 @@ class _ConversationTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Avec ${match.finderName}',
-                    style: AppText.caption,
+                    match.hasConversation
+                        ? '${match.lastMessageIsMine ? 'Vous : ' : ''}'
+                              '${match.lastMessage}'
+                        : 'Avec ${match.finderName}',
+                    style: AppText.caption.copyWith(
+                      color: match.unreadCount > 0
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                      fontWeight: match.unreadCount > 0
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -323,24 +346,51 @@ class _ConversationTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: match.isVerified
-                    ? AppColors.primarySoft
-                    : AppColors.surfaceAlt,
-                shape: BoxShape.circle,
-              ),
-              child: AppIcon(
-                match.isVerified
-                    ? 'chat-round-linear'
-                    : 'lock-keyhole-linear',
-                size: 16,
-                color: match.isVerified
-                    ? AppColors.primary
-                    : AppColors.textTertiary,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: match.canChat
+                        ? AppColors.primarySoft
+                        : AppColors.surfaceAlt,
+                    shape: BoxShape.circle,
+                  ),
+                  child: AppIcon(
+                    match.canChat ? 'chat-round-linear' : 'lock-keyhole-linear',
+                    size: 16,
+                    color: match.canChat
+                        ? AppColors.primary
+                        : AppColors.textTertiary,
+                  ),
+                ),
+                if (match.unreadCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      height: 18,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: AppColors.surface, width: 2),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        match.unreadCount > 99 ? '99+' : '${match.unreadCount}',
+                        style: AppText.tiny.copyWith(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

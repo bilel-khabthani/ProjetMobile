@@ -3,13 +3,16 @@
 namespace Tests\Feature;
 
 use App\Events\MessageSent;
+use App\Events\MessagesRead;
 use App\Models\Item;
 use App\Models\ItemMatch;
 use App\Models\Message;
 use App\Models\ModerationEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -140,6 +143,86 @@ class ChatModerationTest extends TestCase
             'message_id' => $messageId,
             'decision' => ModerationEvent::DECISION_FLAG,
         ]);
+    }
+
+    public function test_messages_endpoint_returns_the_latest_page(): void
+    {
+        [$match, $owner] = $this->makeMatch();
+        $base = now()->startOfMinute();
+
+        foreach (range(0, 54) as $index) {
+            DB::table('messages')->insert([
+                'id' => (string) Str::uuid(),
+                'match_id' => $match->id,
+                'sender_id' => $owner->id,
+                'body' => 'message-'.$index,
+                'status' => Message::STATUS_APPROVED,
+                'created_at' => $base->copy()->subMinutes(55 - $index)->toDateTimeString(),
+            ]);
+        }
+
+        Sanctum::actingAs($owner);
+
+        $this->getJson("/api/matches/{$match->id}/messages?limit=10")
+            ->assertOk()
+            ->assertJsonCount(10)
+            ->assertJsonPath('0.body', 'message-45')
+            ->assertJsonPath('9.body', 'message-54');
+
+        $before = urlencode($base->copy()->subMinutes(10)->toIso8601String());
+
+        $this->getJson("/api/matches/{$match->id}/messages?limit=10&before={$before}")
+            ->assertOk()
+            ->assertJsonCount(10)
+            ->assertJsonPath('0.body', 'message-35')
+            ->assertJsonPath('9.body', 'message-44');
+    }
+
+    public function test_read_receipt_is_broadcast_and_updates_unread_count(): void
+    {
+        [$match, $owner, $finder] = $this->makeMatch();
+        Event::fake([MessageSent::class, MessagesRead::class]);
+
+        Sanctum::actingAs($owner);
+        $messageId = $this->postJson("/api/matches/{$match->id}/messages", [
+            'body' => 'A bientot',
+        ])->assertCreated()->json('id');
+
+        Sanctum::actingAs($finder);
+        $this->getJson('/api/matches')
+            ->assertOk()
+            ->assertJsonPath('0.unread_count', 1)
+            ->assertJsonPath('0.last_message', 'A bientot')
+            ->assertJsonPath('0.can_chat', true);
+
+        $this->postJson("/api/matches/{$match->id}/messages/read")
+            ->assertOk()
+            ->assertJsonPath('updated', 1);
+
+        Event::assertDispatched(
+            MessagesRead::class,
+            fn (MessagesRead $event) => $event->messageIds === [$messageId]
+                && $event->reader->id === $finder->id,
+        );
+
+        $this->getJson('/api/matches')
+            ->assertOk()
+            ->assertJsonPath('0.unread_count', 0);
+    }
+
+    public function test_only_the_owner_can_answer_the_verification(): void
+    {
+        [$match, $owner, $finder] = $this->makeMatch(ItemMatch::STATUS_PENDING);
+
+        Sanctum::actingAs($finder);
+        $this->postJson("/api/matches/{$match->id}/answer", ['answer' => 'YES'])
+            ->assertForbidden();
+
+        Sanctum::actingAs($owner);
+        $this->postJson("/api/matches/{$match->id}/answer", ['answer' => 'YES'])
+            ->assertOk()
+            ->assertJsonPath('status', ItemMatch::STATUS_VERIFIED)
+            ->assertJsonPath('can_chat', true);
     }
 
     /**

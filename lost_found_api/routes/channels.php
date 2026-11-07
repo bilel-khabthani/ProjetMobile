@@ -17,5 +17,5 @@ Broadcast::channel('match.{matchId}', function (User $user, string $matchId): bo
         ->with(['lostItem:id,user_id', 'foundItem:id,user_id'])
         ->find($matchId);
 
-    return $match !== null && $user->can('view', $match);
+    return $match !== null && $user->can('chat', $match);
 });

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Events\MessageSent;
+use App\Events\MessagesRead;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\MessageResource;
 use App\Models\Claim;
@@ -25,12 +26,22 @@ use Illuminate\Validation\Rule;
  */
 class MatchController extends Controller
 {
+    public function __construct(private readonly TrustService $trust) {}
+
     public function index(Request $request)
     {
+        $viewer = $request->user();
+
         $matches = ItemMatch::query()
-            ->with('lostItem.user', 'foundItem.user')
-            ->whereHas('lostItem', fn ($q) => $q->where('user_id', $request->user()->id))
-            ->orWhereHas('foundItem', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->with('lostItem.user', 'foundItem.user', 'latestMessage')
+            ->withCount([
+                'messages as unread_count' => fn ($query) => $query
+                    ->where('sender_id', '!=', $viewer->id)
+                    ->whereNull('read_at')
+                    ->where('status', '!=', Message::STATUS_BLOCKED),
+            ])
+            ->whereHas('lostItem', fn ($q) => $q->where('user_id', $viewer->id))
+            ->orWhereHas('foundItem', fn ($q) => $q->where('user_id', $viewer->id))
             ->latest()
             ->get();
 
@@ -45,9 +56,16 @@ class MatchController extends Controller
     {
         Gate::authorize('view', $match);
 
-        return response()->json(
-            $this->toMatchJson($match->load('lostItem.user', 'foundItem.user'), $request->user())
-        );
+        $viewer = $request->user();
+        $match->load('lostItem.user', 'foundItem.user', 'latestMessage');
+        $match->loadCount([
+            'messages as unread_count' => fn ($query) => $query
+                ->where('sender_id', '!=', $viewer->id)
+                ->whereNull('read_at')
+                ->where('status', '!=', Message::STATUS_BLOCKED),
+        ]);
+
+        return response()->json($this->toMatchJson($match, $viewer));
     }
 
     /**
@@ -58,6 +76,14 @@ class MatchController extends Controller
      */
     protected function toMatchJson(ItemMatch $match, ?User $viewer = null): array
     {
+        $lastMessage = $match->relationLoaded('latestMessage')
+            ? $match->latestMessage
+            : $match->latestMessage()->first();
+
+        $unreadCount = $match->unread_count ?? 0;
+
+        $chatLockReason = $viewer ? $this->trust->chatLockReason($viewer, $match) : null;
+
         return [
             'id' => $match->id,
             'status' => $match->status,
@@ -70,6 +96,13 @@ class MatchController extends Controller
             'owner_confirmed_at' => $match->owner_confirmed_at?->toIso8601String(),
             'finder_confirmed_at' => $match->finder_confirmed_at?->toIso8601String(),
             'created_at' => $match->created_at?->toIso8601String(),
+            'can_chat' => $chatLockReason === null,
+            'chat_locked_reason' => $chatLockReason,
+            'last_message' => $lastMessage?->body,
+            'last_message_at' => $lastMessage?->created_at?->toIso8601String(),
+            'last_message_is_mine' => $viewer !== null
+                && $lastMessage?->sender_id === $viewer->id,
+            'unread_count' => (int) $unreadCount,
             'lost_item' => $this->itemJson($match->lostItem),
             'found_item' => $this->itemJson($match->foundItem),
             'scores' => [
@@ -121,6 +154,12 @@ class MatchController extends Controller
     public function answer(Request $request, ItemMatch $match)
     {
         Gate::authorize('view', $match);
+
+        $match->loadMissing('lostItem:id,user_id');
+
+        if ($match->lostItem?->user_id !== $request->user()->id) {
+            abort(403, 'Seul le propriétaire de l\'objet perdu peut répondre à la vérification.');
+        }
 
         $data = $request->validate([
             'answer' => ['required', Rule::in(['YES', 'UNSURE', 'NO'])],
@@ -197,21 +236,41 @@ class MatchController extends Controller
 
         $data = $request->validate([
             'after' => ['nullable', 'date'],
+            'before' => ['nullable', 'date'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+
+        $limit = (int) ($data['limit'] ?? 50);
 
         $query = Message::query()
             ->where('match_id', $match->id)
             ->where('status', '!=', Message::STATUS_BLOCKED)
-            ->with('sender:id,name')
-            ->orderBy('created_at')
-            ->orderBy('id');
+            ->with('sender:id,name');
 
         if (! empty($data['after'])) {
-            $query->where('created_at', '>', Carbon::parse($data['after']));
-        }
+            // Rafraichissement incremental : uniquement les nouveaux messages.
+            $messages = $query
+                ->where('created_at', '>', Carbon::parse($data['after']))
+                ->orderBy('created_at')
+                ->orderBy('id')
+                ->limit($limit)
+                ->get();
+        } else {
+            // Par defaut on renvoie les plus recents (puis on les remet dans
+            // l'ordre chronologique attendu par le client). "before" permet
+            // de remonter l'historique page par page.
+            if (! empty($data['before'])) {
+                $query->where('created_at', '<', Carbon::parse($data['before']));
+            }
 
-        $messages = $query->limit((int) ($data['limit'] ?? 50))->get();
+            $messages = $query
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->limit($limit)
+                ->get()
+                ->reverse()
+                ->values();
+        }
 
         return response()->json(MessageResource::collection($messages)->resolve());
     }
@@ -271,13 +330,27 @@ class MatchController extends Controller
     {
         Gate::authorize('chat', $match);
 
-        $updated = Message::query()
+        $readAt = now();
+        $messageIds = Message::query()
             ->where('match_id', $match->id)
             ->where('sender_id', '!=', $request->user()->id)
+            ->where('status', '!=', Message::STATUS_BLOCKED)
             ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+            ->pluck('id');
 
-        return response()->json(['updated' => $updated]);
+        if ($messageIds->isEmpty()) {
+            return response()->json(['updated' => 0]);
+        }
+
+        Message::query()->whereIn('id', $messageIds)->update(['read_at' => $readAt]);
+
+        try {
+            broadcast(new MessagesRead($match, $request->user(), $messageIds->all(), $readAt));
+        } catch (\Throwable $exception) {
+            Log::warning('Read receipt broadcast failed.', ['exception' => $exception::class]);
+        }
+
+        return response()->json(['updated' => $messageIds->count()]);
     }
 
     /**

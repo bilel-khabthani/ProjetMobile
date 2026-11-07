@@ -52,17 +52,40 @@ class TrustService
      */
     public function canOpenChat(User $user, ItemMatch $match): bool
     {
+        return $this->chatLockReason($user, $match) === null;
+    }
+
+    /**
+     * Explique pourquoi le chat est verrouille. Retourne null quand il est
+     * accessible, sinon un message affichable dans l'application.
+     */
+    public function chatLockReason(User $user, ItemMatch $match): ?string
+    {
         $isParticipant = $match->lostItem?->user_id === $user->id
             || $match->foundItem?->user_id === $user->id;
 
-        return $isParticipant
-            && $user->phone_verified
-            && in_array($match->status, [
-                ItemMatch::STATUS_VERIFIED,
-                ItemMatch::STATUS_CONTACTED,
-                ItemMatch::STATUS_RECOVERED,
-            ], true)
-            && $user->trust_score >= self::MIN_SCORE_TO_CHAT;
+        if (! $isParticipant) {
+            return 'Vous ne participez pas à cette correspondance.';
+        }
+
+        if (! $user->phone_verified) {
+            return 'Vérifiez votre numéro de téléphone pour discuter.';
+        }
+
+        if (! in_array($match->status, [
+            ItemMatch::STATUS_VERIFIED,
+            ItemMatch::STATUS_CONTACTED,
+            ItemMatch::STATUS_RECOVERED,
+        ], true)) {
+            return 'La correspondance doit d\'abord être vérifiée par le propriétaire.';
+        }
+
+        if ($user->trust_score < self::MIN_SCORE_TO_CHAT) {
+            return 'Votre score de confiance doit atteindre '
+                .self::MIN_SCORE_TO_CHAT.' points pour discuter.';
+        }
+
+        return null;
     }
 
     /**
