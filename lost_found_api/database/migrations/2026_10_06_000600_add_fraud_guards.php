@@ -12,7 +12,9 @@ return new class extends Migration
         // Le CDC section 6.4.3 impose cette contrainte pour bloquer les comptes
         // multiples servant a l'auto-restitution fictive.
         Schema::table('users', function (Blueprint $table) {
-            $table->unique('phone')->nullable();
+            // Un index unique autorise plusieurs valeurs NULL : la colonne
+            // reste nullable pour les comptes crees avant la verification.
+            $table->unique('phone');
         });
     }
 

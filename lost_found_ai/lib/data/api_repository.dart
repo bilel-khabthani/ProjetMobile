@@ -2,6 +2,7 @@
 import 'api_client.dart';
 import 'models/item.dart';
 import 'models/item_match.dart';
+import 'models/swipe_candidate.dart';
 import 'models/trust.dart';
 
 /// Repository branche sur l'API Laravel.
@@ -256,6 +257,38 @@ class ApiRepository {
       'description': description,
       'related_match_id': matchId,
     });
+  }
+
+  /// Module Tinder Cards : deck de correspondances classees par le moteur,
+  /// chaque carte etant enrichie d'une pre-analyse IA.
+  Future<List<SwipeCandidate>> fetchSwipeDeck() async {
+    final json = await _client.get('/swipe/deck') as Map<String, dynamic>;
+    final candidates = json['candidates'] as List<dynamic>? ?? const [];
+    return candidates
+        .map((raw) => SwipeCandidate.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Analyse IA detaillee d'une correspondance (raisons, confiance, message).
+  Future<AiInsight> fetchSwipeInsight(String matchId) async {
+    final json =
+        await _client.get('/swipe/$matchId/insight') as Map<String, dynamic>;
+    return AiInsight.fromJson(
+      (json['insight'] as Map?)?.cast<String, dynamic>() ?? json,
+    );
+  }
+
+  /// Enregistre le choix de l'utilisateur. Le backend met aussi a jour la
+  /// decision du match (LIKE = YES, PASS = NO) pour rester coherent avec le
+  /// parcours de verification existant.
+  Future<void> recordSwipeDecision({
+    required String matchId,
+    required SwipeDirection direction,
+    int? aiConfidence,
+  }) async {
+    final payload = <String, dynamic>{'direction': direction.code};
+    if (aiConfidence != null) payload['ai_confidence'] = aiConfidence;
+    await _client.post('/swipe/$matchId/decision', payload);
   }
 
   Item _toItem(Map<String, dynamic> json) {

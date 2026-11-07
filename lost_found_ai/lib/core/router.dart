@@ -14,6 +14,7 @@ import '../features/match/match_detail_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/publish/publish_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/swipe/swipe_screen.dart';
 import '../features/trust/trust_screen.dart';
 
 abstract final class AppRoutes {
@@ -27,6 +28,7 @@ abstract final class AppRoutes {
   static const String publish = '/publish';
   static const String match = '/match/:id';
   static const String trust = '/trust';
+  static const String swipe = '/swipe';
   static const String claim = '/claim';
   static const String claimWithId = '/claim/:id';
   static const String profile = '/profile';
@@ -117,6 +119,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.trust,
         builder: (context, state) => const TrustScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.swipe,
+        builder: (context, state) => const SwipeScreen(),
       ),
       GoRoute(
         path: AppRoutes.claim,

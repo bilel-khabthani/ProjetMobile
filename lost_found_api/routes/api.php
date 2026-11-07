@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\Api\MatchController;
+use App\Http\Controllers\Api\SwipeController;
 use App\Http\Controllers\Api\TrustController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/matches', [MatchController::class, 'index']);
         Route::get('/matches/{match}', [MatchController::class, 'show']);
         Route::post('/matches/{match}/answer', [MatchController::class, 'answer']);
+
+        // Module Tinder Cards : deck de correspondances, analyse IA et glissements.
+        Route::get('/swipe/deck', [SwipeController::class, 'deck']);
+        Route::get('/swipe/{match}/insight', [SwipeController::class, 'insight']);
+        Route::post('/swipe/{match}/decision', [SwipeController::class, 'decide']);
 
         // Module 5 : restitution et chat
         Route::post('/matches/{match}/confirm-restitution', [MatchController::class, 'confirmRestitution']);

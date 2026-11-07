@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -39,6 +39,13 @@ class HomeScreen extends ConsumerWidget {
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                   child: _ActionRow(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                  child: _TinderBanner(),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
@@ -209,6 +216,124 @@ class _ActionCard extends StatelessWidget {
               subtitle,
               style: AppText.caption.copyWith(height: 1.35),
               maxLines: 3,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TinderBanner extends StatelessWidget {
+  const _TinderBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: () => context.push(AppRoutes.swipe),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEEF0FE), Color(0xFFF3E8FF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.24),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                boxShadow: AppShadows.primary,
+              ),
+              child: const Icon(
+                Icons.style_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Tinder Cards',
+                          style: AppText.bodyStrong.copyWith(
+                            fontSize: 15,
+                            color: AppColors.primaryDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.primary, Color(0xFF8B5CF6)],
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 9,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              'IA',
+                              style: AppText.caption.copyWith(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Glissez les correspondances triées par l’IA : à droite si c’est votre objet.',
+                    style: AppText.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.35,
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.primary,
+              size: 22,
             ),
           ],
         ),
@@ -508,13 +633,6 @@ class _ActivityItem extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
-
 String _relativeTime(DateTime dt) {
   final diff = DateTime.now().difference(dt);
   if (diff.inMinutes < 1) return 'a l\'instant';
@@ -526,7 +644,3 @@ String _relativeTime(DateTime dt) {
   final month = dt.month.toString().padLeft(2, '0');
   return '$day/$month/${dt.year}';
 }
-
-
-
-

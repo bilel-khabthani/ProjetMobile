@@ -69,6 +69,12 @@ class ItemMatch extends Model
         return $this->hasMany(Message::class);
     }
 
+    /** Module Tinder Cards : historique des glissements sur cette correspondance. */
+    public function swipeDecisions(): HasMany
+    {
+        return $this->hasMany(SwipeDecision::class, 'item_match_id');
+    }
+
     /** Evenements de score rattaches a cette correspondance (Module 4). */
     public function trustEvents(): HasMany
     {
