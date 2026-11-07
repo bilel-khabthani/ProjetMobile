@@ -17,6 +17,9 @@ import '../../widgets/app_icon.dart';
 import '../../widgets/photo_placeholder.dart';
 import '../../widgets/pressable_scale.dart';
 
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+
 class PublishScreen extends ConsumerStatefulWidget {
   const PublishScreen({super.key, this.initialType = ItemType.lost});
 
@@ -29,6 +32,7 @@ class PublishScreen extends ConsumerStatefulWidget {
 class _PublishScreenState extends ConsumerState<PublishScreen> {
   late ItemType _type = widget.initialType;
   ItemCategory? _category;
+  File? _imageFile;
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -98,6 +102,14 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     );
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+    if (file != null) {
+      setState(() => _imageFile = File(file.path));
+    }
+  }
+
   void _pickDay(int daysAgo) {
     final now = DateTime.now();
     setState(() {
@@ -152,7 +164,6 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     HapticFeedback.mediumImpact();
     FocusScope.of(context).unfocus();
     setState(() => _publishing = true);
-
     final place = _placeController.text.trim();
     final useGps = _useCurrentPosition && _currentPosition != null;
 
@@ -166,9 +177,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
               title: _titleController.text.trim(),
               description: _descriptionController.text.trim(),
               secretDetail: _secretController.text.trim(),
-              place: place.isNotEmpty
-                  ? place
-                  : (useGps ? 'Position actuelle' : 'Campus'),
+              place: place.isNotEmpty ? place : (useGps ? 'Position actuelle' : 'Campus'),
               occurredAt: _occurredAt,
               latitude: useGps ? _currentPosition!.latitude : null,
               longitude: useGps ? _currentPosition!.longitude : null,
@@ -178,9 +187,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
         ref.invalidate(nearbyFoundProvider);
       } catch (_) {
         if (mounted) {
-          _showMessage(
-            'Publication hors ligne : l’annonce sera synchronisée plus tard.',
-          );
+          _showMessage('Publication hors ligne : l’annonce sera synchronisée plus tard.');
         }
       }
     } else {
@@ -207,6 +214,30 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
       _occurredAt = DateTime.now();
     });
   }
+
+  static bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  static String _formatDate(DateTime date) {
+    const months = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  static String _formatTime(DateTime date) =>
+      '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -290,35 +321,36 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
               onChanged: (value) => setState(() => _type = value),
             ),
             const SizedBox(height: 20),
-            ItemArtwork(
-              category: _category ?? ItemCategory.other,
-              height: 168,
-              width: double.infinity,
-              borderRadius: 24,
-              showLabel: _category != null,
-            ),
+            _imageFile != null
+                ? Image.file(_imageFile!, height: 168, width: double.infinity, fit: BoxFit.cover)
+                : ItemArtwork(
+                    category: _category ?? ItemCategory.other,
+                    height: 168,
+                    width: double.infinity,
+                    borderRadius: 24,
+                    showLabel: _category != null,
+                  ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const AppIcon(
-                  'camera-linear',
-                  size: 14,
-                  color: AppColors.textTertiary,
-                ),
+                const AppIcon('camera-linear', size: 14, color: AppColors.textTertiary),
                 const SizedBox(width: 5),
                 Expanded(
-                  child: Text(
-                    'Visuel de démonstration · l’ajout de photos arrive bientôt.',
-                    style: AppText.tiny.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: _imageFile != null
+                      ? Text(
+                          'Image sélectionnée',
+                          style: AppText.tiny.copyWith(color: AppColors.textPrimary),
+                        )
+                      : Text(
+                          'Choisir une photo',
+                          style: AppText.tiny.copyWith(color: AppColors.textTertiary),
+                        ),
                 ),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 10),
+            _ImageButton(onTap: _pickImage),
+            const SizedBox(height: 20),
             Text('Catégorie', style: AppText.label),
             const SizedBox(height: 10),
             Wrap(
@@ -453,31 +485,6 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
       ),
     );
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  static String _formatDate(DateTime date) {
-    const months = [
-      'janv.',
-      'févr.',
-      'mars',
-      'avr.',
-      'mai',
-      'juin',
-      'juil.',
-      'août',
-      'sept.',
-      'oct.',
-      'nov.',
-      'déc.',
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-
-  static String _formatTime(DateTime date) =>
-      '${date.hour.toString().padLeft(2, '0')}:'
-      '${date.minute.toString().padLeft(2, '0')}';
 }
 
 class _CircleClose extends StatelessWidget {
@@ -866,9 +873,9 @@ class _DayChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : AppColors.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-            ),
+border: Border.all(
+          color: selected ? AppColors.primary : AppColors.border,
+        ),
           ),
           child: Text(
             label,
@@ -1062,6 +1069,43 @@ class _PublishSuccess extends StatelessWidget {
               const Spacer(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageButton extends StatelessWidget {
+  const _ImageButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            const AppIcon('camera-linear', size: 14, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Choisir une photo',
+                style: AppText.tiny.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );
