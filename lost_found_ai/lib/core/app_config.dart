@@ -19,6 +19,6 @@ class AppConfig {
   /// proviennent alors de PostgreSQL via l'API Laravel.
   static const bool useMockData = bool.fromEnvironment(
     'USE_MOCK_DATA',
-    defaultValue: true,
+    defaultValue: false,
   );
 }
