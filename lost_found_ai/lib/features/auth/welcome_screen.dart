@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
@@ -8,9 +9,29 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/scene_art.dart';
+import 'services/google_auth_service.dart';
+import 'widgets/social_buttons.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+  bool _googleLoading = false;
+
+  void _onGoogleSignIn() {
+    GoogleAuthHelper.handleGoogleSignIn(
+      context,
+      ref,
+      onLoadingStart: () => setState(() => _googleLoading = true),
+      onLoadingEnd: () {
+        if (mounted) setState(() => _googleLoading = false);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +64,11 @@ class WelcomeScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const Spacer(flex: 3),
+              GoogleSignInButton(
+                loading: _googleLoading,
+                onPressed: _onGoogleSignIn,
+              ),
+              const SizedBox(height: AppSpacing.sm),
               AppButton(
                 label: AppStrings.createAccount,
                 icon: Icons.person_add_alt_1_rounded,
@@ -54,12 +80,13 @@ class WelcomeScreen extends StatelessWidget {
                 variant: AppButtonVariant.secondary,
                 onPressed: () => context.push(AppRoutes.signIn),
               ),
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.xl),
               Text(
                 'En continuant, vous acceptez les conditions d’utilisation.',
                 style: AppText.caption,
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: AppSpacing.sm),
             ],
           ),
         ),

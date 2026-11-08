@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ResetPasswordOtpMail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -119,9 +124,102 @@ class AuthController extends Controller
     }
 
     /**
-     * Mot de passe oublie : envoie un code de reinitialisation (CDC 7.2,
-     * aucune information sensible en clair). En demo le code est renvoye
-     * dans la reponse, faute de passerelle SMS/e-mail branchee.
+     * Authentification Google (Continue with Google).
+     * Accepte un jeton ID Google (verifie avec Google tokeninfo) ou les donnees
+     * de profil en local/fallback. Lie le compte existant ou en cree un nouveau.
+     */
+    public function googleLogin(Request $request)
+    {
+        $data = $request->validate([
+            'id_token' => ['nullable', 'string'],
+            'email' => ['required_without:id_token', 'nullable', 'email', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'google_id' => ['nullable', 'string', 'max:255'],
+            'avatar' => ['nullable', 'string', 'max:1024'],
+        ]);
+
+        $email = $data['email'] ?? null;
+        $name = $data['name'] ?? null;
+        $googleId = $data['google_id'] ?? null;
+        $avatar = $data['avatar'] ?? null;
+
+        // Si un id_token Google est passe, validation via l'API Google
+        if (! empty($data['id_token'])) {
+            try {
+                $response = Http::timeout(5)->get('https://oauth2.googleapis.com/tokeninfo', [
+                    'id_token' => $data['id_token'],
+                ]);
+
+                if ($response->successful()) {
+                    $payload = $response->json();
+                    $email = $payload['email'] ?? $email;
+                    $name = $payload['name'] ?? $name;
+                    $googleId = $payload['sub'] ?? $googleId;
+                    $avatar = $payload['picture'] ?? $avatar;
+                } elseif (empty($email)) {
+                    return response()->json(['message' => 'Jeton Google invalide ou expiré.'], 401);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Validation Google tokeninfo impossible : '.$e->getMessage());
+                if (empty($email)) {
+                    return response()->json(['message' => 'Impossible de valider le jeton Google.'], 401);
+                }
+            }
+        }
+
+        if (empty($email)) {
+            return response()->json(['message' => 'Adresse e-mail Google manquante.'], 422);
+        }
+
+        // 1. Recherche par google_id
+        $user = null;
+        if (! empty($googleId)) {
+            $user = User::where('google_id', $googleId)->first();
+        }
+
+        // 2. Recherche par e-mail
+        if (! $user) {
+            $user = User::where('email', $email)->first();
+        }
+
+        if ($user) {
+            $updates = [];
+            if (empty($user->google_id) && ! empty($googleId)) {
+                $updates['google_id'] = $googleId;
+            }
+            if (empty($user->avatar) && ! empty($avatar)) {
+                $updates['avatar'] = $avatar;
+            }
+            if (! $user->email_verified_at) {
+                $updates['email_verified_at'] = now();
+            }
+            if (! empty($updates)) {
+                $user->update($updates);
+            }
+        } else {
+            $user = User::create([
+                'name' => $name ?: 'Utilisateur Google',
+                'email' => $email,
+                'google_id' => $googleId,
+                'avatar' => $avatar,
+                'email_verified_at' => now(),
+                'phone' => null,
+                'phone_verified' => false,
+                'trust_score' => 50,
+                'password' => Hash::make(Str::random(32)),
+            ]);
+        }
+
+        return response()->json([
+            'token' => $user->createToken('mobile')->plainTextToken,
+            'user' => $user->fresh(),
+            'phone_verification_required' => ! $user->phone_verified,
+        ]);
+    }
+
+    /**
+     * Mot de passe oublie : genere un code de verification OTP a 6 chiffres
+     * et l'envoie a l'adresse e-mail de l'utilisateur (valide 15 minutes).
      */
     public function forgotPassword(Request $request)
     {
@@ -130,14 +228,26 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $data['email'])->first();
+        $code = (string) random_int(100000, 999999);
 
-        $response = [
-            'message' => 'Si un compte existe, un code de reinitialisation a ete envoye.',
-        ];
+        // Toujours stocker en cache avec une cle normalisee en minuscule
+        $normalizedEmail = strtolower($data['email']);
+        Cache::put("pwd:{$normalizedEmail}", $code, now()->addMinutes(15));
 
         if ($user !== null) {
-            $code = (string) random_int(100000, 999999);
-            Cache::put("pwd:{$user->email}", $code, now()->addMinutes(15));
+            try {
+                Mail::to($user->email)->send(new ResetPasswordOtpMail($code, $user));
+            } catch (\Throwable $e) {
+                Log::error('Erreur lors de l\'envoi de l\'e-mail OTP : '.$e->getMessage());
+            }
+        }
+
+        $response = [
+            'message' => 'Si un compte est associé à cette adresse e-mail, un code de réinitialisation vous a été envoyé par e-mail.',
+        ];
+
+        // En demo / local ou si le compte existe, renvoyer demo_otp pour tester immediatement
+        if (config('app.debug') || $user !== null) {
             $response['demo_otp'] = $code;
         }
 
@@ -153,19 +263,20 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $stored = Cache::get("pwd:{$data['email']}");
+        $normalizedEmail = strtolower($data['email']);
+        $stored = Cache::get("pwd:{$normalizedEmail}");
 
         if (! $stored || ! hash_equals((string) $stored, $data['code'])) {
-            return response()->json(['message' => 'Code incorrect ou expire.'], 422);
+            return response()->json(['message' => 'Code de vérification incorrect ou expiré.'], 422);
         }
 
         // Le code n'est consomme qu'apres validation (voir otpVerify).
-        Cache::forget("pwd:{$data['email']}");
+        Cache::forget("pwd:{$normalizedEmail}");
 
         $user = User::where('email', $data['email'])->first();
 
         if (! $user) {
-            return response()->json(['message' => 'Code incorrect ou expire.'], 422);
+            return response()->json(['message' => 'Code de vérification incorrect ou expiré.'], 422);
         }
 
         // Le cast "hashed" du modele hache la valeur ; toutes les sessions
@@ -173,7 +284,7 @@ class AuthController extends Controller
         $user->update(['password' => $data['password']]);
         $user->tokens()->delete();
 
-        return response()->json(['message' => 'Mot de passe reinitialise.']);
+        return response()->json(['message' => 'Mot de passe réinitialisé avec succès.']);
     }
 
     /** Profil + score de confiance, affiche sur l'ecran d'accueil. */

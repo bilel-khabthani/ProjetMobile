@@ -53,6 +53,27 @@ class ApiRepository {
     return _toUser(json['user'] as Map<String, dynamic>);
   }
 
+  /// Authentification avec Google (Continue with Google).
+  Future<AppUser> signInWithGoogle({
+    String? idToken,
+    String? email,
+    String? name,
+    String? googleId,
+    String? avatar,
+  }) async {
+    final body = <String, dynamic>{};
+    if (idToken != null) body['id_token'] = idToken;
+    if (email != null) body['email'] = email;
+    if (name != null) body['name'] = name;
+    if (googleId != null) body['google_id'] = googleId;
+    if (avatar != null) body['avatar'] = avatar;
+
+    final json = await _client.post('/auth/google', body) as Map<String, dynamic>;
+    _client.token = json['token'] as String?;
+    lastDemoOtp = null;
+    return _toUser(json['user'] as Map<String, dynamic>);
+  }
+
   /// Demande un code de verification au serveur. Retourne le code en demo.
   Future<String?> requestOtp(String phone) async {
     final json = await _client.post('/auth/otp/request', {
@@ -406,6 +427,8 @@ class ApiRepository {
       recoveredCount: (json['recovered_count'] as num?)?.toInt() ?? 0,
       phone: json['phone'] as String? ?? '',
       phoneVerified: json['phone_verified'] as bool? ?? false,
+      avatar: json['avatar'] as String?,
+      googleId: json['google_id'] as String?,
     );
   }
 

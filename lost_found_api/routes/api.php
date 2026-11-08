@@ -24,6 +24,7 @@ Route::get('/ping', fn () => ['status' => 'ok', 'app' => config('app.name')]);
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/google', [AuthController::class, 'googleLogin'])->middleware('throttle:login');
     Route::post('/otp/request', [AuthController::class, 'requestOtp'])->middleware('throttle:otp');
     Route::post('/otp/verify', [AuthController::class, 'otpVerify'])->middleware('throttle:otp');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');

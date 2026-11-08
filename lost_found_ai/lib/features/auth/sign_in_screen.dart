@@ -10,6 +10,7 @@ import '../../core/theme/app_typography.dart';
 import '../../data/api_client.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
+import 'services/google_auth_service.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/social_buttons.dart';
 
@@ -27,6 +28,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   bool _obscure = true;
   bool _loading = false;
+  bool _googleLoading = false;
+
+  void _onGoogleSignIn() {
+    GoogleAuthHelper.handleGoogleSignIn(
+      context,
+      ref,
+      onLoadingStart: () => setState(() => _googleLoading = true),
+      onLoadingEnd: () {
+        if (mounted) setState(() => _googleLoading = false);
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -93,9 +106,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 SocialAuthButtons(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  loading: _googleLoading,
+                  onGooglePressed: _onGoogleSignIn,
+                  onApplePressed: () => ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Connexion sociale indisponible en demo.'),
+                      content: Text('Connexion Apple bientôt disponible.'),
                     ),
                   ),
                 ),

@@ -61,6 +61,33 @@ class SessionNotifier extends StateNotifier<AppUser?> {
     state = await _api.signIn(email: email, password: password);
   }
 
+  /// Connexion avec Google
+  Future<void> signInWithGoogle({
+    String? idToken,
+    String? email,
+    String? name,
+    String? googleId,
+    String? avatar,
+  }) async {
+    if (AppConfig.useMockData) {
+      final mock = MockRepository();
+      state = await mock.signInWithGoogle(
+        email: email,
+        name: name,
+        avatar: avatar,
+      );
+      return;
+    }
+
+    state = await _api.signInWithGoogle(
+      idToken: idToken,
+      email: email,
+      name: name,
+      googleId: googleId,
+      avatar: avatar,
+    );
+  }
+
   /// Module 1 : consomme le dernier code OTP renvoye par l'API (demo).
   String? consumeDemoOtp() => _api.consumeDemoOtp();
 

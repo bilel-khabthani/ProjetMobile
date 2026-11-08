@@ -29,6 +29,18 @@ class MockRepository {
     return _buildUser('Yasmine Benali', email);
   }
 
+  Future<AppUser> signInWithGoogle({
+    String? email,
+    String? name,
+    String? avatar,
+  }) async {
+    await _delay(_medium);
+    return _buildUser(
+      name ?? 'Amina Campus (Google)',
+      email ?? 'amina.google@campus.fr',
+    );
+  }
+
   Future<List<ItemMatch>> fetchMatches() async {
     await _delay(_fast);
     return _seedMatches();
