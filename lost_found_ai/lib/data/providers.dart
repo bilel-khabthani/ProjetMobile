@@ -89,10 +89,14 @@ class SessionNotifier extends StateNotifier<AppUser?> {
   }
 
   /// Module 1 : consomme le dernier code OTP renvoye par l'API (demo).
-  String? consumeDemoOtp() => _api.consumeDemoOtp();
+  String? consumeDemoOtp() {
+    if (AppConfig.useMockData) return '123456';
+    return _api.consumeDemoOtp();
+  }
 
   /// Renvoie un code de verification pour le numero de la session courante.
   Future<String?> resendOtp() async {
+    if (AppConfig.useMockData) return '123456';
     final phone = state?.phone ?? '';
     if (phone.isEmpty) return null;
     return _api.requestOtp(phone);
@@ -101,25 +105,51 @@ class SessionNotifier extends StateNotifier<AppUser?> {
   /// Valide le code saisi : le profil est rafraichi avec phone_verified=true,
   /// ce qui libere automatiquement l'acces aux services (garde du routeur).
   Future<void> verifyPhone({required String code}) async {
+    if (AppConfig.useMockData) {
+      final current = state;
+      if (current != null) {
+        state = AppUser(
+          name: current.name,
+          email: current.email,
+          initials: current.initials,
+          reputation: current.reputation,
+          recoveredCount: current.recoveredCount,
+          phone: current.phone,
+          phoneVerified: true,
+          avatar: current.avatar,
+          googleId: current.googleId,
+        );
+      }
+      return;
+    }
     final phone = state?.phone ?? '';
     if (phone.isEmpty) return;
     state = await _api.verifyOtp(phone: phone, code: code);
   }
 
-  Future<String?> forgotPassword({required String email}) =>
-      _api.forgotPassword(email: email);
+  Future<String?> forgotPassword({required String email}) {
+    if (AppConfig.useMockData) {
+      return Future.delayed(const Duration(milliseconds: 500), () => '123456');
+    }
+    return _api.forgotPassword(email: email);
+  }
 
   Future<void> resetPassword({
     required String email,
     required String code,
     required String password,
     required String passwordConfirmation,
-  }) => _api.resetPassword(
-    email: email,
-    code: code,
-    password: password,
-    passwordConfirmation: passwordConfirmation,
-  );
+  }) {
+    if (AppConfig.useMockData) {
+      return Future.delayed(const Duration(milliseconds: 500));
+    }
+    return _api.resetPassword(
+      email: email,
+      code: code,
+      password: password,
+      passwordConfirmation: passwordConfirmation,
+    );
+  }
 
   Future<void> logout() async {
     try {
@@ -135,6 +165,21 @@ class SessionNotifier extends StateNotifier<AppUser?> {
     String? passwordConfirmation,
     String? phone,
   }) async {
+    if (AppConfig.useMockData) {
+      final current = state;
+      state = AppUser(
+        name: name,
+        email: email,
+        initials: current?.initials ?? 'LF',
+        reputation: current?.reputation ?? 50,
+        recoveredCount: current?.recoveredCount ?? 0,
+        phone: phone ?? current?.phone ?? '',
+        phoneVerified: current?.phoneVerified ?? true,
+        avatar: current?.avatar,
+        googleId: current?.googleId,
+      );
+      return;
+    }
     state = await _api.updateMe(
       name: name,
       email: email,
