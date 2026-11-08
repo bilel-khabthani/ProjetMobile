@@ -1,5 +1,6 @@
 ﻿import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -26,10 +27,16 @@ class ApiClient {
     : _client = client ?? http.Client(),
       baseUrl = baseUrl ?? defaultBaseUrl;
 
-  static const String defaultBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api',
-  );
+  static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+  /// L'emulateur Android atteint la machine hote via 10.0.2.2, alors qu'un
+  /// navigateur (web) doit utiliser localhost. Un `--dart-define` reste
+  /// prioritaire pour cibler un poste distant ou un telephone physique.
+  static String get defaultBaseUrl {
+    if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
+    if (kIsWeb) return 'http://localhost:8000/api';
+    return 'http://10.0.2.2:8000/api';
+  }
 
   final http.Client _client;
 
