@@ -28,7 +28,6 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
   bool _resending = false;
   bool _needsPhone = false;
   String? _error;
-  String? _demoOtp;
 
   @override
   void initState() {
@@ -38,8 +37,6 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
     if (!_needsPhone) {
       _phoneInputController.text = user?.phone ?? '';
     }
-    // En démo le serveur renvoie le code reçu à l'inscription / à l'envoi.
-    _demoOtp = ref.read(sessionProvider.notifier).consumeDemoOtp();
   }
 
   @override
@@ -75,14 +72,12 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
         phone: phone,
       );
       if (!mounted) return;
-      final otp = ref.read(sessionProvider.notifier).consumeDemoOtp();
       setState(() {
         _needsPhone = false;
-        _demoOtp = otp;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Code de vérification envoyé par SMS.'),
+          content: Text('Code de vérification envoyé par e-mail.'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -130,9 +125,9 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
       _error = null;
     });
     try {
-      final otp = await ref.read(sessionProvider.notifier).resendOtp();
+      await ref.read(sessionProvider.notifier).resendOtp();
       if (!mounted) return;
-      setState(() => _demoOtp = otp);
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Nouveau code envoyé.'),
@@ -233,35 +228,6 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
                       prefixIcon: Icon(Icons.sms_outlined),
                     ),
                   ),
-                  if (_demoOtp != null) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.science_outlined,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Démonstration : le code est $_demoOtp',
-                              style: AppText.caption.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   if (_error != null) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Text(

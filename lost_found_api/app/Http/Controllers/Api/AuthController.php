@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PhoneVerificationOtpMail;
 use App\Mail\ResetPasswordOtpMail;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -41,11 +42,12 @@ class AuthController extends Controller
             'trust_score' => 50,
         ]);
 
+        $this->sendPhoneOtp($user, $data['phone']);
+
         return response()->json([
             'token' => $user->createToken('mobile')->plainTextToken,
             'user' => $user,
             'phone_verification_required' => true,
-            'demo_otp' => $this->storeOtp($data['phone']),
         ], 201);
     }
 
@@ -85,10 +87,12 @@ class AuthController extends Controller
             'phone' => ['required', 'string', 'max:30'],
         ]);
 
+        $user = $request->user();
+        $this->sendPhoneOtp($user, $data['phone']);
+
         return response()->json([
-            'message' => 'Code de verification envoye.',
+            'message' => 'Code de verification envoye par e-mail.',
             'phone' => $data['phone'],
-            'demo_otp' => $this->storeOtp($data['phone']),
         ]);
     }
 
@@ -316,15 +320,30 @@ class AuthController extends Controller
 
         if ($phoneChanged) {
             $response['phone_verification_required'] = true;
-            $response['demo_otp'] = $this->storeOtp($user->phone);
+            $this->sendPhoneOtp($user, $user->phone);
         }
 
         return response()->json($response);
     }
 
     /**
+     * Genere un code a six chiffres, le stocke en cache cinq minutes,
+     * et l'envoie par e-mail a l'utilisateur.
+     */
+    private function sendPhoneOtp(?User $user, string $phone): void
+    {
+        $code = $this->storeOtp($phone);
+        if ($user !== null) {
+            try {
+                Mail::to($user->email)->send(new PhoneVerificationOtpMail($code, $user));
+            } catch (\Throwable $e) {
+                Log::error('Erreur envoi OTP téléphone : ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
      * Genere un code a six chiffres et le stocke en cache cinq minutes.
-     * En demo (aucune passerelle SMS), le code est renvoye a l'appelant.
      */
     private function storeOtp(string $phone): string
     {
