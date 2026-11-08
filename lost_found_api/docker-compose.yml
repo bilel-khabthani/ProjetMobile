@@ -1,0 +1,55 @@
+name: lost-found-api
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lost-found-api:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/var/www/html
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-lost_found}
+      DB_USERNAME: ${DB_USERNAME:-lostfound}
+      DB_PASSWORD: ${DB_PASSWORD:-lostfound2026}
+    command: >
+      sh -c "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lost-found-api:latest
+    volumes:
+      - ./:/var/www/html
+    environment:
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ":memory:"
+    command: php artisan test --compact
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-lost_found}
+      POSTGRES_USER: ${DB_USERNAME:-lostfound}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lostfound2026}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-lostfound} -d ${DB_DATABASE:-lost_found}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  db-data:
