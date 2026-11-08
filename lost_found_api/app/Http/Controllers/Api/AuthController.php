@@ -200,7 +200,7 @@ class AuthController extends Controller
             if (! $user->phone_verified) {
                 $updates['phone_verified'] = true;
                 if (empty($user->phone)) {
-                    $updates['phone'] = '+21620123456';
+                    $updates['phone'] = '+216' . random_int(20000000, 99999999);
                 }
             }
             if (! empty($updates)) {
@@ -213,7 +213,7 @@ class AuthController extends Controller
                 'google_id' => $googleId,
                 'avatar' => $avatar,
                 'email_verified_at' => now(),
-                'phone' => '+21620123456',
+                'phone' => '+216' . random_int(20000000, 99999999),
                 'phone_verified' => true,
                 'trust_score' => 50,
                 'reward_points' => 150,

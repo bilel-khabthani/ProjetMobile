@@ -194,9 +194,86 @@ class GoogleAuthHelper {
                     );
                   },
                 ),
+                const Divider(),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFF64748B),
+                    child: Icon(Icons.person_add_alt_1_rounded, color: Colors.white, size: 20),
+                  ),
+                  title: const Text('Utiliser un autre compte Google', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Saisir une autre adresse e-mail'),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _showCustomEmailDialog(context, ref, onLoadingStart: onLoadingStart, onLoadingEnd: onLoadingEnd);
+                  },
+                ),
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  /// Boîte de dialogue pour saisir n'importe quelle adresse e-mail Google.
+  static void _showCustomEmailDialog(
+    BuildContext context,
+    WidgetRef ref, {
+    VoidCallback? onLoadingStart,
+    VoidCallback? onLoadingEnd,
+  }) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Connexion Google', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Entrez l\'adresse e-mail Google que vous souhaitez utiliser :'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.emailAddress,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'exemple@gmail.com',
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final email = controller.text.trim();
+                if (email.isNotEmpty && email.contains('@')) {
+                  Navigator.pop(dialogContext);
+                  final name = email.split('@').first.replaceAll('.', ' ');
+                  _loginWithAccount(
+                    context,
+                    ref,
+                    email: email,
+                    name: name[0].toUpperCase() + name.substring(1),
+                    googleId: 'google-user-${email.hashCode.abs()}',
+                    onLoadingStart: onLoadingStart,
+                    onLoadingEnd: onLoadingEnd,
+                  );
+                }
+              },
+              child: const Text('Se connecter'),
+            ),
+          ],
         );
       },
     );
