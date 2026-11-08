@@ -173,7 +173,7 @@ class _GoogleAccountPickerSheetState extends State<_GoogleAccountPickerSheet> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundColor: AppColors.primaryLight,
+                  backgroundColor: AppColors.primarySoft,
                   child: Text(
                     acc.name.substring(0, 1).toUpperCase(),
                     style: const TextStyle(
@@ -182,7 +182,7 @@ class _GoogleAccountPickerSheetState extends State<_GoogleAccountPickerSheet> {
                     ),
                   ),
                 ),
-                title: Text(acc.name, style: AppText.bodyMedium),
+                title: Text(acc.name, style: AppText.body),
                 subtitle: Text(acc.email, style: AppText.caption),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 onTap: () => Navigator.of(context).pop(acc),
@@ -191,11 +191,11 @@ class _GoogleAccountPickerSheetState extends State<_GoogleAccountPickerSheet> {
             ],
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.surfaceVariant,
-                child: Icon(Icons.person_add_alt_1_rounded, size: 20, color: AppColors.textSecondary),
+              leading: CircleAvatar(
+                backgroundColor: AppColors.surfaceAlt,
+                child: const Icon(Icons.person_add_alt_1_rounded, size: 20, color: AppColors.textSecondary),
               ),
-              title: Text('Utiliser un autre compte', style: AppText.bodyMedium),
+              title: Text('Utiliser un autre compte', style: AppText.body),
               onTap: () => setState(() => _showCustomForm = true),
             ),
           ] else ...[
