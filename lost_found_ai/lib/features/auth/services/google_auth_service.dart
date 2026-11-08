@@ -36,7 +36,6 @@ class GoogleAuthHelper {
         email: selectedAccount.email,
         name: selectedAccount.name,
         googleId: selectedAccount.googleId,
-        avatar: selectedAccount.avatar,
       );
 
       if (!context.mounted) return;
