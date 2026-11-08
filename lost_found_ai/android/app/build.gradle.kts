@@ -7,7 +7,6 @@ plugins {
 android {
     namespace = "fr.campus.lost_found_ai"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
