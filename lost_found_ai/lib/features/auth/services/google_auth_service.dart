@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/app_config.dart';
 import '../../../core/router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -16,6 +17,7 @@ import '../widgets/google_logo.dart';
 /// Service gérant la vraie authentification avec Google via le plugin officiel `google_sign_in`.
 class GoogleAuthHelper {
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: AppConfig.googleServerClientId,
     scopes: const <String>[
       'email',
       'profile',

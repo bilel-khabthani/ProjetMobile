@@ -21,4 +21,11 @@ class AppConfig {
     'USE_MOCK_DATA',
     defaultValue: false,
   );
+
+  /// ID client Web OAuth Google (utilise par GoogleSignIn sur Android pour
+  /// obtenir un idToken officiel et sécurisé).
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '1084749713721-p4rtkavjbfl6efbpj2s643vdtjb0tkhh.apps.googleusercontent.com',
+  );
 }
