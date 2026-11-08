@@ -108,11 +108,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 SocialAuthButtons(
                   loading: _googleLoading,
                   onGooglePressed: _onGoogleSignIn,
-                  onApplePressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Connexion Apple bientôt disponible.'),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 const OrDivider(label: AppStrings.orContinueWith),

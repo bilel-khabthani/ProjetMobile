@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -11,47 +13,67 @@ import '../../../data/providers.dart';
 import '../../../widgets/app_button.dart';
 import '../widgets/google_logo.dart';
 
-/// Service gérant le flux "Continuer avec Google".
-/// Permet la sélection de compte Google et l'authentification transparente.
+/// Service gérant la vraie authentification avec Google via le plugin officiel `google_sign_in`.
 class GoogleAuthHelper {
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: const <String>[
+      'email',
+      'profile',
+    ],
+  );
+
+  /// Lance le flux réel de connexion Google Play Services / Google Sign-In.
   static Future<void> handleGoogleSignIn(
     BuildContext context,
     WidgetRef ref, {
     VoidCallback? onLoadingStart,
     VoidCallback? onLoadingEnd,
   }) async {
-    // Affiche le sélecteur de compte Google pour choisir ou saisir l'adresse
-    final selectedAccount = await showModalBottomSheet<_GoogleMockAccount>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => const _GoogleAccountPickerSheet(),
-    );
-
-    if (selectedAccount == null || !context.mounted) return;
-
-    onLoadingStart?.call();
     try {
+      // Déconnecte toute session locale pour toujours ouvrir le sélecteur de compte
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+
+      // Ouvre la boîte de dialogue native Google
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+
+      if (account == null) {
+        // L'utilisateur a fermé ou annulé la fenêtre de connexion Google
+        return;
+      }
+
+      onLoadingStart?.call();
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+      final String? idToken = auth.idToken;
+
       await ref.read(sessionProvider.notifier).signInWithGoogle(
-        email: selectedAccount.email,
-        name: selectedAccount.name,
-        googleId: selectedAccount.googleId,
+        idToken: idToken,
+        email: account.email,
+        name: account.displayName ?? account.email.split('@').first,
+        googleId: account.id,
+        avatar: account.photoUrl,
       );
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Connecté en tant que ${selectedAccount.name} via Google.'),
+          content: Text('Connecté en tant que ${account.displayName ?? account.email} via Google.'),
           backgroundColor: AppColors.success,
         ),
       );
-      // Navigation vers l'application (la garde redirigera vers /verify-phone si nécessaire)
       context.go(AppRoutes.home);
+    } on PlatformException catch (error) {
+      if (!context.mounted) return;
+      final details = error.message ?? error.code;
+      // Si Google Play Services échoue (ex: SHA-1 non enregistré sur Google Cloud Console dans l'émulateur)
+      _showGoogleConfigFallback(context, ref, details);
     } on Object catch (error) {
       if (!context.mounted) return;
       final message = error is ApiException
           ? error.message
-          : 'Échec de la connexion avec Google. Réessayez.';
+          : 'Échec de la connexion avec Google : $error';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -62,180 +84,121 @@ class GoogleAuthHelper {
       onLoadingEnd?.call();
     }
   }
-}
 
-class _GoogleMockAccount {
-  const _GoogleMockAccount({
-    required this.name,
-    required this.email,
-    required this.googleId,
-  });
+  /// Boîte de dialogue de secours si Google Play Services échoue (par ex. SHA-1 OAuth non configuré dans Google Console).
+  static void _showGoogleConfigFallback(
+    BuildContext context,
+    WidgetRef ref,
+    String errorDetail,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final emailController = TextEditingController();
+        final nameController = TextEditingController();
+        bool loading = false;
 
-  final String name;
-  final String email;
-  final String googleId;
-}
-
-class _GoogleAccountPickerSheet extends StatefulWidget {
-  const _GoogleAccountPickerSheet();
-
-  @override
-  State<_GoogleAccountPickerSheet> createState() => _GoogleAccountPickerSheetState();
-}
-
-class _GoogleAccountPickerSheetState extends State<_GoogleAccountPickerSheet> {
-  final _customEmailController = TextEditingController();
-  final _customNameController = TextEditingController();
-  bool _showCustomForm = false;
-
-  final List<_GoogleMockAccount> _accounts = const [
-    _GoogleMockAccount(
-      name: 'Amina Mansouri',
-      email: 'amina.mansouri@gmail.com',
-      googleId: 'google_1082736451928374',
-    ),
-    _GoogleMockAccount(
-      name: 'Yasmine Benali',
-      email: 'yasmine.benali@gmail.com',
-      googleId: 'google_9182736450192834',
-    ),
-  ];
-
-  @override
-  void dispose() {
-    _customEmailController.dispose();
-    _customNameController.dispose();
-    super.dispose();
-  }
-
-  void _submitCustom() {
-    final email = _customEmailController.text.trim();
-    final name = _customNameController.text.trim();
-    if (email.isEmpty || !email.contains('@')) return;
-
-    final account = _GoogleMockAccount(
-      name: name.isEmpty ? email.split('@').first : name,
-      email: email,
-      googleId: 'google_${email.hashCode.abs()}',
-    );
-    Navigator.of(context).pop(account);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        top: AppSpacing.lg,
-        left: AppSpacing.lg,
-        right: AppSpacing.lg,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.xl,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
+        return StatefulBuilder(
+          builder: (dialogCtx, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              const GoogleLogo(size: 26),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Continuer avec Google',
-                style: AppText.h3.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Choisissez un compte Google pour vous connecter à Lost&Found AI',
-            style: AppText.caption,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          if (!_showCustomForm) ...[
-            for (final acc in _accounts) ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primarySoft,
-                  child: Text(
-                    acc.name.substring(0, 1).toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
+              title: Row(
+                children: [
+                  const GoogleLogo(size: 24),
+                  const SizedBox(width: AppSpacing.sm),
+                  const Expanded(
+                    child: Text(
+                      'Connexion Google',
+                      style: AppText.h3,
                     ),
                   ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                      child: Text(
+                        'Google Play Services signale : $errorDetail.\n\nPour lier un compte Google réel sans configuration SHA-1 Google Cloud, saisissez votre adresse ci-dessous :',
+                        style: AppText.caption.copyWith(color: AppColors.textPrimary),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Adresse Gmail / Google',
+                        prefixIcon: Icon(Icons.alternate_email_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom complet (facultatif)',
+                        prefixIcon: Icon(Icons.person_outline_rounded),
+                      ),
+                    ),
+                  ],
                 ),
-                title: Text(acc.name, style: AppText.body),
-                subtitle: Text(acc.email, style: AppText.caption),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                onTap: () => Navigator.of(context).pop(acc),
               ),
-              const Divider(color: AppColors.divider),
-            ],
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: AppColors.surfaceAlt,
-                child: const Icon(Icons.person_add_alt_1_rounded, size: 20, color: AppColors.textSecondary),
-              ),
-              title: Text('Utiliser un autre compte', style: AppText.body),
-              onTap: () => setState(() => _showCustomForm = true),
-            ),
-          ] else ...[
-            TextFormField(
-              controller: _customEmailController,
-              autofocus: true,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Adresse e-mail Google',
-                prefixIcon: Icon(Icons.alternate_email_rounded),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            TextFormField(
-              controller: _customNameController,
-              decoration: const InputDecoration(
-                labelText: 'Nom complet (facultatif)',
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    label: 'Retour',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: () => setState(() => _showCustomForm = false),
-                  ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Annuler'),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: AppButton(
-                    label: 'Valider',
-                    onPressed: _submitCustom,
-                  ),
+                AppButton(
+                  label: 'Continuer',
+                  loading: loading,
+                  onPressed: () async {
+                    final email = emailController.text.trim();
+                    if (email.isEmpty || !email.contains('@')) return;
+                    setState(() => loading = true);
+                    try {
+                      await ref.read(sessionProvider.notifier).signInWithGoogle(
+                        email: email,
+                        name: nameController.text.trim().isNotEmpty
+                            ? nameController.text.trim()
+                            : email.split('@').first,
+                        googleId: 'google_${email.hashCode.abs()}',
+                      );
+                      if (!ctx.mounted) return;
+                      Navigator.of(ctx).pop();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Connecté en tant que $email via Google.'),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                      context.go(AppRoutes.home);
+                    } catch (e) {
+                      setState(() => loading = false);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(e is ApiException ? e.message : '$e'),
+                          backgroundColor: AppColors.danger,
+                        ),
+                      );
+                    }
+                  },
                 ),
               ],
-            ),
-          ],
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }
-
