@@ -7,10 +7,24 @@ import 'package:http/http.dart' as http;
 /// Erreur renvoyee par l'API, avec le code HTTP pour permettre a l'appelant
 /// de distinguer un 401 (session expiree) d'un 422 (regle de metier).
 class ApiException implements Exception {
-  ApiException(this.statusCode, this.message);
+  ApiException(this.statusCode, this.message, [this.body]);
 
   final int statusCode;
   final String message;
+
+  /// Corps JSON de la reponse d'erreur (code metier, details de validation).
+  final Map<String, dynamic>? body;
+
+  /// Premier message de validation Laravel, sinon le message general.
+  String get userMessage {
+    final errors = body?['errors'];
+    if (errors is Map && errors.isNotEmpty) {
+      final first = errors.values.first;
+      if (first is List && first.isNotEmpty) return first.first.toString();
+      if (first != null) return first.toString();
+    }
+    return message;
+  }
 
   @override
   String toString() => 'ApiException($statusCode): $message';
@@ -111,6 +125,14 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<dynamic> delete(String path) async {
+    final response = await _client
+        .delete(_uri(path), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    return _decode(response);
+  }
+
   /// Convertit la reponse JSON et leve une ApiException sur erreur.
   dynamic _decode(http.Response response) {
     final body = response.body.isEmpty ? null : jsonDecode(response.body);
@@ -123,7 +145,11 @@ class ApiClient {
         ? (body['message']?.toString() ?? 'Erreur ${response.statusCode}')
         : 'Erreur ${response.statusCode}';
 
-    throw ApiException(response.statusCode, message);
+    throw ApiException(
+      response.statusCode,
+      message,
+      body is Map<String, dynamic> ? body : null,
+    );
   }
 
   void close() => _client.close();

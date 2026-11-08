@@ -72,6 +72,15 @@ abstract final class AppText {
     color: AppColors.textTertiary,
   );
 
+  static const TextStyle eyebrow = TextStyle(
+    fontFamily: family,
+    fontSize: 11,
+    height: 1.2,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 1.1,
+    color: AppColors.textTertiary,
+  );
+
   static const TextStyle button = TextStyle(
     fontFamily: family,
     fontSize: 16,
@@ -87,5 +96,14 @@ abstract final class AppText {
     fontWeight: FontWeight.w800,
     letterSpacing: -1,
     color: AppColors.textPrimary,
+  );
+
+  /// Style le plus petit, reserve aux badges et metadonnees compactes.
+  static const TextStyle tiny = TextStyle(
+    fontFamily: family,
+    fontSize: 10,
+    height: 1.2,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textTertiary,
   );
 }

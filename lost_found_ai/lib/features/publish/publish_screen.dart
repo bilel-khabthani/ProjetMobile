@@ -16,7 +16,18 @@ import '../../widgets/photo_placeholder.dart';
 import '../../widgets/pressable_scale.dart';
 
 class PublishScreen extends ConsumerStatefulWidget {
-  const PublishScreen({super.key});
+  const PublishScreen({
+    super.key,
+    this.initialType = ItemType.lost,
+    this.itemId,
+  });
+
+  final ItemType initialType;
+
+  /// Renseigne par la route `/publish?edit=<id>`. L'edition est desormais
+  /// portee par le module objects ; le parametre reste accepte pour ne pas
+  /// casser les liens existants.
+  final String? itemId;
 
   @override
   ConsumerState<PublishScreen> createState() => _PublishScreenState();
@@ -112,7 +123,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     if (!AppConfig.useMockData) {
       try {
         await ref.read(repositoryProvider).publishItem(
-          type: ItemType.lost,
+          type: widget.initialType,
           category: _category ?? ItemCategory.other,
           description: _descriptionController.text.trim(),
           place: _useCurrentPosition && _currentPosition != null
