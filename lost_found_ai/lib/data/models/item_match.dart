@@ -71,6 +71,8 @@ class AppUser {
     this.phone = '',
     // La demonstration hors ligne simule un compte deja verifie.
     this.phoneVerified = true,
+    this.avatar,
+    this.googleId,
   });
 
   final String name;
@@ -83,4 +85,6 @@ class AppUser {
   /// Verification du numero (CDC 6.1) : tant que false, l'application
   /// impose l'ecran de code OTP avant tout acces aux services.
   final bool phoneVerified;
+  final String? avatar;
+  final String? googleId;
 }

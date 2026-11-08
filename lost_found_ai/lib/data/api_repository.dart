@@ -1,7 +1,8 @@
-﻿import '../core/app_config.dart';
+import '../core/app_config.dart';
 import 'api_client.dart';
 import 'models/item.dart';
 import 'models/item_match.dart';
+import 'models/reward.dart';
 import 'models/swipe_candidate.dart';
 import 'models/trust.dart';
 
@@ -48,6 +49,27 @@ class ApiRepository {
       'email': email,
       'password': password,
     }) as Map<String, dynamic>;
+    _client.token = json['token'] as String?;
+    lastDemoOtp = null;
+    return _toUser(json['user'] as Map<String, dynamic>);
+  }
+
+  /// Authentification avec Google (Continue with Google).
+  Future<AppUser> signInWithGoogle({
+    String? idToken,
+    String? email,
+    String? name,
+    String? googleId,
+    String? avatar,
+  }) async {
+    final body = <String, dynamic>{};
+    if (idToken != null) body['id_token'] = idToken;
+    if (email != null) body['email'] = email;
+    if (name != null) body['name'] = name;
+    if (googleId != null) body['google_id'] = googleId;
+    if (avatar != null) body['avatar'] = avatar;
+
+    final json = await _client.post('/auth/google', body) as Map<String, dynamic>;
     _client.token = json['token'] as String?;
     lastDemoOtp = null;
     return _toUser(json['user'] as Map<String, dynamic>);
@@ -259,8 +281,53 @@ class ApiRepository {
     });
   }
 
-  /// Module Tinder Cards : deck de correspondances classees par le moteur,
-  /// chaque carte etant enrichie d'une pre-analyse IA.
+  /// Module 4 : Catalogue des récompenses partenaires (Glovo, Yassir, Restos)
+  Future<List<Reward>> fetchRewards() async {
+    final list = await _client.get('/rewards') as List<dynamic>;
+    return list.map((raw) => Reward.fromJson(raw as Map<String, dynamic>)).toList();
+  }
+
+  /// Module 4 : Liste des coupons de l'utilisateur
+  Future<List<UserCoupon>> fetchMyCoupons() async {
+    final list = await _client.get('/rewards/my-coupons') as List<dynamic>;
+    return list.map((raw) => UserCoupon.fromJson(raw as Map<String, dynamic>)).toList();
+  }
+
+  /// Module 4 : Solde de points, statut du tour gratuit et historique
+  Future<RewardWallet> fetchRewardWallet() async {
+    final json = await _client.get('/rewards/wallet') as Map<String, dynamic>;
+    return RewardWallet.fromJson(json);
+  }
+
+  /// Module 4 : Échange de points contre un coupon
+  Future<Map<String, dynamic>> redeemReward(int rewardId) async {
+    final json = await _client.post('/rewards/$rewardId/redeem', {}) as Map<String, dynamic>;
+    return json;
+  }
+
+  /// Module 4 : Mini-jeu — Roue de la Chance
+  Future<SpinResult> spinWheel() async {
+    final json = await _client.post('/rewards/wheel/spin', {}) as Map<String, dynamic>;
+    return SpinResult.fromJson(json);
+  }
+
+  /// Module 4 : Envoi du coupon par e-mail avec PDF joint
+  Future<String> sendCouponEmail(String couponId, {String? targetEmail}) async {
+    final payload = (targetEmail != null && targetEmail.trim().isNotEmpty)
+        ? {'email': targetEmail.trim()}
+        : <String, dynamic>{};
+    final json = await _client.post('/rewards/coupons/$couponId/send-email', payload) as Map<String, dynamic>;
+    return json['message'] as String? ?? 'E-mail envoyé avec succès.';
+  }
+
+  /// Module 4 : Marquer un coupon comme utilisé
+  Future<UserCoupon> markCouponUsed(String couponId) async {
+    final json = await _client.post('/rewards/coupons/$couponId/use', {}) as Map<String, dynamic>;
+    return UserCoupon.fromJson(json['coupon'] as Map<String, dynamic>);
+  }
+
+  /// Module Tinder Cards : deck de correspondances classées par le moteur,
+  /// chaque carte étant enrichie d'une pré-analyse IA.
   Future<List<SwipeCandidate>> fetchSwipeDeck() async {
     final json = await _client.get('/swipe/deck') as Map<String, dynamic>;
     final candidates = json['candidates'] as List<dynamic>? ?? const [];
@@ -269,7 +336,7 @@ class ApiRepository {
         .toList();
   }
 
-  /// Analyse IA detaillee d'une correspondance (raisons, confiance, message).
+  /// Analyse IA détaillée d'une correspondance (raisons, confiance, message).
   Future<AiInsight> fetchSwipeInsight(String matchId) async {
     final json =
         await _client.get('/swipe/$matchId/insight') as Map<String, dynamic>;
@@ -278,9 +345,9 @@ class ApiRepository {
     );
   }
 
-  /// Enregistre le choix de l'utilisateur. Le backend met aussi a jour la
-  /// decision du match (LIKE = YES, PASS = NO) pour rester coherent avec le
-  /// parcours de verification existant.
+  /// Enregistre le choix de l'utilisateur. Le backend met aussi à jour la
+  /// décision du match (LIKE = YES, PASS = NO) pour rester cohérent avec le
+  /// parcours de vérification existant.
   Future<void> recordSwipeDecision({
     required String matchId,
     required SwipeDirection direction,
@@ -406,6 +473,8 @@ class ApiRepository {
       recoveredCount: (json['recovered_count'] as num?)?.toInt() ?? 0,
       phone: json['phone'] as String? ?? '',
       phoneVerified: json['phone_verified'] as bool? ?? false,
+      avatar: json['avatar'] as String?,
+      googleId: json['google_id'] as String?,
     );
   }
 

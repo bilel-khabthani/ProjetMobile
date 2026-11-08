@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\Api\MatchController;
+use App\Http\Controllers\Api\RewardController;
 use App\Http\Controllers\Api\SwipeController;
 use App\Http\Controllers\Api\TrustController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,7 @@ Route::get('/ping', fn () => ['status' => 'ok', 'app' => config('app.name')]);
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/google', [AuthController::class, 'googleLogin'])->middleware('throttle:login');
     Route::post('/otp/request', [AuthController::class, 'requestOtp'])->middleware('throttle:otp');
     Route::post('/otp/verify', [AuthController::class, 'otpVerify'])->middleware('throttle:otp');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
@@ -71,5 +73,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/claims/{claim}/respond', [ClaimController::class, 'respond']);
         Route::post('/claims/{claim}/escalate', [ClaimController::class, 'escalate']);
         Route::post('/claims/{claim}/resolve', [ClaimController::class, 'resolve']);
+
+        // Module 4 : Gestion des Récompenses, Coupons, PDF, E-mail & Roue de la Chance
+        Route::prefix('rewards')->group(function () {
+            Route::get('/', [RewardController::class, 'index']);
+            Route::get('/my-coupons', [RewardController::class, 'myCoupons']);
+            Route::get('/wallet', [RewardController::class, 'wallet']);
+            Route::post('/wheel/spin', [RewardController::class, 'spinWheel']);
+            Route::post('/{reward}/redeem', [RewardController::class, 'redeem']);
+            Route::get('/coupons/{coupon}/pdf', [RewardController::class, 'downloadPdf']);
+            Route::post('/coupons/{coupon}/send-email', [RewardController::class, 'sendEmail']);
+            Route::post('/coupons/{coupon}/use', [RewardController::class, 'useCoupon']);
+        });
     });
 });

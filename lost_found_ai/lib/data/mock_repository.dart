@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'models/item.dart';
 import 'models/item_match.dart';
+import 'models/reward.dart';
 
 class MockRepository {
   MockRepository();
@@ -27,6 +28,18 @@ class MockRepository {
   }) async {
     await _delay(_medium);
     return _buildUser('Yasmine Benali', email);
+  }
+
+  Future<AppUser> signInWithGoogle({
+    String? email,
+    String? name,
+    String? avatar,
+  }) async {
+    await _delay(_medium);
+    return _buildUser(
+      name ?? 'Amina Campus (Google)',
+      email ?? 'amina.google@campus.fr',
+    );
   }
 
   Future<List<ItemMatch>> fetchMatches() async {
@@ -183,5 +196,136 @@ class MockRepository {
   static Future<void> _delay(Duration duration) {
     final jitter = Random().nextInt(180);
     return Future<void>.delayed(duration + Duration(milliseconds: jitter));
+  }
+
+  // --- Module 4 Mock Methods ---
+
+  Future<List<Reward>> fetchRewards() async {
+    await _delay(_fast);
+    return [
+      const Reward(
+        id: 1,
+        title: 'Livraison Offerte Glovo',
+        partnerName: 'Glovo Express',
+        partnerType: 'DELIVERY',
+        description: 'Livraison 100% gratuite sur vos repas et courses.',
+        pointsCost: 200,
+        discountText: 'Livraison 100% Offerte',
+        iconName: 'delivery_dining',
+        colorHex: '#FFC244',
+        terms: 'Valable sans minimum d\'achat.',
+      ),
+      const Reward(
+        id: 2,
+        title: 'Bon Livraison Yassir Express',
+        partnerName: 'Yassir Express',
+        partnerType: 'DELIVERY',
+        description: 'Course ou livraison offerte dans le Grand Tunis.',
+        pointsCost: 250,
+        discountText: 'Livraison Offerte',
+        iconName: 'local_shipping',
+        colorHex: '#00A859',
+        terms: 'Valable jusqu\'à 10 DT.',
+      ),
+      const Reward(
+        id: 3,
+        title: 'Menu Sandwich / Burger -30%',
+        partnerName: 'Campus Resto',
+        partnerType: 'RESTAURANT',
+        description: '30% de remise sur le menu étudiant.',
+        pointsCost: 150,
+        discountText: '-30% sur votre repas',
+        iconName: 'restaurant',
+        colorHex: '#E11D48',
+        terms: 'Valable au restaurant universitaire.',
+      ),
+      const Reward(
+        id: 4,
+        title: 'Pause Café Offerte',
+        partnerName: 'Cafétéria Centrale',
+        partnerType: 'CAFE',
+        description: 'Un café + un croissant offerts.',
+        pointsCost: 100,
+        discountText: 'Café + Croissant Offert',
+        iconName: 'coffee',
+        colorHex: '#8B5CF6',
+        terms: 'Valable du lundi au samedi.',
+      ),
+    ];
+  }
+
+  Future<List<UserCoupon>> fetchMyCoupons() async {
+    await _delay(_fast);
+    return [
+      UserCoupon(
+        id: 'mock-coupon-1',
+        title: 'Livraison Offerte Glovo — Restitution',
+        partnerName: 'Glovo Express',
+        partnerType: 'DELIVERY',
+        code: 'GLOVO-CAMPUS-771',
+        discountText: 'Livraison 100% Gratuite',
+        status: CouponStatus.active,
+        source: 'RESTITUTION',
+        expiresAt: DateTime.now().add(const Duration(days: 28)),
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        terms: 'Valable sur l\'app Glovo.',
+      ),
+    ];
+  }
+
+  Future<RewardWallet> fetchRewardWallet() async {
+    await _delay(_fast);
+    return RewardWallet(
+      points: 150,
+      canSpinFreeToday: true,
+      spinCost: 15,
+      history: [
+        RewardTransaction(
+          id: 'tx-1',
+          type: 'WELCOME_BONUS',
+          points: 150,
+          description: 'Bonus citoyen de bienvenue',
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      ],
+    );
+  }
+
+  Future<String> sendCouponEmail(String couponId, {String? targetEmail}) async {
+    await _delay(_fast);
+    return 'Le bon a été envoyé avec succès à ${targetEmail ?? "votre adresse e-mail"} avec le PDF joint.';
+  }
+
+  Future<UserCoupon> markCouponUsed(String couponId) async {
+    await _delay(_fast);
+    return UserCoupon(
+      id: couponId,
+      title: 'Coupon Utilisé',
+      partnerName: 'Partenaire',
+      partnerType: 'SHOPPING',
+      code: 'USED-1234',
+      discountText: 'Utilisé',
+      status: CouponStatus.used,
+      source: 'MOCK',
+      expiresAt: DateTime.now().add(const Duration(days: 30)),
+      createdAt: DateTime.now(),
+    );
+  }
+
+  Future<SpinResult> spinWheel() async {
+    await _delay(_medium);
+    return const SpinResult(
+      prizeIndex: 1,
+      prize: WheelPrize(
+        index: 1,
+        label: '+20 Points',
+        type: 'POINTS',
+        colorHex: '#3B82F6',
+        icon: 'star',
+        points: 20,
+      ),
+      message: 'Bravo ! Vous avez gagné 20 points sur la Roue de la Chance !',
+      newBalance: 170,
+    );
   }
 }
