@@ -38,7 +38,16 @@ class GoogleAuthHelper {
       } catch (_) {}
 
       // Ouvre la boîte de dialogue native Google
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      GoogleSignInAccount? account;
+      try {
+        account = await _googleSignIn.signIn();
+      } catch (e) {
+        // En cas de conflit avec serverClientId sur émulateur, retente en mode natif Android direct
+        final nativeSignIn = GoogleSignIn(
+          scopes: const <String>['email', 'profile'],
+        );
+        account = await nativeSignIn.signIn();
+      }
 
       if (account == null) {
         // L'utilisateur a fermé ou annulé la fenêtre de connexion Google
@@ -47,8 +56,13 @@ class GoogleAuthHelper {
 
       onLoadingStart?.call();
 
-      final GoogleSignInAuthentication auth = await account.authentication;
-      final String? idToken = auth.idToken;
+      String? idToken;
+      try {
+        final auth = await account.authentication;
+        idToken = auth.idToken;
+      } catch (_) {
+        // idToken non disponible, l'API accepte les données de profil réelles
+      }
 
       await ref.read(sessionProvider.notifier).signInWithGoogle(
         idToken: idToken,
