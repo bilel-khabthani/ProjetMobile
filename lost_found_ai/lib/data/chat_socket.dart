@@ -17,6 +17,7 @@ class ChatSocket {
     required this.token,
     required this.currentUserId,
     required this.onMessage,
+    this.onMessagesRead,
     this.onStateChanged,
   });
 
@@ -24,6 +25,7 @@ class ChatSocket {
   final String? token;
   final int? currentUserId;
   final void Function(ChatMessage message) onMessage;
+  final void Function(Set<String> messageIds, DateTime readAt)? onMessagesRead;
   final void Function(bool connected)? onStateChanged;
 
   WebSocketChannel? _channel;
@@ -33,6 +35,7 @@ class ChatSocket {
   String? _socketId;
   bool _connected = false;
   bool _disposed = false;
+  int _reconnectAttempts = 0;
 
   bool get isConnected => _connected;
 
@@ -92,6 +95,7 @@ class ChatSocket {
         unawaited(_subscribe());
       case 'pusher_internal:subscription_succeeded':
         _connected = true;
+        _reconnectAttempts = 0;
         onStateChanged?.call(true);
         _startPing();
       case 'pusher:ping':
@@ -99,6 +103,15 @@ class ChatSocket {
       case 'message.sent':
         final payload = _decodeData(data);
         onMessage(ChatMessage.fromJson(payload, currentUserId: currentUserId));
+      case 'message.read':
+        final payload = _decodeData(data);
+        final ids = (payload['message_ids'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .toSet();
+        final readAt = DateTime.tryParse(payload['read_at'] as String? ?? '');
+        if (ids.isNotEmpty && readAt != null) {
+          onMessagesRead?.call(ids, readAt);
+        }
       case 'pusher:error':
         _scheduleReconnect();
     }
@@ -168,7 +181,13 @@ class ChatSocket {
     _connected = false;
     onStateChanged?.call(false);
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 4), () {
+
+    // Retente vite au debut, puis espace progressivement (plafond 30 s) pour
+    // ne pas marteler Reverb quand le serveur est arrete.
+    final index = _reconnectAttempts < 4 ? _reconnectAttempts : 3;
+    final delaySeconds = const <int>[4, 8, 15, 30][index];
+    _reconnectAttempts = index >= 3 ? 3 : index + 1;
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       if (!_disposed) connect();
     });
   }

@@ -90,6 +90,13 @@ class HomeScreen extends ConsumerWidget {
                   child: _ActionRow(),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: _MapShortcut(),
+                ),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
                 child: _SectionHeader(
@@ -412,6 +419,67 @@ class _TrustCard extends StatelessWidget {
                 color: AppColors.primary,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapShortcut extends StatelessWidget {
+  const _MapShortcut();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ShortcutButton(
+            icon: 'map-linear',
+            label: 'Carte',
+            onTap: () => context.push(AppRoutes.map),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ShortcutButton(
+            icon: 'document-text-linear',
+            label: 'Annonces',
+            onTap: () => context.push(AppRoutes.objects),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShortcutButton extends StatelessWidget {
+  const _ShortcutButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            AppIcon(icon, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(label, style: AppText.label),
           ],
         ),
       ),

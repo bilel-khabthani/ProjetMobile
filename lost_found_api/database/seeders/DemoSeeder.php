@@ -68,6 +68,6 @@ class DemoSeeder extends Seeder
         );
 
         // Declenche le moteur de matching pour alimenter la liste des matchs.
-        $matching->findMatchesForLost($lost);
+        $matching->findMatches($lost);
     }
 }

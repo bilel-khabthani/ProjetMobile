@@ -50,10 +50,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (!mounted) return;
     if (error != null) {
+      // Ne perds pas le texte de l'utilisateur quand la moderation ou le
+      // reseau refuse l'envoi.
+      if (_controller.text.isEmpty) {
+        _controller.text = text;
+        _controller.selection = TextSelection.collapsed(offset: text.length);
+      }
       _showSnack(error);
     } else {
       _scrollToBottom();
     }
+  }
+
+  Future<void> _loadOlder() async {
+    if (!_scrollController.hasClients) {
+      final error = await ref
+          .read(chatProvider(widget.matchId).notifier)
+          .loadOlder();
+      if (mounted && error != null) _showSnack(error);
+      return;
+    }
+
+    final oldMax = _scrollController.position.maxScrollExtent;
+    final oldOffset = _scrollController.position.pixels;
+    final error = await ref
+        .read(chatProvider(widget.matchId).notifier)
+        .loadOlder();
+
+    if (!mounted) return;
+    if (error != null) {
+      _showSnack(error);
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final newMax = _scrollController.position.maxScrollExtent;
+      final delta = newMax - oldMax;
+      if (delta > 0) {
+        _scrollController.jumpTo((oldOffset + delta).clamp(0.0, newMax));
+      }
+    });
   }
 
   void _quickReply(String text) {
@@ -126,9 +163,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final match = ref.watch(matchProvider(widget.matchId)).valueOrNull;
 
     ref.listen(
-      chatProvider(widget.matchId).select((state) => state.messages.length),
-      (_, _) => _scrollToBottom(),
+      chatProvider(
+        widget.matchId,
+      ).select((state) => state.messages.isEmpty ? '' : state.messages.last.id),
+      (previous, next) {
+        // Un nouveau message en bas fait defiler ; le chargement de
+        // l'historique (en haut) ne change pas le dernier identifiant.
+        if (next.isNotEmpty && next != previous) _scrollToBottom();
+      },
     );
+
+    if (match != null && !match.canChat) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _ChatHeader(match: match, connected: false),
+              Expanded(
+                child: _ChatLocked(
+                  reason:
+                      match.chatLockedReason ??
+                      'La messagerie est indisponible pour cette '
+                          'correspondance.',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -144,6 +208,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 chat: chat,
                 scrollController: _scrollController,
                 onReport: _report,
+                onLoadOlder: _loadOlder,
               ),
             ),
             _Composer(
@@ -323,12 +388,14 @@ class _ChatBody extends ConsumerWidget {
     required this.chat,
     required this.scrollController,
     required this.onReport,
+    required this.onLoadOlder,
   });
 
   final String matchId;
   final ChatState chat;
   final ScrollController scrollController;
   final Future<void> Function(ChatMessage message) onReport;
+  final VoidCallback onLoadOlder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -349,17 +416,107 @@ class _ChatBody extends ConsumerWidget {
       return const _EmptyChat();
     }
 
+    final rows = <Object>[];
+    DateTime? currentDay;
+    for (final message in chat.messages) {
+      final day = DateUtils.dateOnly(message.createdAt.toLocal());
+      if (currentDay == null || !DateUtils.isSameDay(currentDay, day)) {
+        rows.add(day);
+        currentDay = day;
+      }
+      rows.add(message);
+    }
+
+    final showHistoryHeader = chat.hasMore || chat.loadingOlder;
+    final headerCount = showHistoryHeader ? 1 : 0;
+
     return ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
-      itemCount: chat.messages.length,
+      itemCount: rows.length + headerCount,
       itemBuilder: (context, index) {
-        final message = chat.messages[index];
+        if (showHistoryHeader && index == 0) {
+          return _LoadOlder(loading: chat.loadingOlder, onPressed: onLoadOlder);
+        }
+
+        final row = rows[index - headerCount];
+        if (row is DateTime) {
+          return _DateDivider(day: row);
+        }
+
+        final message = row as ChatMessage;
         return _MessageBubble(
           message: message,
           onReport: message.isMine ? null : () => onReport(message),
         );
       },
+    );
+  }
+}
+
+class _LoadOlder extends StatelessWidget {
+  const _LoadOlder({required this.loading, required this.onPressed});
+
+  final bool loading;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: loading ? null : onPressed,
+          icon: loading
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const AppIcon(
+                  'clock-circle-linear',
+                  size: 15,
+                  color: AppColors.primary,
+                ),
+          label: Text(
+            'Charger les messages précédents',
+            style: AppText.tiny.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DateDivider extends StatelessWidget {
+  const _DateDivider({required this.day});
+
+  final DateTime day;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(color: AppColors.divider)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              _dayLabel(day),
+              style: AppText.tiny.copyWith(
+                color: AppColors.textTertiary,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider(color: AppColors.divider)),
+        ],
+      ),
     );
   }
 }
@@ -714,6 +871,49 @@ class _EmptyChat extends StatelessWidget {
   }
 }
 
+class _ChatLocked extends StatelessWidget {
+  const _ChatLocked({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: AppIcon(
+                  'lock-keyhole-linear',
+                  size: 34,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Messagerie verrouillée', style: AppText.h3),
+            const SizedBox(height: 5),
+            Text(
+              reason,
+              style: AppText.body.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatError extends StatelessWidget {
   const _ChatError({required this.message, required this.onRetry});
 
@@ -748,6 +948,33 @@ class _ChatError extends StatelessWidget {
       ),
     );
   }
+}
+
+String _dayLabel(DateTime day) {
+  final now = DateUtils.dateOnly(DateTime.now());
+  final target = DateUtils.dateOnly(day);
+  final difference = now.difference(target).inDays;
+
+  if (difference == 0) return "Aujourd'hui";
+  if (difference == 1) return 'Hier';
+
+  const months = [
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
+  ];
+
+  final label = '${target.day} ${months[target.month - 1]}';
+  return target.year == now.year ? label : '$label ${target.year}';
 }
 
 String _timeLabel(DateTime date) {

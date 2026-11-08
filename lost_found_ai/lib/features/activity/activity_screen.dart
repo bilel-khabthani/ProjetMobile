@@ -373,11 +373,11 @@ class _TimelineRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: PressableScale(
-              onTap: entry.matchId == null
-                  ? null
-                  : () => context.push(
-                      AppRoutes.matchDetail(entry.matchId!),
-                    ),
+              onTap: entry.matchId != null
+                  ? () => context.push(AppRoutes.matchDetail(entry.matchId!))
+                  : entry.itemId != null
+                  ? () => context.push(AppRoutes.itemDetail(entry.itemId!))
+                  : null,
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(

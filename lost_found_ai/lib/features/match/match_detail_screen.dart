@@ -398,9 +398,7 @@ class _MiniItemCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   place,
-                  style: AppText.tiny.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                  style: AppText.tiny.copyWith(color: AppColors.textTertiary),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -778,9 +776,14 @@ class _VerificationCardState extends ConsumerState<_VerificationCard> {
 
       if (ok) {
         ref.invalidate(matchesProvider);
+        // La correspondance vient de passer en VERIFIED : il faut recharger
+        // le detail pour obtenir can_chat et deverrouiller la messagerie.
+        ref.invalidate(matchProvider(widget.match.id));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Correspondance vérifiée. La messagerie est ouverte.'),
+            content: Text(
+              'Correspondance vérifiée. La messagerie est ouverte.',
+            ),
           ),
         );
       } else {
@@ -793,8 +796,7 @@ class _VerificationCardState extends ConsumerState<_VerificationCard> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error =
-              'Impossible d’envoyer la réponse. Vérifiez votre connexion.';
+          _error = 'Impossible d’envoyer la réponse. Vérifiez votre connexion.';
         });
       }
     } finally {
@@ -1116,12 +1118,20 @@ class _DetailBottomBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: verified
-            ? AppButton(
-                label: 'Discuter avec ${match.finderName.split(' ').first}',
-                iconName: 'chat-round-linear',
-                variant: AppButtonVariant.success,
-                onPressed: onChat,
-              )
+            ? match.canChat
+                  ? AppButton(
+                      label:
+                          'Discuter avec ${match.finderName.split(' ').first}',
+                      iconName: 'chat-round-linear',
+                      variant: AppButtonVariant.success,
+                      onPressed: onChat,
+                    )
+                  : _LockedBar(
+                      title: 'Chat verrouillé',
+                      subtitle:
+                          match.chatLockedReason ??
+                          'Votre score de confiance est encore trop bas.',
+                    )
             : match.iAmFinder
             ? const _LockedBar()
             : AppButton(
@@ -1135,7 +1145,13 @@ class _DetailBottomBar extends StatelessWidget {
 }
 
 class _LockedBar extends StatelessWidget {
-  const _LockedBar();
+  const _LockedBar({
+    this.title = AppStrings.chatLocked,
+    this.subtitle = 'En attente du propriétaire',
+  });
+
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -1157,15 +1173,10 @@ class _LockedBar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(title, style: AppText.label.copyWith(fontSize: 13)),
                 Text(
-                  AppStrings.chatLocked,
-                  style: AppText.label.copyWith(fontSize: 13),
-                ),
-                Text(
-                  'En attente du propriétaire',
-                  style: AppText.tiny.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+                  subtitle,
+                  style: AppText.tiny.copyWith(color: AppColors.textTertiary),
                 ),
               ],
             ),

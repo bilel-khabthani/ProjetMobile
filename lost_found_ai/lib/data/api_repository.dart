@@ -1,7 +1,3 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
 import '../core/app_config.dart';
 import 'api_client.dart';
 import 'models/chat_message.dart';
@@ -185,11 +181,15 @@ class ApiRepository {
   Future<List<ChatMessage>> fetchMessages(
     String matchId, {
     DateTime? after,
+    DateTime? before,
     int limit = 50,
   }) async {
     final query = <String, String>{'limit': '$limit'};
     if (after != null) {
       query['after'] = after.toUtc().toIso8601String();
+    }
+    if (before != null) {
+      query['before'] = before.toUtc().toIso8601String();
     }
     final suffix = Uri(queryParameters: query).query;
     final json = await _client.get(
@@ -245,7 +245,7 @@ class ApiRepository {
     return json['status'] != 'PENDING';
   }
 
-  Future<void> publishItem({
+  Future<Item> publishItem({
     required ItemType type,
     required ItemCategory category,
     required String title,
@@ -255,7 +255,120 @@ class ApiRepository {
     required DateTime occurredAt,
     double? latitude,
     double? longitude,
-    http.MultipartFile? image,
+    String? imagePath,
+  }) async {
+    final item = await _writeItem(
+      path: '/items',
+      type: type,
+      category: category,
+      title: title,
+      description: description,
+      secretDetail: secretDetail,
+      place: place,
+      occurredAt: occurredAt,
+      latitude: latitude,
+      longitude: longitude,
+      imagePath: imagePath,
+    );
+    await _refreshMatches(item.id);
+    return item;
+  }
+
+  Future<Item> updateItem({
+    required String id,
+    required ItemType type,
+    required ItemCategory category,
+    required String title,
+    required String description,
+    String? secretDetail,
+    required String place,
+    required DateTime occurredAt,
+    double? latitude,
+    double? longitude,
+    bool clearLocation = false,
+    String? imagePath,
+    bool removeImage = false,
+    ItemStatus? status,
+  }) async {
+    final item = await _writeItem(
+      path: '/items/$id',
+      type: type,
+      category: category,
+      title: title,
+      description: description,
+      secretDetail: secretDetail,
+      place: place,
+      occurredAt: occurredAt,
+      latitude: latitude,
+      longitude: longitude,
+      clearLocation: clearLocation,
+      imagePath: imagePath,
+      removeImage: removeImage,
+      status: status,
+      replacing: true,
+    );
+    await _refreshMatches(item.id);
+    return item;
+  }
+
+  Future<Item> fetchItem(String id) async {
+    final json = await _client.get('/items/$id') as Map<String, dynamic>;
+    return Item.fromJson(json);
+  }
+
+  Future<void> deleteItem(String id) async {
+    await _client.delete('/items/$id');
+  }
+
+  Future<List<Item>> fetchCatalog(ItemCatalogQuery query) async {
+    final items = <Item>[];
+    final seen = <String>{};
+    var page = 1;
+    var lastPage = 1;
+    while (page <= lastPage && page <= 5) {
+      final json = await _client.get('/items?${query.toQuery(page: page)}');
+      if (json is! Map<String, dynamic>) break;
+      final data = json['data'];
+      if (data is List) {
+        for (final raw in data) {
+          if (raw is! Map<String, dynamic>) continue;
+          final item = Item.fromJson(raw);
+          if (seen.add(item.id)) items.add(item);
+        }
+      }
+      final meta = json['meta'];
+      if (meta is Map) {
+        lastPage = (meta['last_page'] as num?)?.toInt() ?? page;
+      }
+      page++;
+    }
+    return items;
+  }
+
+  Future<List<Item>> fetchMyItems() async {
+    final items = await _client.get('/items/mine') as List<dynamic>;
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(Item.fromJson)
+        .toList();
+  }
+
+  Future<Item> _writeItem({
+    required String path,
+    required ItemType type,
+    required ItemCategory category,
+    required String title,
+    required String description,
+    String? secretDetail,
+    required String place,
+    required DateTime occurredAt,
+    double? latitude,
+    double? longitude,
+    bool clearLocation = false,
+    String? imagePath,
+    bool removeImage = false,
+    ItemStatus? status,
+    bool replacing = false,
   }) async {
     final payload = <String, dynamic>{
       'type': type == ItemType.lost ? 'LOST' : 'FOUND',
@@ -267,49 +380,37 @@ class ApiRepository {
     };
     final secret = secretDetail?.trim() ?? '';
     if (secret.isNotEmpty) payload['secret_detail'] = secret;
-    if (latitude != null) payload['latitude'] = latitude;
-    if (longitude != null) payload['longitude'] = longitude;
+    if (latitude != null && longitude != null) {
+      payload['latitude'] = latitude;
+      payload['longitude'] = longitude;
+    } else if (clearLocation) {
+      payload['clear_location'] = true;
+    }
+    if (removeImage) payload['remove_image'] = true;
+    if (status != null && replacing) {
+      payload['status'] = itemStatusToCode(status);
+    }
 
-    if (image == null) {
-      await _client.post('/items', payload);
-    } else {
-      final request =
-          http.MultipartRequest('POST', Uri.parse('${_client.baseUrl}/items'));
-      request.headers['Accept'] = 'application/json';
-      if (_client.token != null) {
-        request.headers['Authorization'] = 'Bearer ${_client.token}';
-      }
-      request.fields.addAll(
-        payload.map((key, value) => MapEntry(key, value.toString())),
+    final dynamic json;
+    if (imagePath != null) {
+      json = await _client.postMultipart(
+        path,
+        fields: payload.map((key, value) => MapEntry(key, '$value')),
+        fileField: 'image',
+        filePath: imagePath,
       );
-      request.files.add(image);
-
-      final response = await request
-          .send()
-          .timeout(const Duration(seconds: 30));
-      final body = await response.stream.bytesToString();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        var message = 'Erreur ${response.statusCode}';
-        try {
-          final json = jsonDecode(body) as Map<String, dynamic>;
-          message = json['message']?.toString() ?? message;
-        } catch (_) {}
-        throw ApiException(response.statusCode, message);
-      }
+    } else if (replacing) {
+      json = await _client.put(path, payload);
+    } else {
+      json = await _client.post(path, payload);
     }
-
-    final mine = await _client.get('/items/mine') as List<dynamic>;
-    if (mine.isNotEmpty) {
-      final last = mine.first as Map<String, dynamic>;
-      try {
-        await _client.get('/items/${last['id']}/matches');
-      } catch (_) {}
-    }
+    return Item.fromJson(json as Map<String, dynamic>);
   }
 
-  Future<List<Item>> fetchMyItems() async {
-    final items = await _client.get('/items/mine') as List<dynamic>;
-    return items.map((raw) => _toItem(raw as Map<String, dynamic>)).toList();
+  Future<void> _refreshMatches(String id) async {
+    try {
+      await _client.get('/items/$id/matches');
+    } catch (_) {}
   }
 
   Future<List<Map<String, dynamic>>> fetchNearbyFound() async {
@@ -350,24 +451,6 @@ class ApiRepository {
       'description': description,
       'related_match_id': matchId,
     });
-  }
-
-  Item _toItem(Map<String, dynamic> json) {
-    return Item(
-      id: json['id'] as String? ?? '',
-      type: (json['type'] as String?) == 'LOST'
-          ? ItemType.lost
-          : ItemType.found,
-      category: itemCategoryFromCode(json['category'] as String?),
-      title: json['title'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      place: json['place_label'] as String? ?? '',
-      occurredAt:
-          DateTime.tryParse(json['occurred_at'] as String? ?? '') ??
-          DateTime.now(),
-      distanceMeters: 0,
-      status: ItemStatus.active,
-    );
   }
 
   String _timeLabel(String? iso) {
@@ -418,7 +501,9 @@ class ApiRepository {
       foundItemTitle: otherItem?['title'] as String? ?? '',
       foundItemPlace: otherItem?['place_label'] as String? ?? '',
       foundItemTimeLabel: _timeLabel(otherItem?['occurred_at'] as String?),
-      foundItemCategory: itemCategoryFromCode(otherItem?['category'] as String?),
+      foundItemCategory: itemCategoryFromCode(
+        otherItem?['category'] as String?,
+      ),
       finderName: otherUser?['name'] as String? ?? 'Utilisateur',
       finderInitials: _initials(otherUser?['name'] as String? ?? 'U'),
       finderReputation: (otherUser?['trust_score'] as num?)?.toDouble() ?? 50,
@@ -438,7 +523,21 @@ class ApiRepository {
           'Confirmez-vous que cet objet correspond a votre declaration ?',
       minutesAgo: _minutesAgo(json['created_at'] as String?),
       status: json['status'] as String? ?? 'PENDING',
+      canChat: json['can_chat'] as bool? ?? _statusAllowsChat(json['status']),
+      chatLockedReason: json['chat_locked_reason'] as String?,
+      lastMessage: json['last_message'] as String?,
+      lastMessageAt: DateTime.tryParse(
+        json['last_message_at'] as String? ?? '',
+      ),
+      lastMessageIsMine: json['last_message_is_mine'] as bool? ?? false,
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  bool _statusAllowsChat(Object? status) {
+    return status == 'VERIFIED' ||
+        status == 'CONTACTED' ||
+        status == 'RECOVERED';
   }
 
   int _minutesAgo(String? iso) {

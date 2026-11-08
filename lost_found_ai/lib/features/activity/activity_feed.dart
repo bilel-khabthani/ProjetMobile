@@ -13,6 +13,7 @@ class ActivityEntry {
     required this.subtitle,
     required this.at,
     this.matchId,
+    this.itemId,
   });
 
   final ActivityKind kind;
@@ -20,6 +21,7 @@ class ActivityEntry {
   final String subtitle;
   final DateTime at;
   final String? matchId;
+  final String? itemId;
 
   String get iconName => switch (kind) {
     ActivityKind.lost => 'magnifer-linear',
@@ -52,6 +54,7 @@ List<ActivityEntry> buildActivityFeed({
         subtitle: '${item.place.isEmpty ? item.category.label : item.place}'
             ' · ${relativeTime(item.occurredAt, reference)}',
         at: item.occurredAt,
+        itemId: item.id,
       ),
     for (final match in matches)
       ActivityEntry(

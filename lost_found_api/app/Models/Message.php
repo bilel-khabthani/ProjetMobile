@@ -6,74 +6,53 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-/**
- * Message Model - Represents messages between users about objects
- * Enables communication between lost and found object reporters
- */
 #[Fillable([
-    'from_user_id', 'to_user_id', 'item_id', 'content',
-    'is_read', 'read_at',
+    'match_id', 'sender_id', 'body', 'status', 'moderation_categories',
+    'moderation_scores', 'moderation_provider', 'read_at',
 ])]
 class Message extends Model
 {
-    use HasUuids;
+    use HasUuids, SoftDeletes;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
+
+    public const CREATED_AT = 'created_at';
+
+    public const UPDATED_AT = null;
+
+    public const STATUS_APPROVED = 'APPROVED';
+
+    public const STATUS_BLOCKED = 'BLOCKED';
+
+    public const STATUS_FLAGGED = 'FLAGGED';
 
     protected function casts(): array
     {
         return [
-            'is_read' => 'boolean',
+            'moderation_categories' => 'array',
+            'moderation_scores' => 'array',
             'read_at' => 'datetime',
+            'deleted_at' => 'datetime',
         ];
     }
 
-    /**
-     * Sender of the message
-     */
-    public function fromUser(): BelongsTo
+    public function match(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'from_user_id');
+        return $this->belongsTo(ItemMatch::class);
     }
 
-    /**
-     * Recipient of the message
-     */
-    public function toUser(): BelongsTo
+    public function sender(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'to_user_id');
+        return $this->belongsTo(User::class, 'sender_id');
     }
 
-    /**
-     * Related object (lost/found item)
-     */
-    public function item(): BelongsTo
+    public function moderationEvents(): HasMany
     {
-        return $this->belongsTo(Item::class);
-    }
-
-    /**
-     * Mark message as read
-     */
-    public function markAsRead(): void
-    {
-        if (!$this->is_read) {
-            $this->update([
-                'is_read' => true,
-                'read_at' => now(),
-            ]);
-        }
-    }
-
-    /**
-     * Get unread count for user
-     */
-    public static function unreadCountFor(int $userId): int
-    {
-        return self::where('to_user_id', $userId)
-            ->where('is_read', false)
-            ->count();
+        return $this->hasMany(ModerationEvent::class);
     }
 }

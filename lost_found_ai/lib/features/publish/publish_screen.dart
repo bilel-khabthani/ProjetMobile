@@ -1,14 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/app_config.dart';
 import '../../core/app_strings.dart';
+import '../../core/device_location.dart';
 import '../../core/router.dart';
+import '../../data/api_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -18,12 +21,15 @@ import '../../widgets/app_button.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/photo_placeholder.dart';
 import '../../widgets/pressable_scale.dart';
-import '../objects/data/providers/objects_providers.dart';
+import '../map/location_picker_screen.dart';
+
+import 'package:image_picker/image_picker.dart';
 
 class PublishScreen extends ConsumerStatefulWidget {
-  const PublishScreen({super.key, this.initialType = ItemType.lost});
+  const PublishScreen({super.key, this.initialType = ItemType.lost, this.itemId});
 
   final ItemType initialType;
+  final String? itemId;
 
   @override
   ConsumerState<PublishScreen> createState() => _PublishScreenState();
@@ -32,6 +38,15 @@ class PublishScreen extends ConsumerStatefulWidget {
 class _PublishScreenState extends ConsumerState<PublishScreen> {
   late ItemType _type = widget.initialType;
   ItemCategory? _category;
+  File? _imageFile;
+  String? _existingImageUrl;
+  bool _removeExistingImage = false;
+  double? _pickedLat;
+  double? _pickedLng;
+  bool _clearLocation = false;
+  bool _loadingItem = false;
+  String? _loadError;
+  ItemStatus _status = ItemStatus.active;
 
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -44,10 +59,49 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
   bool _publishing = false;
   bool _published = false;
 
-  final ImagePicker _imagePicker = ImagePicker();
-  Uint8List? _photoBytes;
-  String _photoName = 'photo.jpg';
-  bool _photoLoading = false;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.itemId != null) {
+      _loadingItem = true;
+      Future.microtask(_loadExisting);
+    }
+  }
+
+  Future<void> _loadExisting() async {
+    try {
+      final item = await ref.read(repositoryProvider).fetchItem(widget.itemId!);
+      if (!mounted) return;
+      setState(() {
+        _type = item.type;
+        _category = item.category;
+        _titleController.text = item.title;
+        _descriptionController.text = item.description;
+        _secretController.text = item.secretDetail ?? '';
+        _placeController.text = item.place;
+        _occurredAt = item.occurredAt.toLocal();
+        _pickedLat = item.latitude;
+        _pickedLng = item.longitude;
+        _existingImageUrl = item.imageUrl;
+        _status = item.status == ItemStatus.closed
+            ? ItemStatus.closed
+            : ItemStatus.active;
+        _loadingItem = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingItem = false;
+        _loadError = error.userMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingItem = false;
+        _loadError = 'Impossible de charger cette annonce.';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -65,27 +119,15 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
       (_placeController.text.trim().length >= 2 || _useCurrentPosition);
 
   Future<bool> _getCurrentLocation() async {
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        return false;
-      }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: AndroidSettings(accuracy: LocationAccuracy.high),
-      );
-      if (!mounted) return true;
-      setState(() {
-        _currentPosition = position;
-        _useCurrentPosition = true;
-      });
-      return true;
-    } catch (_) {
-      return false;
-    }
+    final position = await requestCurrentPosition();
+    if (!mounted) return position != null;
+    if (position == null) return false;
+    setState(() {
+      _currentPosition = position;
+      _useCurrentPosition = true;
+      _clearLocation = false;
+    });
+    return true;
   }
 
   Future<void> _toggleGps(bool value) async {
@@ -104,6 +146,53 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+    if (file != null) {
+      setState(() {
+        _imageFile = File(file.path);
+        _removeExistingImage = false;
+      });
+    }
+  }
+
+  String? _imageError(File? file) {
+    if (file == null) return null;
+    final ext = file.path.split('.').last.toLowerCase();
+    if (!const {'jpg', 'jpeg', 'png', 'webp'}.contains(ext)) {
+      return 'Format d’image non accepté (JPG, PNG ou WEBP).';
+    }
+    try {
+      if (file.lengthSync() > 5 * 1024 * 1024) {
+        return 'L’image dépasse 5 Mo.';
+      }
+    } catch (_) {
+      return 'Impossible de lire l’image sélectionnée.';
+    }
+    return null;
+  }
+
+  Future<void> _pickOnMap() async {
+    final initial = _pickedLat != null && _pickedLng != null
+        ? LatLng(_pickedLat!, _pickedLng!)
+        : _currentPosition == null
+        ? null
+        : LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(initial: initial),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _pickedLat = picked.latitude;
+      _pickedLng = picked.longitude;
+      _clearLocation = false;
+      _useCurrentPosition = false;
+    });
   }
 
   void _pickDay(int daysAgo) {
@@ -155,153 +244,75 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     });
   }
 
-  Future<void> _openPhotoSheet() async {
-    FocusScope.of(context).unfocus();
-    final hasPhoto = _photoBytes != null;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 42,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.photo_camera_rounded,
-                  color: AppColors.primary,
-                ),
-                title: const Text('Prendre une photo'),
-                subtitle: const Text('Ouvrir l’appareil photo'),
-                onTap: () => Navigator.pop(sheetContext, 'camera'),
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.photo_library_rounded,
-                  color: AppColors.primary,
-                ),
-                title: const Text('Choisir dans la galerie'),
-                subtitle: const Text('Sélectionner une image existante'),
-                onTap: () => Navigator.pop(sheetContext, 'gallery'),
-              ),
-              if (hasPhoto)
-                ListTile(
-                  leading: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: AppColors.danger,
-                  ),
-                  title: Text(
-                    'Supprimer la photo',
-                    style: TextStyle(color: AppColors.danger),
-                  ),
-                  onTap: () => Navigator.pop(sheetContext, 'remove'),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (choice == null) return;
-    if (choice == 'remove') {
-      setState(() => _photoBytes = null);
-      return;
-    }
-    await _pickPhoto(
-      choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
-    );
-  }
-
-  Future<void> _pickPhoto(ImageSource source) async {
-    if (_photoLoading) return;
-    setState(() => _photoLoading = true);
-    try {
-      final picked = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 1800,
-        maxHeight: 1800,
-        imageQuality: 85,
-      );
-      if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
-      setState(() {
-        _photoBytes = bytes;
-        _photoName = picked.name;
-      });
-    } catch (_) {
-      if (mounted) {
-        _showMessage('Impossible de sélectionner cette photo. Réessayez.');
-      }
-    } finally {
-      if (mounted) setState(() => _photoLoading = false);
-    }
-  }
-
   Future<void> _publish() async {
     if (!_canSubmit || _publishing) return;
     HapticFeedback.mediumImpact();
     FocusScope.of(context).unfocus();
     setState(() => _publishing = true);
-
     final place = _placeController.text.trim();
     final useGps = _useCurrentPosition && _currentPosition != null;
 
-    http.MultipartFile? image;
-    if (_photoBytes != null) {
-      image = http.MultipartFile.fromBytes(
-        'image',
-        _photoBytes!,
-        filename: _photoName,
-      );
-    }
+    final double? finalLat = useGps ? _currentPosition!.latitude : _pickedLat;
+    final double? finalLng = useGps ? _currentPosition!.longitude : _pickedLng;
+    final String placeLabel = place.isNotEmpty
+        ? place
+        : (useGps
+            ? 'Position actuelle'
+            : (_pickedLat != null ? 'Point sélectionné' : 'Campus'));
 
     if (!AppConfig.useMockData) {
       try {
-        await ref
-            .read(repositoryProvider)
-            .publishItem(
-              type: _type,
-              category: _category!,
-              title: _titleController.text.trim(),
-              description: _descriptionController.text.trim(),
-              secretDetail: _secretController.text.trim(),
-              place: place.isNotEmpty
-                  ? place
-                  : (useGps ? 'Position actuelle' : 'Campus'),
-              occurredAt: _occurredAt,
-              latitude: useGps ? _currentPosition!.latitude : null,
-              longitude: useGps ? _currentPosition!.longitude : null,
-              image: image,
-            );
+        final repo = ref.read(repositoryProvider);
+        if (widget.itemId != null) {
+          await repo.updateItem(
+            id: widget.itemId!,
+            type: _type,
+            category: _category!,
+            title: _titleController.text.trim(),
+            description: _descriptionController.text.trim(),
+            secretDetail: _secretController.text.trim(),
+            place: placeLabel,
+            occurredAt: _occurredAt,
+            latitude: finalLat,
+            longitude: finalLng,
+            clearLocation: _clearLocation,
+            imagePath: _imageFile?.path,
+            removeImage: _removeExistingImage,
+            status: _status,
+          );
+        } else {
+          await repo.publishItem(
+            type: _type,
+            category: _category!,
+            title: _titleController.text.trim(),
+            description: _descriptionController.text.trim(),
+            secretDetail: _secretController.text.trim(),
+            place: placeLabel,
+            occurredAt: _occurredAt,
+            latitude: finalLat,
+            longitude: finalLng,
+            imagePath: _imageFile?.path,
+          );
+        }
         ref.invalidate(myItemsProvider);
         ref.invalidate(matchesProvider);
         ref.invalidate(nearbyFoundProvider);
-        invalidateObjectProviders(ref);
-      } catch (error) {
+        ref.invalidate(catalogProvider);
+      } catch (e) {
         if (mounted) {
-          setState(() => _publishing = false);
-          _showMessage('Publication impossible : $error');
+          _showMessage(
+            e is ApiException
+                ? e.userMessage
+                : 'Impossible d’enregistrer l’annonce.',
+          );
         }
+        if (mounted) setState(() => _publishing = false);
         return;
       }
     } else {
       ref.invalidate(myItemsProvider);
       ref.invalidate(matchesProvider);
+      ref.invalidate(catalogProvider);
     }
 
     if (!mounted) return;
@@ -321,10 +332,32 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
       _placeController.clear();
       _useCurrentPosition = false;
       _occurredAt = DateTime.now();
-      _photoBytes = null;
-      _photoName = 'photo.jpg';
     });
   }
+
+  static bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  static String _formatDate(DateTime date) {
+    const months = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  static String _formatTime(DateTime date) =>
+      '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -347,6 +380,7 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
         enabled: _canSubmit,
         loading: _publishing,
         type: _type,
+        isEditing: widget.itemId != null,
         onPressed: _publish,
       ),
       body: SafeArea(
@@ -392,14 +426,21 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              'NOUVELLE ANNONCE',
+              widget.itemId != null ? 'MODIFICATION' : 'NOUVELLE ANNONCE',
               style: AppText.eyebrow.copyWith(color: AppColors.primary),
             ),
             const SizedBox(height: 6),
-            Text(AppStrings.publishTitle, style: AppText.h1),
+            Text(
+              widget.itemId != null
+                  ? 'Modifier votre déclaration'
+                  : AppStrings.publishTitle,
+              style: AppText.h1,
+            ),
             const SizedBox(height: 4),
             Text(
-              AppStrings.publishSubtitle,
+              widget.itemId != null
+                  ? 'Mettez à jour les détails, le lieu ou la photo de votre objet.'
+                  : AppStrings.publishSubtitle,
               style: AppText.body.copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
@@ -408,41 +449,36 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
               onChanged: (value) => setState(() => _type = value),
             ),
             const SizedBox(height: 20),
-            _PhotoPicker(
-              bytes: _photoBytes,
-              category: _category ?? ItemCategory.other,
-              loading: _photoLoading,
-              onTap: _openPhotoSheet,
-              onRemove: _photoBytes == null
-                  ? null
-                  : () => setState(() => _photoBytes = null),
-            ),
+            _imageFile != null
+                ? Image.file(_imageFile!, height: 168, width: double.infinity, fit: BoxFit.cover)
+                : ItemArtwork(
+                    category: _category ?? ItemCategory.other,
+                    height: 168,
+                    width: double.infinity,
+                    borderRadius: 24,
+                    showLabel: _category != null,
+                  ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const AppIcon(
-                  'camera-linear',
-                  size: 14,
-                  color: AppColors.textTertiary,
-                ),
+                const AppIcon('camera-linear', size: 14, color: AppColors.textTertiary),
                 const SizedBox(width: 5),
                 Expanded(
-                  child: Text(
-                    _photoBytes == null
-                        ? 'Ajoutez une vraie photo · appareil ou galerie.'
-                        : 'Photo prête · elle sera jointe à l’annonce.',
-                    style: AppText.tiny.copyWith(
-                      color: _photoBytes == null
-                          ? AppColors.textTertiary
-                          : AppColors.success,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: _imageFile != null
+                      ? Text(
+                          'Image sélectionnée',
+                          style: AppText.tiny.copyWith(color: AppColors.textPrimary),
+                        )
+                      : Text(
+                          'Choisir une photo',
+                          style: AppText.tiny.copyWith(color: AppColors.textTertiary),
+                        ),
                 ),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 10),
+            _ImageButton(onTap: _pickImage),
+            const SizedBox(height: 20),
             Text('Catégorie', style: AppText.label),
             const SizedBox(height: 10),
             Wrap(
@@ -522,6 +558,33 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
               active: _useCurrentPosition,
               onChanged: _toggleGps,
             ),
+            const SizedBox(height: 8),
+            _PickerButton(
+              icon: 'map-point-linear',
+              label: _pickedLat != null && _pickedLng != null
+                  ? 'Position : ${_pickedLat!.toStringAsFixed(4)}, ${_pickedLng!.toStringAsFixed(4)}'
+                  : 'Pointer sur la carte interactive',
+              onTap: _pickOnMap,
+            ),
+            if (_pickedLat != null && _pickedLng != null) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _pickedLat = null;
+                      _pickedLng = null;
+                      _clearLocation = true;
+                    });
+                  },
+                  child: Text(
+                    'Effacer le repère',
+                    style: AppText.tiny.copyWith(color: AppColors.danger),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Text('Quand ?', style: AppText.label),
             const SizedBox(height: 10),
@@ -577,31 +640,6 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
       ),
     );
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
-
-  static String _formatDate(DateTime date) {
-    const months = [
-      'janv.',
-      'févr.',
-      'mars',
-      'avr.',
-      'mai',
-      'juin',
-      'juil.',
-      'août',
-      'sept.',
-      'oct.',
-      'nov.',
-      'déc.',
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
-  }
-
-  static String _formatTime(DateTime date) =>
-      '${date.hour.toString().padLeft(2, '0')}:'
-      '${date.minute.toString().padLeft(2, '0')}';
 }
 
 class _CircleClose extends StatelessWidget {
@@ -990,9 +1028,9 @@ class _DayChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : AppColors.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-            ),
+border: Border.all(
+          color: selected ? AppColors.primary : AppColors.border,
+        ),
           ),
           child: Text(
             label,
@@ -1055,12 +1093,14 @@ class _PublishBottomBar extends StatelessWidget {
     required this.enabled,
     required this.loading,
     required this.type,
+    this.isEditing = false,
     required this.onPressed,
   });
 
   final bool enabled;
   final bool loading;
   final ItemType type;
+  final bool isEditing;
   final VoidCallback onPressed;
 
   @override
@@ -1075,154 +1115,18 @@ class _PublishBottomBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: AppButton(
-          label: type == ItemType.lost
-              ? 'Lancer la recherche'
-              : 'Publier l’objet trouvé',
-          iconName: type == ItemType.lost
-              ? 'magnifer-linear'
-              : 'hand-heart-linear',
+          label: isEditing
+              ? 'Enregistrer les modifications'
+              : (type == ItemType.lost
+                  ? 'Lancer la recherche'
+                  : 'Publier l’objet trouvé'),
+          iconName: isEditing
+              ? 'pen-linear'
+              : (type == ItemType.lost
+                  ? 'magnifer-linear'
+                  : 'hand-heart-linear'),
           loading: loading,
           onPressed: enabled ? onPressed : null,
-        ),
-      ),
-    );
-  }
-}
-
-class _PhotoPicker extends StatelessWidget {
-  const _PhotoPicker({
-    required this.bytes,
-    required this.category,
-    required this.loading,
-    required this.onTap,
-    required this.onRemove,
-  });
-
-  final Uint8List? bytes;
-  final ItemCategory category;
-  final bool loading;
-  final VoidCallback onTap;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasPhoto = bytes != null;
-
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
-        height: 190,
-        width: double.infinity,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: AppShadows.card,
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasPhoto)
-              Image.memory(bytes!, fit: BoxFit.cover)
-            else
-              ItemArtwork(
-                category: category,
-                height: 190,
-                width: double.infinity,
-                borderRadius: 24,
-                showLabel: false,
-              ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: hasPhoto ? 0.48 : 0.06),
-                  ],
-                ),
-              ),
-            ),
-            if (loading)
-              const ColoredBox(
-                color: Color(0x66000000),
-                child: Center(
-                  child: SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            Positioned(
-              left: 12,
-              right: 52,
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.add_a_photo_rounded,
-                      size: 17,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        hasPhoto ? 'Changer la photo' : 'Ajouter une photo',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.label.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (onRemove != null)
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Semantics(
-                  button: true,
-                  label: 'Supprimer la photo',
-                  child: GestureDetector(
-                    onTap: onRemove,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
         ),
       ),
     );
@@ -1326,6 +1230,43 @@ class _PublishSuccess extends StatelessWidget {
               const Spacer(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageButton extends StatelessWidget {
+  const _ImageButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            const AppIcon('camera-linear', size: 14, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Choisir une photo',
+                style: AppText.tiny.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -12,16 +12,9 @@ import 'models/item_match.dart';
 import 'models/trust.dart';
 import 'models/item.dart';
 
-/// Client API centralise et partage pour Sanctum.
-final apiClientProvider = Provider<ApiClient>(
-  (ref) => ApiClient(baseUrl: AppConfig.apiBaseUrl),
-);
-
 /// Source de donnees active. Les deux classes exposent la meme surface, donc
 /// les ecrans ne changent pas selon le mode choisi.
-final apiRepositoryProvider = Provider<ApiRepository>(
-  (ref) => ApiRepository(client: ref.watch(apiClientProvider)),
-);
+final apiRepositoryProvider = Provider<ApiRepository>((ref) => ApiRepository());
 
 final mockRepositoryProvider = Provider<MockRepository>(
   (ref) => MockRepository(),
@@ -50,6 +43,8 @@ class SessionNotifier extends StateNotifier<AppUser?> {
     _ref.invalidate(trustProvider);
     _ref.invalidate(myItemsProvider);
     _ref.invalidate(nearbyFoundProvider);
+    _ref.invalidate(catalogProvider);
+    _ref.invalidate(itemProvider);
     _ref.invalidate(verificationProvider);
   }
 
@@ -262,6 +257,8 @@ class ChatState {
     this.loading = true,
     this.sending = false,
     this.connected = false,
+    this.loadingOlder = false,
+    this.hasMore = false,
     this.error,
   });
 
@@ -269,6 +266,8 @@ class ChatState {
   final bool loading;
   final bool sending;
   final bool connected;
+  final bool loadingOlder;
+  final bool hasMore;
   final String? error;
 
   ChatState copyWith({
@@ -276,6 +275,8 @@ class ChatState {
     bool? loading,
     bool? sending,
     bool? connected,
+    bool? loadingOlder,
+    bool? hasMore,
     String? error,
     bool clearError = false,
   }) {
@@ -284,6 +285,8 @@ class ChatState {
       loading: loading ?? this.loading,
       sending: sending ?? this.sending,
       connected: connected ?? this.connected,
+      loadingOlder: loadingOlder ?? this.loadingOlder,
+      hasMore: hasMore ?? this.hasMore,
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -298,6 +301,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       token: _repository.token,
       currentUserId: _repository.currentUserId,
       onMessage: _onSocketMessage,
+      onMessagesRead: _onMessagesRead,
       onStateChanged: (connected) {
         if (mounted) {
           state = state.copyWith(connected: connected);
@@ -307,27 +311,36 @@ class ChatNotifier extends StateNotifier<ChatState> {
     unawaited(load());
   }
 
+  static const int _pageSize = 50;
+  static const Duration _pollInterval = Duration(seconds: 10);
+
   final ApiRepository _repository;
   final String matchId;
   late final ChatSocket _socket;
+
+  Timer? _pollTimer;
+  bool _polling = false;
+  int _pollTicks = 0;
 
   Future<void> load() async {
     state = state.copyWith(loading: true, clearError: true);
 
     try {
-      final messages = await _repository.fetchMessages(matchId);
+      final messages = await _repository.fetchMessages(
+        matchId,
+        limit: _pageSize,
+      );
       if (!mounted) return;
 
-      state = state.copyWith(messages: messages, loading: false);
+      state = state.copyWith(
+        messages: messages,
+        loading: false,
+        hasMore: messages.length >= _pageSize,
+      );
 
-      // Un echec de lecture ne doit pas empecher l'ouverture du WebSocket.
-      try {
-        await _repository.markMessagesRead(matchId);
-      } catch (_) {
-        // Le message reste non lu cote serveur ; la messagerie reste utilisable.
-      }
-      await _socket.connect();
-      await _socket.connect();
+      _markReadSilently();
+      unawaited(_socket.connect());
+      _ensurePolling();
     } on ApiException catch (error) {
       if (!mounted) return;
       state = state.copyWith(loading: false, error: error.message);
@@ -337,6 +350,42 @@ class ChatNotifier extends StateNotifier<ChatState> {
         loading: false,
         error: 'Messagerie indisponible. Verifiez votre connexion.',
       );
+    }
+  }
+
+  /// Charge la page precedente. Retourne une erreur affichable si besoin.
+  Future<String?> loadOlder() async {
+    if (state.loadingOlder || !state.hasMore || state.messages.isEmpty) {
+      return null;
+    }
+
+    state = state.copyWith(loadingOlder: true, clearError: true);
+
+    try {
+      final older = await _repository.fetchMessages(
+        matchId,
+        before: state.messages.first.createdAt,
+        limit: _pageSize,
+      );
+      if (!mounted) return null;
+
+      state = state.copyWith(
+        messages: _mergeMessages(older, state.messages),
+        loadingOlder: false,
+        hasMore: older.length >= _pageSize,
+      );
+      return null;
+    } on ApiException catch (error) {
+      if (mounted) {
+        state = state.copyWith(loadingOlder: false, error: error.message);
+      }
+      return error.message;
+    } catch (_) {
+      const message = "Impossible de charger l'historique.";
+      if (mounted) {
+        state = state.copyWith(loadingOlder: false, error: message);
+      }
+      return message;
     }
   }
 
@@ -354,11 +403,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
       if (!mounted) return null;
 
-      final messages = [...state.messages];
-      if (!messages.any((item) => item.id == message.id)) {
-        messages.add(message);
-      }
-      state = state.copyWith(messages: messages, sending: false);
+      state = state.copyWith(
+        messages: _mergeMessages(state.messages, [message]),
+        sending: false,
+      );
       return null;
     } on ApiException catch (error) {
       if (mounted) {
@@ -392,16 +440,105 @@ class ChatNotifier extends StateNotifier<ChatState> {
   void _onSocketMessage(ChatMessage message) {
     if (!mounted) return;
 
-    final existing = state.messages.indexWhere((item) => item.id == message.id);
-    if (existing >= 0) return;
+    if (state.messages.any((item) => item.id == message.id)) return;
 
-    final messages = [...state.messages, message]
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    state = state.copyWith(messages: messages);
+    state = state.copyWith(messages: _mergeMessages(state.messages, [message]));
 
     if (!message.isMine) {
       _markReadSilently();
     }
+  }
+
+  void _onMessagesRead(Set<String> messageIds, DateTime readAt) {
+    if (!mounted) return;
+
+    final messages = state.messages
+        .map(
+          (message) => message.isMine && messageIds.contains(message.id)
+              ? message.copyWith(readAt: readAt)
+              : message,
+        )
+        .toList(growable: false);
+
+    state = state.copyWith(messages: messages);
+  }
+
+  /// Filet de securite quand Reverb n'est pas disponible : on interroge l'API
+  /// toutes les 10 s pour recuperer les nouveaux messages et les accuses de
+  /// lecture. Toutes les 40 s, on recharge la derniere page pour synchroniser
+  /// aussi les statuts de lecture.
+  void _ensurePolling() {
+    _pollTimer ??= Timer.periodic(_pollInterval, (_) => _poll());
+  }
+
+  Future<void> _poll() async {
+    if (_polling || !mounted) return;
+    _polling = true;
+
+    try {
+      _pollTicks++;
+      if (_pollTicks % 4 == 0) {
+        await _refreshLatest();
+      } else {
+        await _fetchNew();
+      }
+    } catch (_) {
+      // Le prochain tick retentera ; l'ecran garde les messages deja affiches.
+    } finally {
+      _polling = false;
+    }
+  }
+
+  Future<void> _fetchNew() async {
+    if (state.messages.isEmpty) {
+      await _refreshLatest();
+      return;
+    }
+
+    final last = state.messages.last.createdAt.subtract(
+      const Duration(seconds: 1),
+    );
+    final fresh = await _repository.fetchMessages(
+      matchId,
+      after: last,
+      limit: _pageSize,
+    );
+    if (!mounted || fresh.isEmpty) return;
+
+    state = state.copyWith(messages: _mergeMessages(state.messages, fresh));
+
+    if (fresh.any((message) => !message.isMine)) {
+      _markReadSilently();
+    }
+  }
+
+  Future<void> _refreshLatest() async {
+    final latest = await _repository.fetchMessages(matchId, limit: _pageSize);
+    if (!mounted || latest.isEmpty) return;
+
+    final latestIds = latest.map((message) => message.id).toSet();
+    final older = state.messages
+        .where((message) => !latestIds.contains(message.id))
+        .toList(growable: false);
+
+    state = state.copyWith(messages: _mergeMessages(older, latest));
+
+    if (latest.any((message) => !message.isMine && message.readAt == null)) {
+      _markReadSilently();
+    }
+  }
+
+  List<ChatMessage> _mergeMessages(
+    List<ChatMessage> base,
+    List<ChatMessage> incoming,
+  ) {
+    final byId = <String, ChatMessage>{
+      for (final message in base) message.id: message,
+      for (final message in incoming) message.id: message,
+    };
+    final merged = byId.values.toList(growable: false)
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return merged;
   }
 
   void _markReadSilently() {
@@ -416,6 +553,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     unawaited(_socket.dispose());
     super.dispose();
   }
@@ -440,4 +578,17 @@ final nearbyFoundProvider = FutureProvider<List<Map<String, dynamic>>>((
     return const [];
   }
   return ref.watch(repositoryProvider).fetchNearbyFound();
+});
+
+final catalogProvider = FutureProvider.autoDispose
+    .family<List<Item>, ItemCatalogQuery>((ref, query) async {
+      if (AppConfig.useMockData) return const [];
+      return ref.watch(repositoryProvider).fetchCatalog(query);
+    });
+
+final itemProvider = FutureProvider.autoDispose.family<Item, String>((
+  ref,
+  id,
+) async {
+  return ref.watch(repositoryProvider).fetchItem(id);
 });

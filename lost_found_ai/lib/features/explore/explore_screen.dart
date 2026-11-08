@@ -124,86 +124,25 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       ],
                     ),
                   ),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.foundSoft,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const AppIcon(
-                      'map-point-linear',
-                      size: 23,
-                      color: AppColors.mintDark,
+                  GestureDetector(
+                    onTap: () => context.push(AppRoutes.map),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.foundSoft,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const AppIcon(
+                        'map-point-linear',
+                        size: 23,
+                        color: AppColors.mintDark,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              GestureDetector(
-                onTap: () => context.push(AppRoutes.objectsMap),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF5B4DF5), AppColors.primary],
-                    ),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                    boxShadow: AppShadows.primary,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.map_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Carte interactive',
-                              style: AppText.bodyStrong.copyWith(
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Rayon, filtres, géolocalisation et itinéraires',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppText.tiny.copyWith(
-                                color: Colors.white.withValues(alpha: 0.82),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 22),
               _SearchField(
                 controller: _searchController,
                 onChanged: (value) => setState(() => _query = value),

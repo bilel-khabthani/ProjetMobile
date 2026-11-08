@@ -11,18 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('notifications')) {
-            Schema::create('notifications', function (Blueprint $table) {
-                $table->id();
-                $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade');
-                $table->string('title')->nullable();
-                $table->text('message')->nullable();
-                $table->string('type')->default('general');
-                $table->json('data')->nullable();
-                $table->boolean('is_read')->default(false);
-                $table->timestamps();
-            });
-        }
+        Schema::create('notifications', function (Blueprint $table) {
+            $table->id();
+            $table->timestamps();
+        });
     }
 
     /**

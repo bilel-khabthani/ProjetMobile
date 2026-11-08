@@ -3,529 +3,181 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Category;
 use App\Models\Item;
-use App\Models\ItemImage;
-use App\Models\ObjectEvent;
-use App\Models\ObjectFavorite;
 use App\Services\MatchingService;
-use App\Services\NotificationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Module 2 - Gestion des Objets Perdus et Trouves (Lost & Found Management Module).
- * Gere le cycle de vie complet des annonces d'objets perdus et trouves,
- * la recherche geographique par formule de Haversine, le filtrage avance et les statistiques.
+ * Module 2 - Declaration et verification (CDC section 6.2).
+ * Une declaration est un Item de type LOST ou FOUND.
  */
 class ItemController extends Controller
 {
-    /**
-     * Liste des objets avec filtres avances et pagination.
-     */
+    private const CATEGORIES = [
+        'sac', 'telephone', 'cles', 'papiers', 'vetement', 'lunettes', 'portefeuille', 'autre',
+    ];
+
+    private const PUBLIC_STATUSES = ['ACTIVE', 'MATCHED', 'DISPUTED', 'RECOVERED', 'CLOSED'];
+
     public function index(Request $request)
     {
-        $query = Item::query()->with(['user:id,name,trust_score', 'images', 'categoryRef:id,slug,name,icon']);
+        $filters = $request->validate([
+            'type' => ['nullable', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND])],
+            'category' => ['nullable', Rule::in(self::CATEGORIES)],
+            'status' => ['nullable', Rule::in(self::PUBLIC_STATUSES)],
+            'q' => ['nullable', 'string', 'max:120'],
+            'occurred_from' => ['nullable', 'date'],
+            'occurred_to' => ['nullable', 'date'],
+            'with_location' => ['nullable', 'boolean'],
+            'sort' => ['nullable', Rule::in(['recent', 'oldest', 'title'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
 
-        // Filtre par statut (par defaut ACTIVE si non specifie, ou 'all' pour tout)
-        $status = $request->query('status');
-        if ($status && strtolower($status) !== 'all') {
-            $query->where('status', strtoupper($status));
-        } elseif (!$status) {
-            $query->where('status', 'ACTIVE');
+        $query = Item::query()->with('user:id,name,trust_score');
+
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        } else {
+            $query->whereIn('status', ['ACTIVE', 'MATCHED', 'DISPUTED']);
         }
 
-        // Filtre par type (LOST ou FOUND)
-        if ($type = $request->query('type')) {
-            $query->where('type', strtoupper($type));
+        $query
+            ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
+            ->when($filters['category'] ?? null, fn ($q, $category) => $q->where('category', $category))
+            ->when($filters['occurred_from'] ?? null, fn ($q, $from) => $q->where('occurred_at', '>=', $from))
+            ->when($filters['occurred_to'] ?? null, fn ($q, $to) => $q->where('occurred_at', '<=', $to));
+
+        if ($request->boolean('with_location')) {
+            $query->whereNotNull('latitude')->whereNotNull('longitude');
         }
 
-        // Filtre par categorie
-        if ($category = $request->query('category')) {
-            $query->where('category', strtolower($category));
-        }
-
-        // Recherche textuelle (titre, description, lieu)
-        if ($search = $request->query('search') ?: $request->query('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('place_label', 'like', "%{$search}%");
+        $term = trim((string) ($filters['q'] ?? ''));
+        if ($term !== '') {
+            $like = '%'.addcslashes($term, '%_\\').'%';
+            $query->where(function ($inner) use ($like) {
+                $inner->where('title', 'like', $like)
+                    ->orWhere('description', 'like', $like)
+                    ->orWhere('place_label', 'like', $like);
             });
         }
 
-        // Filtre par date (aliases start_date / end_date acceptes par le client Flutter)
-        $fromDate = $request->query('date_from') ?: $request->query('start_date');
-        $toDate = $request->query('date_to') ?: $request->query('end_date');
-        if ($fromDate) {
-            $query->where('occurred_at', '>=', $fromDate);
-        }
-        if ($toDate) {
-            $query->where('occurred_at', '<=', $toDate);
-        }
+        match ($filters['sort'] ?? 'recent') {
+            'oldest' => $query->orderBy('occurred_at')->orderBy('id'),
+            'title' => $query->orderBy('title')->orderBy('id'),
+            default => $query->orderByDesc('occurred_at')->orderBy('id'),
+        };
 
-        $sort = $request->query('sort');
-        $sortBy = $request->query('sort_by', 'created_at');
-        $sortOrder = strtolower((string) $request->query('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
-        if ($sort === 'oldest') {
-            $query->orderBy('created_at', 'asc');
-        } elseif ($sort === 'newest') {
-            $query->orderBy('created_at', 'desc');
-        } elseif (in_array($sortBy, ['created_at', 'occurred_at', 'title'], true)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->latest();
-        }
-
-        // Pagination
-        $limit = min((int) ($request->query('limit', 50)), 100);
-        $offset = max((int) ($request->query('offset', 0)), 0);
-
-        $latitude = $request->query('latitude');
-        $longitude = $request->query('longitude');
-        $radiusKm = $request->query('radius_km');
-        if ($latitude !== null && $longitude !== null && $radiusKm !== null) {
-            $originLat = (float) $latitude;
-            $originLng = (float) $longitude;
-            $radius = (float) $radiusKm;
-            $items = $query
-                ->whereNotNull('latitude')
-                ->whereNotNull('longitude')
-                ->limit(500)
-                ->get()
-                ->map(function (Item $item) use ($originLat, $originLng) {
-                    $item->distance_km = round($this->calculateHaversineDistance(
-                        $originLat,
-                        $originLng,
-                        (float) $item->latitude,
-                        (float) $item->longitude
-                    ), 2);
-
-                    return $item;
-                })
-                ->filter(fn (Item $item) => $item->distance_km <= $radius)
-                ->sortBy($request->query('sort') === 'distance' ? 'distance_km' : 'created_at')
-                ->values();
-
-            if ($request->query('sort') !== 'distance' && $request->query('sort') === 'oldest') {
-                $items = $items->sortBy('created_at')->values();
-            }
-
-            $total = $items->count();
-            $items = $items->slice($offset, $limit)->values();
-            $this->attachFavoriteFlag($items, $request);
-
-            if ($request->header('Accept-Format') === 'paginated' || $request->has('page')) {
-                return response()->json([
-                    'data' => $items,
-                    'total' => $total,
-                    'limit' => $limit,
-                    'offset' => $offset,
-                ]);
-            }
-
-            return response()->json($items);
-        }
-
-        $total = (clone $query)->count();
-        $items = $query->skip($offset)->take($limit)->get();
-        $this->attachFavoriteFlag($items, $request);
-
-        // Supporte a la fois reponse directe (tableau) pour compatibilite client ou structure paginee
-        if ($request->header('Accept-Format') === 'paginated' || $request->has('page')) {
-            return response()->json([
-                'data' => $items,
-                'total' => $total,
-                'limit' => $limit,
-                'offset' => $offset,
-            ]);
-        }
-
-        return response()->json($items);
-    }
-
-    /**
-     * Statistiques globales pour le tableau de bord.
-     */
-    public function statistics()
-    {
-        $totalLost = Item::where('type', Item::TYPE_LOST)->count();
-        $totalFound = Item::where('type', Item::TYPE_FOUND)->count();
-        $activeCount = Item::where('status', 'ACTIVE')->count();
-        $resolvedCount = Item::whereIn('status', ['RECOVERED', 'RESOLVED', 'CLOSED'])->count();
-        $recent = Item::with(['user:id,name,trust_score', 'images'])
-            ->where('status', 'ACTIVE')
-            ->latest()
-            ->limit(5)
-            ->get();
+        $paginator = $query->paginate((int) ($filters['per_page'] ?? 50));
 
         return response()->json([
-            'total_objects' => $totalLost + $totalFound,
-            'total_lost' => $totalLost,
-            'total_found' => $totalFound,
-            'active_count' => $activeCount,
-            'resolved_count' => $resolvedCount,
-            'with_location' => Item::where('status', 'ACTIVE')->whereNotNull('latitude')->whereNotNull('longitude')->count(),
-            'recent_objects' => $recent,
+            'data' => $paginator->getCollection()
+                ->map(fn (Item $item) => $this->payload($item, $request))
+                ->values(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 
-    /**
-     * Mes declarations (objets crees par l'utilisateur connecte).
-     */
+    /** Mes declarations : une seule structure LOST/FOUND (CDC 6.2.1). */
     public function mine(Request $request)
     {
-        $query = Item::where('user_id', $request->user()->id);
-
-        if ($type = $request->query('type')) {
-            $query->where('type', strtoupper($type));
-        }
-
-        if ($status = $request->query('status')) {
-            if (strtolower($status) !== 'all') {
-                $query->where('status', strtoupper($status));
-            }
-        }
-
-        $items = $query->latest()->get();
-
-        return response()->json($items);
-    }
-
-    /**
-     * Details complets d'un objet.
-     */
-    public function show(Request $request, Item $item)
-    {
-        $item->load(['user:id,name,trust_score', 'images', 'categoryRef:id,slug,name,icon', 'events']);
-        $item->setAttribute('is_favorite', ObjectFavorite::query()
+        $items = Item::query()
+            ->with('user:id,name,trust_score')
             ->where('user_id', $request->user()->id)
-            ->where('item_id', $item->id)
-            ->exists());
+            ->latest()
+            ->get();
 
-        if ($item->user_id === $request->user()->id) {
-            $item->makeVisible('secret_detail');
-        }
-
-        return response()->json($item);
+        return response()->json(
+            $items->map(fn (Item $item) => $this->payload($item, $request))->values()
+        );
     }
 
-    /**
-     * Publication d'un objet perdu ou trouve.
-     */
-    public function store(Request $request, MatchingService $matching)
+    public function store(Request $request)
     {
-        $data = $request->validate([
-            'type' => ['required', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND, 'lost', 'found'])],
-            'category' => ['required', 'string', 'max:40', Rule::exists('categories', 'slug')],
-            'title' => ['required', 'string', 'max:120'],
-            'description' => ['required', 'string'],
-            'secret_detail' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'place_label' => ['nullable', 'string', 'max:160'],
-            'occurred_at' => ['required', 'date'],
-            'contact_phone' => ['nullable', 'string', 'max:30'],
-            'image' => ['nullable', 'image', 'max:5120'],
-            'images' => ['nullable', 'array', 'max:5'],
-            'images.*' => ['image', 'max:5120'],
-        ]);
-
-        $type = strtoupper($data['type']);
-        $category = Category::where('slug', strtolower($data['category']))->first();
-
-        $imagePath = null;
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('items', 'public');
-        }
+        $data = $this->validatedItem($request);
+        $imagePath = $this->storeImage($request);
 
         $item = Item::create([
+            ...$data,
             'user_id' => $request->user()->id,
-            'category_id' => $category?->id,
-            'type' => $type,
-            'category' => strtolower($data['category']),
-            'title' => $data['title'],
-            'description' => $data['description'],
-            'secret_detail' => $data['secret_detail'] ?? null,
-            'latitude' => isset($data['latitude']) ? (float) $data['latitude'] : null,
-            'longitude' => isset($data['longitude']) ? (float) $data['longitude'] : null,
-            'place_label' => $data['place_label'] ?? null,
-            'occurred_at' => $data['occurred_at'],
-            'contact_phone' => $data['contact_phone'] ?? null,
-            'image_path' => $imagePath,
             'status' => 'ACTIVE',
+            'image_path' => $imagePath,
         ]);
 
-        if ($imagePath) {
-            ItemImage::create([
-                'item_id' => $item->id,
-                'path' => $imagePath,
-                'is_primary' => true,
-            ]);
-        }
-
-        foreach ($request->file('images', []) as $index => $file) {
-            $path = $file->store('items', 'public');
-            $isPrimary = $imagePath === null && $index === 0;
-            ItemImage::create([
-                'item_id' => $item->id,
-                'path' => $path,
-                'is_primary' => $isPrimary,
-            ]);
-            if ($isPrimary) {
-                $item->update(['image_path' => $path]);
-            }
-        }
-
-        $this->syncGeography($item);
-        $this->recordEvent($item, $request->user()->id, 'created');
-        $this->notifyCredibleMatches($item, $matching);
-
-        return response()->json($item->load(['user:id,name,trust_score', 'images', 'categoryRef']), 201);
+        return response()->json($this->payload($item, $request), 201);
     }
 
-    /**
-     * Mise a jour d'un objet. Seul le proprietaire peut le modifier.
-     */
+    public function show(Request $request, Item $item)
+    {
+        return response()->json($this->payload($item, $request));
+    }
+
     public function update(Request $request, Item $item)
     {
-        abort_unless($item->user_id === $request->user()->id, 403, 'Action non autorisee sur cet objet.');
+        $this->authorizeOwner($request, $item, 'Vous ne pouvez modifier que vos propres annonces.');
 
-        $data = $request->validate([
-            'type' => ['sometimes', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND, 'lost', 'found'])],
-            'category' => ['sometimes', 'string', 'max:40', Rule::exists('categories', 'slug')],
-            'title' => ['sometimes', 'string', 'max:120'],
-            'description' => ['sometimes', 'string'],
-            'secret_detail' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'place_label' => ['nullable', 'string', 'max:160'],
-            'occurred_at' => ['sometimes', 'date'],
-            'contact_phone' => ['nullable', 'string', 'max:30'],
-            'status' => ['sometimes', Rule::in(['ACTIVE', 'RECOVERED', 'RESOLVED', 'CLOSED'])],
-            'image' => ['nullable', 'image', 'max:5120'],
-            'images' => ['nullable', 'array', 'max:5'],
-            'images.*' => ['image', 'max:5120'],
-        ]);
+        $data = $this->validatedItem($request);
 
-        if (isset($data['type'])) {
-            $data['type'] = strtoupper($data['type']);
-        }
-        if (isset($data['category'])) {
-            $data['category'] = strtolower($data['category']);
+        if ($request->filled('status')) {
+            $data['status'] = $request->validate([
+                'status' => ['required', Rule::in(['ACTIVE', 'CLOSED'])],
+            ])['status'];
         }
 
-        // Remplacement de l'image
+        if ($request->boolean('clear_location') && ! $request->filled('latitude')) {
+            $data['latitude'] = null;
+            $data['longitude'] = null;
+        }
+
         if ($request->hasFile('image')) {
-            if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
-                Storage::disk('public')->delete($item->image_path);
-            }
-            $data['image_path'] = $request->file('image')->store('items', 'public');
+            $this->deleteImage($item);
+            $data['image_path'] = $this->storeImage($request);
+        } elseif ($request->boolean('remove_image')) {
+            $this->deleteImage($item);
+            $data['image_path'] = null;
         }
 
         $item->update($data);
 
-        return response()->json($item->fresh()->load('user:id,name,trust_score'));
+        return response()->json($this->payload($item->refresh(), $request));
     }
 
-    /**
-     * Suppression d'un objet. Seul le proprietaire peut le supprimer.
-     */
     public function destroy(Request $request, Item $item)
     {
-        abort_unless($item->user_id === $request->user()->id, 403, 'Action non autorisee sur cet objet.');
-
-        // Suppression de l'image associee
-        if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
-            Storage::disk('public')->delete($item->image_path);
-        }
-
+        $this->authorizeOwner($request, $item, 'Vous ne pouvez supprimer que vos propres annonces.');
+        $this->deleteImage($item);
         $item->delete();
 
-        return response()->json(['message' => 'Objet supprime avec succes.']);
+        return response()->noContent();
     }
 
     /**
-     * Marquer un objet comme resolu / recupere.
-     */
-    public function resolve(Request $request, Item $item)
-    {
-        abort_unless($item->user_id === $request->user()->id, 403, 'Action non autorisee sur cet objet.');
-
-        $item->update(['status' => 'RECOVERED']);
-
-        return response()->json([
-            'message' => 'Objet marque comme recupere.',
-            'item' => $item->fresh()->load('user:id,name,trust_score'),
-        ]);
-    }
-
-    /**
-     * Recherche geographique d'objets a proximite via la formule de Haversine.
-     */
-    public function nearby(Request $request)
-    {
-        $validated = $request->validate([
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'radius_km' => ['nullable', 'numeric', 'min:0.1', 'max:500'],
-            'type' => ['nullable', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND, 'lost', 'found'])],
-            'category' => ['nullable', 'string'],
-        ]);
-
-        $latitude = (float) $validated['latitude'];
-        $longitude = (float) $validated['longitude'];
-        $radiusKm = (float) ($validated['radius_km'] ?? 10);
-        $type = !empty($validated['type']) ? strtoupper($validated['type']) : null;
-        $category = !empty($validated['category']) ? strtolower($validated['category']) : null;
-
-        $items = Item::query()
-            ->with('user:id,name,trust_score')
-            ->where('status', 'ACTIVE')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->when($type, fn ($q) => $q->where('type', $type))
-            ->when($category, fn ($q) => $q->where('category', $category))
-            ->get()
-            ->map(function ($item) use ($latitude, $longitude) {
-                $distance = $this->calculateHaversineDistance(
-                    $latitude,
-                    $longitude,
-                    (float) $item->latitude,
-                    (float) $item->longitude
-                );
-                $item->distance_km = round($distance, 2);
-                return $item;
-            })
-            ->filter(fn ($item) => $item->distance_km <= $radiusKm)
-            ->sortBy('distance_km')
-            ->values();
-
-        return response()->json($items);
-    }
-
-    /**
-     * Calcul de la distance geodesique (en km) par formule de Haversine.
-     */
-    public function calculateHaversineDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
-    {
-        $earthRadius = 6371; // km
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
-
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-             sin($dLon / 2) * sin($dLon / 2);
-
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return $earthRadius * $c;
-    }
-
-    /**
-     * Distance en km entre deux Item.
-     */
-    public function distanceKm(Item $a, Item $b): float
-    {
-        if ($a->latitude === null || $a->longitude === null || $b->latitude === null || $b->longitude === null) {
-            return 0.0;
-        }
-
-        return round($this->calculateHaversineDistance(
-            (float) $a->latitude,
-            (float) $a->longitude,
-            (float) $b->latitude,
-            (float) $b->longitude
-        ), 2);
-    }
-
-    /**
-     * Complete les coordonnees geographiques de l'objet.
-     *
-     * Les colonnes dediees (geohash, ville) ne sont pas encore presentes :
-     * latitude et longitude sont deja stockees directement sur l'objet.
-     */
-    private function syncGeography(Item $item): void
-    {
-        // Rien a synchroniser pour le moment.
-    }
-
-    /**
-     * Trace une action dans le journal des objets.
-     */
-    private function recordEvent(Item $item, int $userId, string $event): void
-    {
-        if (!Schema::hasTable('object_events')) {
-            return;
-        }
-
-        ObjectEvent::create([
-            'item_id' => $item->id,
-            'user_id' => $userId,
-            'event' => $event,
-        ]);
-    }
-
-    /**
-     * Ajoute le drapeau "favori" aux objets d'une liste.
-     */
-    private function attachFavoriteFlag($items, Request $request): void
-    {
-        $user = $request->user();
-        if (!$user) {
-            return;
-        }
-
-        $favoriteIds = ObjectFavorite::where('user_id', $user->id)
-            ->pluck('item_id')
-            ->all();
-
-        foreach ($items as $item) {
-            $item->setAttribute('is_favorite', in_array($item->id, $favoriteIds, true));
-        }
-    }
-
-    /**
-     * Notifie le proprietaire des correspondances les plus credibles.
-     */
-    private function notifyCredibleMatches(Item $item, MatchingService $matching): void
-    {
-        $matches = $item->type === Item::TYPE_LOST
-            ? $matching->findMatchesForLost($item)
-            : $matching->findMatchesForFound($item);
-
-        foreach ($matches as $match) {
-            if ($match['score'] < MatchingService::MEDIUM_MATCH_THRESHOLD) {
-                continue;
-            }
-
-            NotificationService::notifyPotentialMatch(
-                $item->user_id,
-                $match['item'],
-                $match['score']
-            );
-        }
-    }
-
-    /**
-     * Declenche le moteur de matching (Module 3).
+     * Declenche le moteur de matching (Module 3) pour une declaration
+     * et retourne les candidats tries par score decroissant.
      */
     public function findMatches(Request $request, Item $item, MatchingService $matching)
     {
         abort_unless($item->user_id === $request->user()->id, 403);
 
-        $results = $item->type === Item::TYPE_LOST
-            ? $matching->findMatchesForLost($item)
-            : $matching->findMatchesForFound($item);
+        $results = $matching->findMatches($item);
 
-        return response()->json($results);
+        return response()->json(array_map(
+            fn ($r) => ['match' => $r['match']->load('lostItem', 'foundItem'), 'decision' => $r['score']['decision']],
+            $results
+        ));
     }
 
     /**
-     * Suggestions d'objets trouves a proximite de la derniere declaration perdue.
+     * Module 2 - Suggestions dynamiques : objets trouves a proximite de ma
+     * derniere declaration perdue.
      */
     public function nearbyFound(Request $request, MatchingService $matching)
     {
@@ -536,7 +188,7 @@ class ItemController extends Controller
             ->latest('occurred_at')
             ->first();
 
-        if (!$lastLost) {
+        if (! $lastLost) {
             return response()->json([]);
         }
 
@@ -549,21 +201,17 @@ class ItemController extends Controller
         $results = [];
 
         foreach ($candidates as $candidate) {
-            $score = $matching->calculateScore($lastLost, $candidate);
+            $scored = $matching->score($lastLost, $candidate);
 
-            if ($score < MatchingService::LOW_MATCH_THRESHOLD) {
+            if ($scored['decision'] === 'NO') {
                 continue;
             }
 
-            $decision = $score >= MatchingService::HIGH_MATCH_THRESHOLD
-                ? 'YES'
-                : ($score >= MatchingService::MEDIUM_MATCH_THRESHOLD ? 'UNSURE' : 'NO');
-
             $results[] = [
-                'found_item' => $candidate->load('user:id,name,trust_score'),
-                'global_score' => $score,
-                'dimensions' => [],
-                'decision' => $decision,
+                'found_item' => $this->payload($candidate, $request),
+                'global_score' => $scored['global_score'],
+                'dimensions' => $scored['dimensions'],
+                'decision' => $scored['decision'],
                 'distance_km' => $this->distanceKm($lastLost, $candidate),
                 'time_hours' => abs($lastLost->occurred_at->diffInHours($candidate->occurred_at, false)),
             ];
@@ -572,5 +220,97 @@ class ItemController extends Controller
         usort($results, fn ($a, $b) => $b['global_score'] <=> $a['global_score']);
 
         return response()->json(array_slice($results, 0, 10));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatedItem(Request $request): array
+    {
+        $data = $request->validate([
+            'type' => ['required', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND])],
+            'category' => ['required', Rule::in(self::CATEGORIES)],
+            'title' => ['required', 'string', 'min:3', 'max:120'],
+            'description' => ['required', 'string', 'min:10', 'max:5000'],
+            'secret_detail' => ['nullable', 'string', 'max:500'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
+            'place_label' => ['nullable', 'string', 'min:2', 'max:160'],
+            'occurred_at' => ['required', 'date'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'remove_image' => ['sometimes', 'boolean'],
+            'clear_location' => ['sometimes', 'boolean'],
+        ]);
+
+        unset($data['image'], $data['remove_image'], $data['clear_location']);
+
+        $hasPlace = isset($data['place_label']) && trim((string) $data['place_label']) !== '';
+        $hasPoint = isset($data['latitude'], $data['longitude']);
+        $clearsPoint = $request->boolean('clear_location') && ! $request->filled('latitude');
+
+        if (! $hasPlace && (! $hasPoint || $clearsPoint)) {
+            throw ValidationException::withMessages([
+                'place_label' => 'Indiquez un lieu ou une position géographique.',
+            ]);
+        }
+
+        return $data;
+    }
+
+    private function storeImage(Request $request): ?string
+    {
+        if (! $request->hasFile('image')) {
+            return null;
+        }
+
+        return $request->file('image')->store('items', 'public');
+    }
+
+    private function deleteImage(Item $item): void
+    {
+        if ($item->image_path) {
+            Storage::disk('public')->delete($item->image_path);
+        }
+    }
+
+    private function authorizeOwner(Request $request, Item $item, string $message): void
+    {
+        abort_unless($item->user_id === $request->user()->id, 403, $message);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function payload(Item $item, Request $request): array
+    {
+        $item->loadMissing('user:id,name,trust_score');
+        $mine = $request->user() !== null && $request->user()->id === $item->user_id;
+        $data = $item->toArray();
+
+        if (! $mine) {
+            unset($data['secret_detail']);
+        }
+
+        $data['is_mine'] = $mine;
+        $data['owner_name'] = $item->user?->name;
+        $data['image_url'] = $item->image_path ? '/storage/'.$item->image_path : null;
+
+        return $data;
+    }
+
+    private function distanceKm(Item $a, Item $b): ?float
+    {
+        if ($a->latitude === null || $b->latitude === null) {
+            return null;
+        }
+
+        $earthRadius = 6371;
+        $deltaLat = deg2rad((float) $b->latitude - (float) $a->latitude);
+        $deltaLon = deg2rad((float) $b->longitude - (float) $a->longitude);
+
+        $aVal = sin($deltaLat / 2) ** 2 + cos(deg2rad((float) $a->latitude)) * cos(deg2rad((float) $b->latitude)) * sin($deltaLon / 2) ** 2;
+        $dist = 2 * $earthRadius * atan2(sqrt($aVal), sqrt(1 - $aVal));
+
+        return round($dist, 2);
     }
 }

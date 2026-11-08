@@ -50,8 +50,4 @@ class AppConfig {
 
   /// Origine HTTP de l'API, sans le suffixe /api (utile pour /broadcasting/auth).
   static String get apiOrigin => Uri.parse(apiBaseUrl).origin;
-
-  /// Racine du serveur (sans /api) pour les medias et images publiques.
-  static String get serverBaseUrl =>
-      apiBaseUrl.replaceAll(RegExp(r'/api/?$'), '');
 }

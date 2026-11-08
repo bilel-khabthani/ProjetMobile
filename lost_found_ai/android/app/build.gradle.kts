@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "fr.campus.lost_found_ai"
-    compileSdk = 36
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

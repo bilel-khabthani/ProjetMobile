@@ -14,6 +14,17 @@ class ApiException implements Exception {
   /// Corps JSON de la reponse d'erreur (code metier, details de validation).
   final Map<String, dynamic>? body;
 
+  /// Premier message de validation Laravel, sinon le message général.
+  String get userMessage {
+    final errors = body?['errors'];
+    if (errors is Map && errors.isNotEmpty) {
+      final first = errors.values.first;
+      if (first is List && first.isNotEmpty) return first.first.toString();
+      if (first != null) return first.toString();
+    }
+    return message;
+  }
+
   @override
   String toString() => 'ApiException($statusCode): $message';
 }
@@ -99,17 +110,40 @@ class ApiClient {
     return _decode(response);
   }
 
-  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
-    final response = await _client
-        .patch(_uri(path), headers: _headers, body: jsonEncode(body))
-        .timeout(const Duration(seconds: 15));
-
-    return _decode(response);
-  }
-
   Future<dynamic> delete(String path) async {
     final response = await _client
         .delete(_uri(path), headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    return _decode(response);
+  }
+
+  /// Envoi multipart (photo). PHP ne remplit les fichiers que sur POST,
+  /// donc la mise à jour avec image passe aussi par POST.
+  Future<dynamic> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    String? fileField,
+    String? filePath,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    request.headers['Accept'] = 'application/json';
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+    request.fields.addAll(fields);
+    if (fileField != null && filePath != null) {
+      request.files.add(await http.MultipartFile.fromPath(fileField, filePath));
+    }
+    final streamed = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamed);
+    return _decode(response);
+  }
+
+  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
+    final response = await _client
+        .patch(_uri(path), headers: _headers, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15));
 
     return _decode(response);

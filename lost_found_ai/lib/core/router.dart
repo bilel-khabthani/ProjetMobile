@@ -16,17 +16,13 @@ import '../features/explore/explore_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/match/match_detail_screen.dart';
 import '../features/messages/messages_screen.dart';
+import '../features/map/map_screen.dart';
+import '../features/objects/item_detail_screen.dart';
+import '../features/objects/objects_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/publish/publish_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/trust/trust_screen.dart';
-import '../features/objects/presentation/screens/objects_dashboard_screen.dart';
-import '../features/objects/presentation/screens/objects_list_screen.dart';
-import '../features/objects/presentation/screens/objects_map_screen.dart';
-import '../features/objects/presentation/screens/map_selection_screen.dart';
-import '../features/objects/presentation/screens/my_objects_screen.dart';
-import '../features/objects/presentation/screens/object_detail_screen.dart';
-import '../features/objects/presentation/screens/object_form_screen.dart';
 
 abstract final class AppRoutes {
   static const String onboarding = '/onboarding';
@@ -40,23 +36,18 @@ abstract final class AppRoutes {
   static const String messages = '/messages';
   static const String activity = '/activity';
   static const String publish = '/publish';
+  static const String objects = '/objects';
+  static const String map = '/map';
+  static const String item = '/items/:id';
+
+  static String itemDetail(String id) => '/items/$id';
+  static String editItem(String id) => '/publish?edit=$id';
   static const String match = '/match/:id';
   static const String chat = '/chat/:id';
   static const String trust = '/trust';
   static const String claim = '/claim';
   static const String claimWithId = '/claim/:id';
   static const String profile = '/profile';
-
-  // Gestion des objets perdus / trouves.
-  static const String objectsDashboard = '/objects';
-  static const String objectsList = '/objects/list';
-  static const String objectsMap = '/objects/map';
-  static const String objectsMapSelection = '/objects/map-selection';
-  static const String objectAdd = '/objects/add';
-  static const String objectMyList = '/objects/my-list';
-
-  static String objectDetail(String id) => '/objects/$id';
-  static String objectEdit(String id) => '/objects/edit/$id';
 
   static String matchDetail(String id) => '/match/$id';
   static String chatDetail(String id) => '/chat/$id';
@@ -150,7 +141,28 @@ final routerProvider = Provider<GoRouter>((ref) {
           final type = state.uri.queryParameters['type'];
           return PublishScreen(
             initialType: type == 'found' ? ItemType.found : ItemType.lost,
+            itemId: state.uri.queryParameters['edit'],
           );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.objects,
+        builder: (context, state) {
+          final type = state.uri.queryParameters['type'];
+          return ObjectsScreen(
+            initialType: type == 'found' ? ItemType.found : ItemType.lost,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.map,
+        builder: (context, state) => const MapScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.item,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ItemDetailScreen(itemId: id);
         },
       ),
       GoRoute(
@@ -185,49 +197,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.profile,
         builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.objectsDashboard,
-        builder: (context, state) => const ObjectsDashboardScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.objectsList,
-        builder: (context, state) => const ObjectsListScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.objectsMap,
-        builder: (context, state) => const ObjectsMapScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.objectsMapSelection,
-        builder: (context, state) => const MapSelectionScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.objectMyList,
-        builder: (context, state) => const MyObjectsScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.objectAdd,
-        builder: (context, state) {
-          final typeParam = state.uri.queryParameters['type'];
-          final initialType =
-              typeParam == 'found' ? ItemType.found : ItemType.lost;
-          return ObjectFormScreen(initialType: initialType);
-        },
-      ),
-      GoRoute(
-        path: '/objects/edit/:id',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return ObjectFormScreen(objectId: id);
-        },
-      ),
-      GoRoute(
-        path: '/objects/:id',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return ObjectDetailScreen(objectId: id);
-        },
       ),
     ],
   );

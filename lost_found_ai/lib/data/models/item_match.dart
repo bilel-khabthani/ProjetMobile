@@ -41,6 +41,12 @@ class ItemMatch {
     this.viewerRole = 'owner',
     this.myItemType = ItemType.lost,
     this.otherItemType = ItemType.found,
+    this.canChat = true,
+    this.chatLockedReason,
+    this.lastMessage,
+    this.lastMessageAt,
+    this.lastMessageIsMine = false,
+    this.unreadCount = 0,
   });
 
   final String id;
@@ -75,6 +81,20 @@ class ItemMatch {
 
   /// Type de l'annonce de l'autre partie.
   final ItemType otherItemType;
+
+  /// Le serveur autorise-t-il l'ouverture du chat pour cet utilisateur ?
+  final bool canChat;
+
+  /// Raison affichable quand [canChat] est faux.
+  final String? chatLockedReason;
+
+  /// Apercu de la derniere conversation.
+  final String? lastMessage;
+  final DateTime? lastMessageAt;
+  final bool lastMessageIsMine;
+  final int unreadCount;
+
+  bool get hasConversation => lastMessage != null;
 
   bool get isVerified =>
       status == 'VERIFIED' || status == 'CONTACTED' || status == 'RECOVERED';

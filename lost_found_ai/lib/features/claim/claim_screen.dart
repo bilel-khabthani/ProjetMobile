@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/pressable_scale.dart';
@@ -13,19 +16,20 @@ import '../../widgets/pressable_scale.dart';
 /// L'ecran permet de deposer une reclamation. Le CDC exige que toute
 /// reclamation soit tracee et obtienne une reponse : cet ecran facilite
 /// le depot, tout en rappelant le principe de tracabilite.
-class ClaimScreen extends StatefulWidget {
+class ClaimScreen extends ConsumerStatefulWidget {
   const ClaimScreen({this.matchId, super.key});
 
   final String? matchId;
 
   @override
-  State<ClaimScreen> createState() => _ClaimScreenState();
+  ConsumerState<ClaimScreen> createState() => _ClaimScreenState();
 }
 
-class _ClaimScreenState extends State<ClaimScreen> {
+class _ClaimScreenState extends ConsumerState<ClaimScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   String? _type;
+  bool _sending = false;
 
   static const List<Map<String, String>> _claimTypes = [
     {
@@ -61,16 +65,38 @@ class _ClaimScreenState extends State<ClaimScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    if (_sending || !_formKey.currentState!.validate()) return;
 
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Réclamation envoyée. Vous recevrez une réponse.'),
-      ),
-    );
-    context.pop();
+    setState(() => _sending = true);
+
+    final notifier = ref.read(claimProvider.notifier);
+    final sent = AppConfig.useMockData
+        ? true
+        : await notifier.send(
+            type: _type!,
+            description: _descriptionController.text.trim(),
+            matchId: widget.matchId,
+          );
+
+    if (!mounted) return;
+    setState(() => _sending = false);
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            sent
+                ? 'Réclamation envoyée. Vous recevrez une réponse.'
+                : (notifier.error ??
+                      "Impossible d'envoyer la réclamation pour le moment."),
+          ),
+        ),
+      );
+
+    if (sent) context.pop();
   }
 
   @override
@@ -137,8 +163,9 @@ class _ClaimScreenState extends State<ClaimScreen> {
               const SizedBox(height: 8),
               FormField<String>(
                 initialValue: _type,
-                validator: (value) =>
-                    (value == null || value.isEmpty) ? 'Choisissez un motif' : null,
+                validator: (value) => (value == null || value.isEmpty)
+                    ? 'Choisissez un motif'
+                    : null,
                 builder: (field) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,8 +186,7 @@ class _ClaimScreenState extends State<ClaimScreen> {
                               _TypeTile(
                                 label: _claimTypes[i]['label']!,
                                 icon: _claimTypes[i]['icon']!,
-                                selected:
-                                    _type == _claimTypes[i]['value'],
+                                selected: _type == _claimTypes[i]['value'],
                                 onTap: () {
                                   final value = _claimTypes[i]['value'];
                                   setState(() => _type = value);
@@ -243,7 +269,8 @@ class _ClaimScreenState extends State<ClaimScreen> {
               AppButton(
                 label: 'Envoyer la réclamation',
                 iconName: 'flag-linear',
-                onPressed: _submit,
+                loading: _sending,
+                onPressed: _sending ? null : _submit,
               ),
             ],
           ),
