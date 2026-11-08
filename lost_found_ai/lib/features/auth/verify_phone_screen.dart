@@ -9,9 +9,9 @@ import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
 import 'widgets/auth_header.dart';
 
-/// Module 1 (CDC 6.1) : verification obligatoire du numero de telephone.
-/// Le compte est cree non verifie ; l'application impose cette saisie avant
-/// tout acces aux services (garde du routeur + middleware verified-phone).
+/// Module 1 (CDC 6.1) : vérification obligatoire du numéro de téléphone.
+/// Le compte est créé non vérifié ; l'application impose cette saisie avant
+/// tout accès aux services (garde du routeur + middleware verified-phone).
 class VerifyPhoneScreen extends ConsumerStatefulWidget {
   const VerifyPhoneScreen({super.key});
 
@@ -22,30 +22,79 @@ class VerifyPhoneScreen extends ConsumerStatefulWidget {
 class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
+  final _phoneInputController = TextEditingController();
 
   bool _loading = false;
   bool _resending = false;
+  bool _needsPhone = false;
   String? _error;
   String? _demoOtp;
 
   @override
   void initState() {
     super.initState();
-    // En demo le serveur renvoie le code recu a l'inscription / a l'envoi.
+    final user = ref.read(sessionProvider);
+    _needsPhone = user?.phone.isEmpty ?? true;
+    if (!_needsPhone) {
+      _phoneInputController.text = user?.phone ?? '';
+    }
+    // En démo le serveur renvoie le code reçu à l'inscription / à l'envoi.
     _demoOtp = ref.read(sessionProvider.notifier).consumeDemoOtp();
   }
 
   @override
   void dispose() {
     _codeController.dispose();
+    _phoneInputController.dispose();
     super.dispose();
   }
 
   String _messageOf(Object error) => error is ApiException
       ? error.message
-      : 'Connexion impossible. Reessayez.';
+      : 'Connexion impossible. Réessayez.';
 
-  Future<void> _submit() async {
+  Future<void> _submitPhone() async {
+    final phone = _phoneInputController.text.trim();
+    if (phone.isEmpty || phone.length < 8) {
+      setState(() => _error = 'Veuillez saisir un numéro de téléphone valide.');
+      return;
+    }
+
+    final user = ref.read(sessionProvider);
+    if (user == null) return;
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      await ref.read(sessionProvider.notifier).updateMe(
+        name: user.name,
+        email: user.email,
+        phone: phone,
+      );
+      if (!mounted) return;
+      final otp = ref.read(sessionProvider.notifier).consumeDemoOtp();
+      setState(() {
+        _needsPhone = false;
+        _demoOtp = otp;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Code de vérification envoyé par SMS.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _messageOf(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _submitCode() async {
     final code = _codeController.text.trim();
     if (code.length != 6) {
       setState(() => _error = 'Le code comporte 6 chiffres.');
@@ -60,10 +109,13 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
       await ref.read(sessionProvider.notifier).verifyPhone(code: code);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Numero de telephone verifie !')),
+        const SnackBar(
+          content: Text('Numéro de téléphone vérifié !'),
+          backgroundColor: AppColors.success,
+        ),
       );
-      // Le changement de session redeclenche la garde du routeur :
-      // phoneVerified=true libere l'acces a l'application.
+      // Le changement de session redéclenche la garde du routeur :
+      // phoneVerified=true libère l'accès à l'application.
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _messageOf(error));
@@ -81,6 +133,12 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
       final otp = await ref.read(sessionProvider.notifier).resendOtp();
       if (!mounted) return;
       setState(() => _demoOtp = otp);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nouveau code envoyé.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _messageOf(error));
@@ -95,15 +153,15 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final phone = ref.watch(sessionProvider)?.phone ?? '';
+    final currentPhone = ref.watch(sessionProvider)?.phone ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verification du numero'),
+        title: const Text('Vérification du numéro'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Se deconnecter',
+            tooltip: 'Se déconnecter',
             onPressed: _loading ? null : _logout,
           ),
         ],
@@ -121,91 +179,140 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AuthHeader(
-                  title: 'Un code vous attend',
-                  subtitle: phone.isEmpty
-                      ? 'Saisissez le code a six chiffres recu pour verifier votre compte.'
-                      : 'Saisissez le code a six chiffres envoye au $phone pour activer votre compte.',
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                TextFormField(
-                  controller: _codeController,
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.done,
-                  maxLength: 6,
-                  style: AppText.h2.copyWith(letterSpacing: 10),
-                  onFieldSubmitted: (_) => _submit(),
-                  decoration: const InputDecoration(
-                    labelText: 'Code de verification',
-                    hintText: '000000',
-                    counterText: '',
-                    prefixIcon: Icon(Icons.sms_outlined),
+                if (_needsPhone) ...[
+                  const AuthHeader(
+                    title: 'Ajoutez votre numéro',
+                    subtitle:
+                        'Pour des raisons de sécurité et d\'anti-fraude (CDC 6.1), un numéro vérifié est obligatoire pour utiliser les services.',
                   ),
-                ),
-                if (_demoOtp != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
+                  const SizedBox(height: AppSpacing.xl),
+                  TextFormField(
+                    controller: _phoneInputController,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submitPhone(),
+                    decoration: const InputDecoration(
+                      labelText: 'Numéro de téléphone',
+                      hintText: '+33 6 12 34 56 78',
+                      prefixIcon: Icon(Icons.phone_outlined),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.science_outlined,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            'Demonstration : le code est $_demoOtp',
-                            style: AppText.caption.copyWith(
-                              color: AppColors.primary,
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      _error!,
+                      style: AppText.caption.copyWith(color: AppColors.danger),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.xl),
+                  AppButton(
+                    label: 'Envoyer le code de vérification',
+                    icon: Icons.send_rounded,
+                    loading: _loading,
+                    onPressed: _submitPhone,
+                  ),
+                ] else ...[
+                  AuthHeader(
+                    title: 'Un code vous attend',
+                    subtitle: currentPhone.isEmpty
+                        ? 'Saisissez le code à six chiffres reçu pour vérifier votre compte.'
+                        : 'Saisissez le code à six chiffres envoyé au $currentPhone pour activer votre compte.',
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  TextFormField(
+                    controller: _codeController,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    maxLength: 6,
+                    style: AppText.h2.copyWith(letterSpacing: 10),
+                    onFieldSubmitted: (_) => _submitCode(),
+                    decoration: const InputDecoration(
+                      labelText: 'Code de vérification',
+                      hintText: '000000',
+                      counterText: '',
+                      prefixIcon: Icon(Icons.sms_outlined),
+                    ),
+                  ),
+                  if (_demoOtp != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.science_outlined,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              'Démonstration : le code est $_demoOtp',
+                              style: AppText.caption.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      _error!,
+                      style: AppText.caption.copyWith(color: AppColors.danger),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.xl),
+                  AppButton(
+                    label: 'Vérifier mon numéro',
+                    loading: _loading,
+                    onPressed: _submitCode,
                   ),
-                ],
-                if (_error != null) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    _error!,
-                    style: AppText.caption.copyWith(color: AppColors.danger),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _resending || _loading ? null : _resend,
+                        child: _resending
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                'Renvoyer le code',
+                                style: AppText.label.copyWith(
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                      ),
+                      const Text(' • '),
+                      TextButton(
+                        onPressed: _loading ? null : () => setState(() => _needsPhone = true),
+                        child: Text(
+                          'Modifier le numéro',
+                          style: AppText.label.copyWith(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-                const SizedBox(height: AppSpacing.xl),
-                AppButton(
-                  label: 'Verifier mon numero',
-                  loading: _loading,
-                  onPressed: _submit,
-                ),
                 const SizedBox(height: AppSpacing.sm),
-                Center(
-                  child: TextButton(
-                    onPressed: _resending || _loading ? null : _resend,
-                    child: _resending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            'Renvoyer le code',
-                            style: AppText.label.copyWith(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                  ),
-                ),
                 Center(
                   child: TextButton(
                     onPressed: _loading ? null : _logout,
                     child: Text(
-                      'Se deconnecter',
+                      'Se déconnecter',
                       style: AppText.label.copyWith(
                         color: AppColors.textTertiary,
                       ),
