@@ -42,13 +42,21 @@ class AuthController extends Controller
             'trust_score' => 50,
         ]);
 
-        $this->sendPhoneOtp($user, $data['phone']);
+        $demoOtp = $this->sendPhoneOtp($user, $data['phone']);
 
-        return response()->json([
+        $payload = [
             'token' => $user->createToken('mobile')->plainTextToken,
             'user' => $user,
             'phone_verification_required' => true,
-        ], 201);
+        ];
+
+        // Pas de passerelle SMS en local : le code est renvoye pour permettre
+        // a l'application de valider le numero immediatement. Jamais en prod.
+        if (app()->environment(['local', 'testing'])) {
+            $payload['demo_otp'] = $demoOtp;
+        }
+
+        return response()->json($payload, 201);
     }
 
     public function login(Request $request)
@@ -88,12 +96,18 @@ class AuthController extends Controller
         ]);
 
         $user = $request->user();
-        $this->sendPhoneOtp($user, $data['phone']);
+        $demoOtp = $this->sendPhoneOtp($user, $data['phone']);
 
-        return response()->json([
+        $payload = [
             'message' => 'Code de verification envoye par e-mail.',
             'phone' => $data['phone'],
-        ]);
+        ];
+
+        if (app()->environment(['local', 'testing'])) {
+            $payload['demo_otp'] = $demoOtp;
+        }
+
+        return response()->json($payload);
     }
 
     public function otpVerify(Request $request)
@@ -200,7 +214,7 @@ class AuthController extends Controller
             if (! $user->phone_verified) {
                 $updates['phone_verified'] = true;
                 if (empty($user->phone)) {
-                    $updates['phone'] = '+216' . random_int(20000000, 99999999);
+                    $updates['phone'] = '+216'.random_int(20000000, 99999999);
                 }
             }
             if (! empty($updates)) {
@@ -213,7 +227,7 @@ class AuthController extends Controller
                 'google_id' => $googleId,
                 'avatar' => $avatar,
                 'email_verified_at' => now(),
-                'phone' => '+216' . random_int(20000000, 99999999),
+                'phone' => '+216'.random_int(20000000, 99999999),
                 'phone_verified' => true,
                 'trust_score' => 50,
                 'reward_points' => 150,
@@ -256,6 +270,10 @@ class AuthController extends Controller
         $response = [
             'message' => 'Si un compte est associé à cette adresse e-mail, un code de réinitialisation vous a été envoyé par e-mail.',
         ];
+
+        if (app()->environment(['local', 'testing'])) {
+            $response['demo_otp'] = $code;
+        }
 
         return response()->json($response);
     }
@@ -332,16 +350,18 @@ class AuthController extends Controller
      * Genere un code a six chiffres, le stocke en cache cinq minutes,
      * et l'envoie par e-mail a l'utilisateur.
      */
-    private function sendPhoneOtp(?User $user, string $phone): void
+    private function sendPhoneOtp(?User $user, string $phone): string
     {
         $code = $this->storeOtp($phone);
         if ($user !== null) {
             try {
                 Mail::to($user->email)->send(new PhoneVerificationOtpMail($code, $user));
             } catch (\Throwable $e) {
-                Log::error('Erreur envoi OTP téléphone : ' . $e->getMessage());
+                Log::error('Erreur envoi OTP téléphone : '.$e->getMessage());
             }
         }
+
+        return $code;
     }
 
     /**
