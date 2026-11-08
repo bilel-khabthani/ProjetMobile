@@ -11,10 +11,14 @@ import 'models/swipe_candidate.dart';
 import 'models/trust.dart';
 import 'models/item.dart';
 
+final apiClientProvider = Provider<ApiClient>(
+  (ref) => ApiClient(baseUrl: AppConfig.apiBaseUrl),
+);
+
 /// Source de donnees active. Les deux classes exposent la meme surface, donc
 /// les ecrans ne changent pas selon le mode choisi.
 final apiRepositoryProvider = Provider<ApiRepository>(
-  (ref) => ApiRepository(),
+  (ref) => ApiRepository(client: ref.watch(apiClientProvider)),
 );
 
 final mockRepositoryProvider = Provider<MockRepository>((ref) => MockRepository());
@@ -416,4 +420,18 @@ final rewardWalletProvider = FutureProvider<RewardWallet>((ref) async {
   }
   return ref.watch(repositoryProvider).fetchRewardWallet();
 });
+
+final catalogProvider = FutureProvider.autoDispose
+    .family<List<Item>, ItemCatalogQuery>((ref, query) async {
+      if (AppConfig.useMockData) return const [];
+      return ref.watch(repositoryProvider).fetchCatalog(query);
+    });
+
+final itemProvider = FutureProvider.autoDispose.family<Item, String>((
+  ref,
+  id,
+) async {
+  return ref.watch(repositoryProvider).fetchItem(id);
+});
+
 
