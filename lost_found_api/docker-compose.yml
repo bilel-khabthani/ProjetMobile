@@ -8,6 +8,9 @@ services:
     image: lost-found-api:latest
     ports:
       - "8000:8000"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - ./:/var/www/html
     environment:

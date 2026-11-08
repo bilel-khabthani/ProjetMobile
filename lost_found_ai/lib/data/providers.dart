@@ -6,14 +6,19 @@ import 'api_repository.dart';
 import 'demo_swipe_deck.dart';
 import 'mock_repository.dart';
 import 'models/item_match.dart';
+import 'models/reward.dart';
 import 'models/swipe_candidate.dart';
 import 'models/trust.dart';
 import 'models/item.dart';
 
+final apiClientProvider = Provider<ApiClient>(
+  (ref) => ApiClient(baseUrl: AppConfig.apiBaseUrl),
+);
+
 /// Source de donnees active. Les deux classes exposent la meme surface, donc
 /// les ecrans ne changent pas selon le mode choisi.
 final apiRepositoryProvider = Provider<ApiRepository>(
-  (ref) => ApiRepository(),
+  (ref) => ApiRepository(client: ref.watch(apiClientProvider)),
 );
 
 final mockRepositoryProvider = Provider<MockRepository>((ref) => MockRepository());
@@ -59,6 +64,33 @@ class SessionNotifier extends StateNotifier<AppUser?> {
     }
 
     state = await _api.signIn(email: email, password: password);
+  }
+
+  /// Connexion avec Google
+  Future<void> signInWithGoogle({
+    String? idToken,
+    String? email,
+    String? name,
+    String? googleId,
+    String? avatar,
+  }) async {
+    if (AppConfig.useMockData) {
+      final mock = MockRepository();
+      state = await mock.signInWithGoogle(
+        email: email,
+        name: name,
+        avatar: avatar,
+      );
+      return;
+    }
+
+    state = await _api.signInWithGoogle(
+      idToken: idToken,
+      email: email,
+      name: name,
+      googleId: googleId,
+      avatar: avatar,
+    );
   }
 
   /// Module 1 : consomme le dernier code OTP renvoye par l'API (demo).
@@ -229,13 +261,13 @@ class ClaimNotifier extends StateNotifier<bool> {
 
   void reset() => state = false;
 }
-
 final myItemsProvider = FutureProvider<List<Item>>((ref) async {
   if (AppConfig.useMockData) {
     return const [];
   }
   return ref.watch(repositoryProvider).fetchMyItems();
 });
+
 
 final nearbyFoundProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   if (AppConfig.useMockData) {
@@ -244,7 +276,7 @@ final nearbyFoundProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asy
   return ref.watch(repositoryProvider).fetchNearbyFound();
 });
 
-/// Module Tinder Cards : etat du deck de correspondances a trier.
+/// Module Tinder Cards : état du deck de correspondances à trier.
 class SwipeDeckState {
   SwipeDeckState({
     required List<SwipeCandidate> candidates,
@@ -284,11 +316,7 @@ class SwipeDeckState {
   }
 }
 
-/// Charge le deck et applique les decisions de facon optimiste.
-///
-/// Si l'API est injoignable (serveur non lance, appareil hors ligne), le deck
-/// de demonstration prend le relais et l'ecran affiche une banniere : le module
-/// reste presentable sans casser le parcours reel.
+/// Charge le deck et applique les décisions de façon optimiste.
 class SwipeDeckNotifier extends AsyncNotifier<SwipeDeckState> {
   @override
   Future<SwipeDeckState> build() => _load();
@@ -348,13 +376,11 @@ class SwipeDeckNotifier extends AsyncNotifier<SwipeDeckState> {
             aiConfidence: candidate.ai.confidence,
           );
     } catch (_) {
-      // La carte est deja retiree : on ne bloque pas l'utilisateur. Le
-      // prochain rafraichissement rejouera la synchronisation.
+      // La carte est déjà retirée : on ne bloque pas l'utilisateur.
     }
   }
 
-  /// Analyse IA detaillee. En mode demo (ou si l'appel echoue), on retombe sur
-  /// la pre-analyse deja presente sur la carte.
+  /// Analyse IA détaillée.
   Future<AiInsight> insight(SwipeCandidate candidate) async {
     if (state.valueOrNull?.isDemo ?? false) return candidate.ai;
     try {
@@ -371,3 +397,41 @@ final swipeDeckProvider =
     AsyncNotifierProvider<SwipeDeckNotifier, SwipeDeckState>(
       SwipeDeckNotifier.new,
     );
+
+// --- Module 4 : Providers Récompenses, Coupons & Gamification ---
+
+final rewardsProvider = FutureProvider<List<Reward>>((ref) async {
+  if (AppConfig.useMockData) {
+    return ref.watch(mockRepositoryProvider).fetchRewards();
+  }
+  return ref.watch(repositoryProvider).fetchRewards();
+});
+
+final myCouponsProvider = FutureProvider<List<UserCoupon>>((ref) async {
+  if (AppConfig.useMockData) {
+    return ref.watch(mockRepositoryProvider).fetchMyCoupons();
+  }
+  return ref.watch(repositoryProvider).fetchMyCoupons();
+});
+
+final rewardWalletProvider = FutureProvider<RewardWallet>((ref) async {
+  if (AppConfig.useMockData) {
+    return ref.watch(mockRepositoryProvider).fetchRewardWallet();
+  }
+  return ref.watch(repositoryProvider).fetchRewardWallet();
+});
+
+final catalogProvider = FutureProvider.autoDispose
+    .family<List<Item>, ItemCatalogQuery>((ref, query) async {
+      if (AppConfig.useMockData) return const [];
+      return ref.watch(repositoryProvider).fetchCatalog(query);
+    });
+
+final itemProvider = FutureProvider.autoDispose.family<Item, String>((
+  ref,
+  id,
+) async {
+  return ref.watch(repositoryProvider).fetchItem(id);
+});
+
+

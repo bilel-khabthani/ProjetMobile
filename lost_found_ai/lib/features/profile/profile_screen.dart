@@ -173,6 +173,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => context.push(AppRoutes.trust),
               ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.card_giftcard_rounded, color: AppColors.accent),
+                title: const Text('Mes Récompenses & Bons Partenaires'),
+                subtitle: const Text('Coupons Glovo, Yassir & Roue de la Chance'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => context.push(AppRoutes.rewards),
+              ),
               const SizedBox(height: AppSpacing.lg),
               SwitchListTile.adaptive(
                 title: const Text('Modifier le mot de passe'),

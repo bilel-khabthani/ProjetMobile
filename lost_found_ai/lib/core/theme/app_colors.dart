@@ -14,9 +14,16 @@ abstract final class AppColors {
   static const Color accent = Color(0xFFFFB33C);
   static const Color accentSoft = Color(0xFFFFF3E0);
 
+  /// Vert menthe du design (accent-foreground).
+  static const Color mint = Color(0xFFE4F6ED);
+  static const Color mintDark = Color(0xFF0B6B4F);
+  static const Color lavender = Color(0xFFEEF0FE);
+
   static const Color background = Color(0xFFFFF9F4);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceAlt = Color(0xFFFDF3EA);
+
+  static const Color input = Color(0xFFFFFCF6);
 
   static const Color textPrimary = Color(0xFF1F1B2E);
   static const Color textSecondary = Color(0xFF6B6480);

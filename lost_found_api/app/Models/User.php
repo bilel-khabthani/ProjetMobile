@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'phone', 'phone_verified'])]
+#[Fillable(['name', 'email', 'password', 'phone', 'phone_verified', 'google_id', 'avatar', 'reward_points', 'last_spin_at', 'trust_score', 'recovered_count'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -28,6 +28,8 @@ class User extends Authenticatable
             'phone_verified' => 'boolean',
             'trust_score' => 'integer',
             'recovered_count' => 'integer',
+            'reward_points' => 'integer',
+            'last_spin_at' => 'datetime',
         ];
     }
 
@@ -36,10 +38,53 @@ class User extends Authenticatable
         return $this->hasMany(Item::class);
     }
 
+    /** Module Tinder Cards : historique des décisions de glissement. */
+    public function swipeDecisions(): HasMany
+    {
+        return $this->hasMany(SwipeDecision::class);
+    }
+
     /** Journal des evenements de score (Module 4). */
     public function trustEvents(): HasMany
     {
         return $this->hasMany(TrustEvent::class);
+    }
+
+    /** Bons de réduction et coupons partenaires (Module 4). */
+    public function coupons(): HasMany
+    {
+        return $this->hasMany(UserCoupon::class);
+    }
+
+    /** Historique des points gagnés et dépensés (Module 4). */
+    public function rewardTransactions(): HasMany
+    {
+        return $this->hasMany(RewardTransaction::class);
+    }
+
+    /** Ajoute ou déduit des points de récompense avec trace dans l'historique. */
+    public function addRewardPoints(int $points, string $type, string $description): RewardTransaction
+    {
+        $this->reward_points = max(0, ($this->reward_points ?? 0) + $points);
+        $this->save();
+
+        return RewardTransaction::create([
+            'user_id' => $this->id,
+            'type' => $type,
+            'points' => $points,
+            'description' => $description,
+            'created_at' => now(),
+        ]);
+    }
+
+    /** Vérifie si l'utilisateur a droit à un tour gratuit de la roue aujourd'hui. */
+    public function canSpinFreeToday(): bool
+    {
+        if (! $this->last_spin_at) {
+            return true;
+        }
+
+        return ! $this->last_spin_at->isToday();
     }
 
     /**

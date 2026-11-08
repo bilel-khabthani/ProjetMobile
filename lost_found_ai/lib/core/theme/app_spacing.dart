@@ -32,4 +32,8 @@ abstract final class AppShadows {
   static const List<BoxShadow> primary = [
     BoxShadow(color: Color(0x405B6CF0), blurRadius: 22, offset: Offset(0, 10)),
   ];
+
+  static const List<BoxShadow> nav = [
+    BoxShadow(color: Color(0x141F1B2E), blurRadius: 30, offset: Offset(0, -8)),
+  ];
 }

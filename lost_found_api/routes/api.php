@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\ItemController;
 use App\Http\Controllers\Api\MatchController;
+use App\Http\Controllers\Api\RewardController;
 use App\Http\Controllers\Api\SwipeController;
 use App\Http\Controllers\Api\TrustController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,7 @@ Route::get('/ping', fn () => ['status' => 'ok', 'app' => config('app.name')]);
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/google', [AuthController::class, 'googleLogin'])->middleware('throttle:login');
     Route::post('/otp/request', [AuthController::class, 'requestOtp'])->middleware('throttle:otp');
     Route::post('/otp/verify', [AuthController::class, 'otpVerify'])->middleware('throttle:otp');
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
@@ -44,13 +46,35 @@ Route::middleware('auth:sanctum')->group(function () {
     // CDC 6.1 : les services (annonces, matching, reclamations) exigent un
     // numero de telephone verifie (anti-fraude 6.4.3).
     Route::middleware('verified-phone')->group(function () {
-        // Module 2 : declarations
+        // Module 2 : declarations & objects
         Route::get('/items', [ItemController::class, 'index']);
         Route::get('/items/mine', [ItemController::class, 'mine']);
         Route::get('/items/nearby-found', [ItemController::class, 'nearbyFound']);
         Route::post('/items', [ItemController::class, 'store']);
         Route::get('/items/{item}', [ItemController::class, 'show']);
+        Route::match(['put', 'patch', 'post'], '/items/{item}', [ItemController::class, 'update']);
+        Route::delete('/items/{item}', [ItemController::class, 'destroy']);
+        Route::patch('/items/{item}/resolve', function (\Illuminate\Http\Request $request, \App\Models\Item $item) {
+            abort_unless($item->user_id === $request->user()->id, 403);
+            $item->update(['status' => 'RECOVERED']);
+            return response()->json(['item' => $item]);
+        });
         Route::get('/items/{item}/matches', [ItemController::class, 'findMatches']);
+
+        // Module Objects aliases (supports ObjectsRepository)
+        Route::get('/objects', [ItemController::class, 'index']);
+        Route::post('/objects', [ItemController::class, 'store']);
+        Route::get('/objects/statistics', [ItemController::class, 'mine']);
+        Route::get('/objects/my-objects', [ItemController::class, 'mine']);
+        Route::get('/objects/nearby', [ItemController::class, 'nearbyFound']);
+        Route::get('/objects/{item}', [ItemController::class, 'show']);
+        Route::match(['put', 'patch', 'post'], '/objects/{item}', [ItemController::class, 'update']);
+        Route::delete('/objects/{item}', [ItemController::class, 'destroy']);
+        Route::patch('/objects/{item}/resolve', function (\Illuminate\Http\Request $request, \App\Models\Item $item) {
+            abort_unless($item->user_id === $request->user()->id, 403);
+            $item->update(['status' => 'RECOVERED']);
+            return response()->json(['item' => $item]);
+        });
 
         // Module 3 : matching + verification
         Route::get('/matches', [MatchController::class, 'index']);
@@ -66,10 +90,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/matches/{match}/confirm-restitution', [MatchController::class, 'confirmRestitution']);
         Route::get('/matches/{match}/messages', [MatchController::class, 'messages']);
         Route::post('/matches/{match}/messages', [MatchController::class, 'sendMessage']);
+        Route::post('/matches/{match}/messages/read', [MatchController::class, 'markMessagesRead']);
+        Route::post('/matches/{match}/messages/{message}/report', [MatchController::class, 'reportMessage']);
         Route::get('/claims', [ClaimController::class, 'index']);
         Route::post('/claims', [ClaimController::class, 'store']);
         Route::post('/claims/{claim}/respond', [ClaimController::class, 'respond']);
         Route::post('/claims/{claim}/escalate', [ClaimController::class, 'escalate']);
         Route::post('/claims/{claim}/resolve', [ClaimController::class, 'resolve']);
+
+        // Module 4 : Gestion des Récompenses, Coupons, PDF, E-mail & Roue de la Chance
+        Route::prefix('rewards')->group(function () {
+            Route::get('/', [RewardController::class, 'index']);
+            Route::get('/my-coupons', [RewardController::class, 'myCoupons']);
+            Route::get('/wallet', [RewardController::class, 'wallet']);
+            Route::post('/wheel/spin', [RewardController::class, 'spinWheel']);
+            Route::post('/{reward}/redeem', [RewardController::class, 'redeem']);
+            Route::get('/coupons/{coupon}/pdf', [RewardController::class, 'downloadPdf']);
+            Route::post('/coupons/{coupon}/send-email', [RewardController::class, 'sendEmail']);
+            Route::post('/coupons/{coupon}/use', [RewardController::class, 'useCoupon']);
+        });
     });
 });
