@@ -70,13 +70,11 @@ class _GoogleMockAccount {
     required this.name,
     required this.email,
     required this.googleId,
-    this.avatar,
   });
 
   final String name;
   final String email;
   final String googleId;
-  final String? avatar;
 }
 
 class _GoogleAccountPickerSheet extends StatefulWidget {
