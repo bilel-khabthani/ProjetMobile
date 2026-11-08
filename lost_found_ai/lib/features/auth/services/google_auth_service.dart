@@ -17,7 +17,6 @@ import '../widgets/google_logo.dart';
 /// Service gérant la vraie authentification avec Google via le plugin officiel `google_sign_in`.
 class GoogleAuthHelper {
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: AppConfig.googleServerClientId,
     scopes: const <String>[
       'email',
       'profile',
@@ -38,16 +37,7 @@ class GoogleAuthHelper {
       } catch (_) {}
 
       // Ouvre la boîte de dialogue native Google
-      GoogleSignInAccount? account;
-      try {
-        account = await _googleSignIn.signIn();
-      } catch (e) {
-        // En cas de conflit avec serverClientId sur émulateur, retente en mode natif Android direct
-        final nativeSignIn = GoogleSignIn(
-          scopes: const <String>['email', 'profile'],
-        );
-        account = await nativeSignIn.signIn();
-      }
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
       if (account == null) {
         // L'utilisateur a fermé ou annulé la fenêtre de connexion Google
@@ -60,9 +50,7 @@ class GoogleAuthHelper {
       try {
         final auth = await account.authentication;
         idToken = auth.idToken;
-      } catch (_) {
-        // idToken non disponible, l'API accepte les données de profil réelles
-      }
+      } catch (_) {}
 
       await ref.read(sessionProvider.notifier).signInWithGoogle(
         idToken: idToken,
