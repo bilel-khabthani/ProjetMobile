@@ -38,7 +38,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   String? _error;
   String? _info;
-  String? _demoOtp;
 
   @override
   void dispose() {
@@ -89,7 +88,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     });
 
     try {
-      final otp = await ref
+      await ref
           .read(sessionProvider.notifier)
           .forgotPassword(email: email);
       if (!mounted) return;
@@ -97,7 +96,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _startCooldown();
       setState(() {
         _codeSent = true;
-        _demoOtp = otp;
         _info = 'Un code de vérification OTP a été envoyé par e-mail à $email.';
       });
 
@@ -169,7 +167,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _codeController.clear();
       _passwordController.clear();
       _confirmController.clear();
-      _demoOtp = null;
       _info = null;
       _error = null;
     });
@@ -240,29 +237,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       prefixIcon: Icon(Icons.pin_outlined),
                     ),
                   ),
-                  if (_demoOtp != null) ...[
-                    const SizedBox(height: AppSpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            'Mode démo : votre code est $_demoOtp',
-                            style: AppText.caption.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [

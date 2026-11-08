@@ -250,11 +250,6 @@ class AuthController extends Controller
             'message' => 'Si un compte est associé à cette adresse e-mail, un code de réinitialisation vous a été envoyé par e-mail.',
         ];
 
-        // En demo / local ou si le compte existe, renvoyer demo_otp pour tester immediatement
-        if (config('app.debug') || $user !== null) {
-            $response['demo_otp'] = $code;
-        }
-
         return response()->json($response);
     }
 
