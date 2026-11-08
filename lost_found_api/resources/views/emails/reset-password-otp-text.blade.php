@@ -12,3 +12,4 @@ Ce code est valide pendant 15 minutes.
 Sécurité : Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.
 
 Lost&Found AI - Smart Object Recovery
+

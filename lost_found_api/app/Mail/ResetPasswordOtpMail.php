@@ -33,3 +33,4 @@ class ResetPasswordOtpMail extends Mailable
         );
     }
 }
+

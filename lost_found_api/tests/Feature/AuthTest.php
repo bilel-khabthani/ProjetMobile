@@ -182,3 +182,4 @@ class AuthTest extends TestCase
             ->assertJsonPath('message', 'Code de vérification incorrect ou expiré.');
     }
 }
+

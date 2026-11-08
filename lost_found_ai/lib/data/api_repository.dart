@@ -1,4 +1,4 @@
-﻿import '../core/app_config.dart';
+import '../core/app_config.dart';
 import 'api_client.dart';
 import 'models/item.dart';
 import 'models/item_match.dart';
