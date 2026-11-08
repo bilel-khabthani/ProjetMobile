@@ -11,6 +11,8 @@ use Tests\TestCase;
 
 class RewardFeatureTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected User $user;
 
     protected function setUp(): void
@@ -140,4 +142,3 @@ class RewardFeatureTest extends TestCase
             ->assertJson(['status' => 'sent']);
     }
 }
-

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_typography.dart';
+import 'app_icon.dart';
 import 'pressable_scale.dart';
 
 enum AppButtonVariant { primary, secondary, ghost, success, danger }
@@ -13,6 +14,7 @@ class AppButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.icon,
+    this.iconName,
     this.variant = AppButtonVariant.primary,
     this.loading = false,
     this.expand = true,
@@ -22,6 +24,9 @@ class AppButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+
+  /// Icone du set Solar (nom de fichier sans extension), alternative a [icon].
+  final String? iconName;
   final AppButtonVariant variant;
   final bool loading;
   final bool expand;
@@ -33,6 +38,7 @@ class AppButton extends StatelessWidget {
       variant: variant,
       loading: loading,
       icon: icon,
+      iconName: iconName,
     );
 
     final child = SizedBox(
@@ -56,7 +62,14 @@ class AppButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (visual.icon != null) ...[
+                    if (visual.iconName != null) ...[
+                      AppIcon(
+                        visual.iconName!,
+                        size: 20,
+                        color: visual.foreground,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                    ] else if (visual.icon != null) ...[
                       Icon(visual.icon, size: 20, color: visual.foreground),
                       const SizedBox(width: AppSpacing.xs),
                     ],
@@ -94,11 +107,13 @@ class _AppButtonVisual {
     required this.variant,
     required this.loading,
     this.icon,
+    this.iconName,
   });
 
   final AppButtonVariant variant;
   final bool loading;
   final IconData? icon;
+  final String? iconName;
 
   Color get foreground => switch (variant) {
     AppButtonVariant.primary => Colors.white,

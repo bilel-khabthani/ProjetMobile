@@ -55,6 +55,9 @@ abstract final class AppRoutes {
   static const String objectsDashboard = '/objects/dashboard';
   static const String objectsList = '/objects/list';
   static const String objectsAdd = '/objects/add';
+
+  /// Alias utilise par le module objects (singulier).
+  static const String objectAdd = objectsAdd;
   static const String myObjects = '/my-objects';
   static const String objectMyList = '/my-objects';
   static const String map = '/map';
