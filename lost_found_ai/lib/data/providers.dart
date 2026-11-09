@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/ai/text_agreement_engine.dart';
 import '../core/app_config.dart';
 import 'api_client.dart';
 import 'api_repository.dart';
@@ -205,10 +206,15 @@ final trustProvider = FutureProvider<TrustSummary>((ref) async {
 });
 
 class VerificationResult {
-  const VerificationResult({required this.success, required this.matchId});
+  const VerificationResult({
+    required this.success,
+    required this.matchId,
+    this.outcome,
+  });
 
   final bool success;
   final String matchId;
+  final VerificationOutcome? outcome;
 }
 
 final verificationProvider =
@@ -225,12 +231,28 @@ class VerificationNotifier extends StateNotifier<VerificationResult?> {
   bool _busy = false;
   bool get busy => _busy;
 
-  Future<bool> submit({required String matchId, required String answer}) async {
+  Future<VerificationOutcome> submit({
+    required String matchId,
+    required String answer,
+  }) async {
     _busy = true;
-    final ok = await _repository.verifyAnswer(matchId: matchId, answer: answer);
-    state = VerificationResult(success: ok, matchId: matchId);
+    final VerificationOutcome outcome;
+    if (AppConfig.useMockData) {
+      outcome = await MockRepository()
+          .verifyAnswer(matchId: matchId, answer: answer);
+    } else {
+      outcome = await _repository.verifyAnswer(
+        matchId: matchId,
+        answer: answer,
+      );
+    }
+    state = VerificationResult(
+      success: outcome.accepted,
+      matchId: matchId,
+      outcome: outcome,
+    );
     _busy = false;
-    return ok;
+    return outcome;
   }
 
   void reset() => state = null;
@@ -401,8 +423,13 @@ class SwipeDeckNotifier extends AsyncNotifier<SwipeDeckState> {
     }
   }
 
-  /// Analyse IA détaillée.
+  /// Analyse IA detaillee, enrichie des signaux calcules sur l'appareil.
   Future<AiInsight> insight(SwipeCandidate candidate) async {
+    final insight = await _fetchInsight(candidate);
+    return _withLocalAgreement(insight, candidate);
+  }
+
+  Future<AiInsight> _fetchInsight(SwipeCandidate candidate) async {
     if (state.valueOrNull?.isDemo ?? false) return candidate.ai;
     try {
       return await ref
@@ -411,6 +438,29 @@ class SwipeDeckNotifier extends AsyncNotifier<SwipeDeckState> {
     } catch (_) {
       return candidate.ai;
     }
+  }
+
+  /// Enrichit l'analyse serveur avec le moteur d'accord local : l'appareil
+  /// peut expliquer la correspondance meme sans reseau ni modele configure.
+  AiInsight _withLocalAgreement(AiInsight insight, SwipeCandidate candidate) {
+    final local = const TextAgreementEngine().analyze(
+      '${candidate.lostTitle} ${candidate.lostDescription}',
+      '${candidate.foundTitle} ${candidate.foundDescription} '
+          '${candidate.foundPlace}',
+    );
+
+    return insight.copyWith(
+      agreementScore:
+          insight.agreementScore > 0 ? insight.agreementScore : local.score,
+      sharedDetails:
+          insight.sharedDetails.isNotEmpty
+              ? insight.sharedDetails
+              : local.shared,
+      contradictions:
+          insight.contradictions.isNotEmpty
+              ? insight.contradictions
+              : local.contradictions,
+    );
   }
 }
 

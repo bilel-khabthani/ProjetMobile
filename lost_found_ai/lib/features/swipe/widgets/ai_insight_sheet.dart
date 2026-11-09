@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/swipe_candidate.dart';
+import '../../../widgets/agreement_signals.dart';
+import '../../../widgets/photo_comparison_card.dart';
 
 /// Ouvre l'analyse IA detaillee d'une carte.
 Future<void> showAiInsightSheet(
@@ -141,6 +143,23 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                         insight.summary,
                         style: AppText.body.copyWith(height: 1.5),
                       ),
+                      if (insight.agreementScore > 0 ||
+                          insight.sharedDetails.isNotEmpty ||
+                          insight.contradictions.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        AgreementSignals(
+                          score: insight.agreementScore,
+                          shared: insight.sharedDetails,
+                          contradictions: insight.contradictions,
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.md),
+                      PhotoComparisonCard(
+                        leftUrl: widget.candidate.lostImageUrl,
+                        rightUrl: widget.candidate.foundImageUrl,
+                        leftCategory: widget.candidate.lostCategory,
+                        rightCategory: widget.candidate.foundCategory,
+                      ),
                       if (insight.reasons.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.xl),
                         Text(
@@ -268,7 +287,7 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                             const SizedBox(width: AppSpacing.xs),
                             Expanded(
                               child: Text(
-                                'L’IA analyse le texte, la distance et l’écart horaire. '
+                                'L’IA analyse le texte, les photos, la distance et l’écart horaire. '
                                 'Elle ne remplace pas la question de vérification : '
                                 'le propriétaire doit toujours prouver que l’objet est le sien.',
                                 style: AppText.caption.copyWith(
@@ -285,6 +304,12 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                         insight.isLiveAi
                             ? 'Analyse générée par le modèle OpenAI.'
                             : 'Pré-analyse locale (le modèle OpenAI n’est pas configuré).',
+                        style: AppText.caption.copyWith(fontSize: 10),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'L’accord des descriptions et la comparaison des photos '
+                        'sont calculés sur l’appareil.',
                         style: AppText.caption.copyWith(fontSize: 10),
                       ),
                     ],

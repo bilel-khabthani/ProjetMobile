@@ -1,3 +1,4 @@
+import '../../core/ai/text_agreement_engine.dart';
 import 'item.dart';
 
 class MatchScores {
@@ -18,6 +19,69 @@ class MatchScores {
 
 enum MatchVerification { pending, verified }
 
+/// Decision rendue par le moteur d'accord textuel apres une reponse libre.
+enum VerificationDecision {
+  yes,
+  unsure,
+  no;
+
+  static VerificationDecision fromCode(String? code) => switch (code?.toUpperCase()) {
+    'YES' || 'OUI' => VerificationDecision.yes,
+    'UNSURE' => VerificationDecision.unsure,
+    _ => VerificationDecision.no,
+  };
+
+  String get label => switch (this) {
+    VerificationDecision.yes => 'Réponse acceptée',
+    VerificationDecision.unsure => 'Réponse incertaine',
+    VerificationDecision.no => 'Réponse refusée',
+  };
+}
+
+/// Resultat de la verification : score, decision et signaux exploitables.
+///
+/// Le serveur renvoie cette forme a la fois dans `verification` (reponse a
+/// POST /matches/{id}/answer) et dans `decision.verification` (fiche match).
+class VerificationOutcome {
+  const VerificationOutcome({
+    required this.score,
+    required this.decision,
+    required this.matched,
+    required this.contradictions,
+    this.neutral = false,
+  });
+
+  final int score;
+  final VerificationDecision decision;
+  final List<String> matched;
+  final List<String> contradictions;
+
+  /// Vrai quand aucun detail secret n'est enregistre : le moteur ne peut pas
+  /// conclure et la reponse reste en sursis.
+  final bool neutral;
+
+  bool get accepted => decision == VerificationDecision.yes;
+  bool get partial => decision == VerificationDecision.unsure;
+
+  factory VerificationOutcome.fromJson(Map<String, dynamic>? json) {
+    final data = json ?? const <String, dynamic>{};
+    return VerificationOutcome(
+      score: ((data['score'] as num?)?.toInt() ?? 0).clamp(0, 100),
+      decision: VerificationDecision.fromCode(data['decision'] as String?),
+      matched: _stringList(data['matched']),
+      contradictions: _stringList(data['contradictions']),
+      neutral: data['neutral'] == true,
+    );
+  }
+
+  static List<String> _stringList(dynamic raw) {
+    return (raw as List<dynamic>? ?? const [])
+        .map((value) => value.toString())
+        .where((value) => value.trim().isNotEmpty)
+        .toList();
+  }
+}
+
 class ItemMatch {
   const ItemMatch({
     required this.id,
@@ -37,7 +101,12 @@ class ItemMatch {
     required this.verificationQuestion,
     required this.minutesAgo,
     this.verification = MatchVerification.pending,
+    this.myItemImageUrl,
+    this.foundItemImageUrl,
     this.status = 'PENDING',
+    this.verificationAttempts = 0,
+    this.agreement,
+    this.verificationOutcome,
     this.viewerRole = 'owner',
     this.myItemType = ItemType.lost,
     this.otherItemType = ItemType.found,
@@ -70,8 +139,22 @@ class ItemMatch {
   final int minutesAgo;
   final MatchVerification verification;
 
+  /// Photo de l'annonce perdue, resolue sur le serveur (null si absente).
+  final String? myItemImageUrl;
+
+  /// Photo de l'annonce trouvee, resolue sur le serveur (null si absente).
+  final String? foundItemImageUrl;
+
   /// Statut serveur : PENDING, VERIFIED, CONTACTED, RECOVERED, REJECTED.
   final String status;
+
+  final int verificationAttempts;
+
+  /// Accord textuel calcule par le moteur lors du matching.
+  final TextAgreement? agreement;
+
+  /// Derniere evaluation de la reponse du proprietaire, si elle existe.
+  final VerificationOutcome? verificationOutcome;
 
   /// Role de l'utilisateur connecte dans cette correspondance : owner | finder.
   final String viewerRole;
@@ -103,6 +186,8 @@ class ItemMatch {
 
   /// Nom de la personne avec qui l'utilisateur connecte discute.
   String get counterpartName => finderName;
+
+  bool get hasVerificationOutcome => verificationOutcome != null;
 }
 
 class AppUser {

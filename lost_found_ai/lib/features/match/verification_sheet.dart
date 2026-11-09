@@ -5,10 +5,13 @@ import '../../core/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../data/api_client.dart';
 import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
+import '../../widgets/agreement_signals.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/photo_placeholder.dart';
+import '../../widgets/item_photo.dart';
+import '../../widgets/photo_comparison_card.dart';
 import '../../widgets/status_pill.dart';
 
 Future<void> showVerificationSheet(BuildContext context, ItemMatch match) {
@@ -31,8 +34,9 @@ class VerificationSheet extends ConsumerStatefulWidget {
 
 class _VerificationSheetState extends ConsumerState<VerificationSheet> {
   final _answerController = TextEditingController();
+  VerificationOutcome? _outcome;
   bool _loading = false;
-  bool _wrong = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -41,28 +45,66 @@ class _VerificationSheetState extends ConsumerState<VerificationSheet> {
   }
 
   Future<void> _submit() async {
+    final answer = _answerController.text.trim();
+    if (answer.isEmpty) {
+      setState(() => _error = 'Écrivez votre réponse avant de valider.');
+      return;
+    }
+
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
-      _wrong = false;
+      _error = null;
     });
 
-    final ok = await ref
-        .read(verificationProvider.notifier)
-        .submit(matchId: widget.match.id, answer: _answerController.text);
+    try {
+      final outcome = await ref
+          .read(verificationProvider.notifier)
+          .submit(matchId: widget.match.id, answer: answer);
 
-    if (!mounted) return;
+      if (!mounted) return;
+      setState(() {
+        _outcome = outcome;
+        _loading = false;
+      });
+
+      if (outcome.accepted) {
+        // La fiche et la liste doivent refleter le match desormais verifie.
+        ref.invalidate(matchProvider(widget.match.id));
+        ref.invalidate(matchesProvider);
+      }
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.userMessage;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Réponse impossible à envoyer. Vérifiez votre connexion.';
+      });
+    }
+  }
+
+  void _retry() {
     setState(() {
-      _loading = false;
-      _wrong = !ok;
+      _outcome = null;
+      _error = null;
+      _answerController.clear();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final verification = ref.watch(verificationProvider);
     final verified =
-        ref.watch(verificationProvider)?.success == true &&
-        ref.watch(verificationProvider)?.matchId == widget.match.id;
+        verification != null &&
+        verification.success &&
+        verification.matchId == widget.match.id;
+    final outcome = _outcome;
+    final accepted = verified || (outcome?.accepted ?? false);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -86,16 +128,23 @@ class _VerificationSheetState extends ConsumerState<VerificationSheet> {
               AppSpacing.xl,
               AppSpacing.xl,
             ),
-            child: verified
-                ? _SuccessState(match: widget.match)
-                : _QuestionState(
+            child: accepted
+                ? _SuccessState(
                     match: widget.match,
-                    controller: _answerController,
-                    loading: _loading,
-                    wrong: _wrong,
-                    onSubmit: _submit,
-                    onHint: () => setState(() => _wrong = false),
-                  ),
+                    outcome: outcome ?? verification?.outcome,
+                  )
+                : outcome != null
+                    ? _OutcomeState(outcome: outcome, onRetry: _retry)
+                    : _QuestionState(
+                        match: widget.match,
+                        controller: _answerController,
+                        loading: _loading,
+                        error: _error,
+                        onSubmit: _submit,
+                        onHint: () {
+                          if (_error != null) setState(() => _error = null);
+                        },
+                      ),
           ),
         ),
       ),
@@ -127,7 +176,7 @@ class _QuestionState extends StatelessWidget {
     required this.match,
     required this.controller,
     required this.loading,
-    required this.wrong,
+    required this.error,
     required this.onSubmit,
     required this.onHint,
   });
@@ -135,23 +184,25 @@ class _QuestionState extends StatelessWidget {
   final ItemMatch match;
   final TextEditingController controller;
   final bool loading;
-  final bool wrong;
+  final String? error;
   final VoidCallback onSubmit;
   final VoidCallback onHint;
 
   @override
   Widget build(BuildContext context) {
+    final agreement = match.agreement;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _Handle(),
         Row(
           children: [
-            PhotoPlaceholder(
+            ItemPhoto(
+              imageUrl: match.foundItemImageUrl,
               category: match.foundItemCategory,
               size: 56,
               borderRadius: AppRadius.md,
-              showLabel: false,
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
@@ -201,6 +252,23 @@ class _QuestionState extends StatelessWidget {
             ],
           ),
         ),
+        if (agreement != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          AgreementSignals(
+            score: agreement.score,
+            shared: agreement.shared,
+            contradictions: agreement.contradictions,
+            title: 'Ce que le moteur a compris',
+            compact: true,
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        PhotoComparisonCard(
+          leftUrl: match.myItemImageUrl,
+          rightUrl: match.foundItemImageUrl,
+          leftCategory: match.myItemCategory,
+          rightCategory: match.foundItemCategory,
+        ),
         const SizedBox(height: AppSpacing.lg),
         TextField(
           controller: controller,
@@ -211,7 +279,7 @@ class _QuestionState extends StatelessWidget {
           decoration: InputDecoration(
             labelText: AppStrings.fieldAnswer,
             hintText: AppStrings.fieldAnswerHint,
-            errorText: wrong ? AppStrings.answerWrong : null,
+            errorText: error,
             prefixIcon: const Icon(Icons.edit_outlined),
           ),
         ),
@@ -239,10 +307,184 @@ class _QuestionState extends StatelessWidget {
   }
 }
 
+class _OutcomeState extends StatelessWidget {
+  const _OutcomeState({required this.outcome, required this.onRetry});
+
+  final VerificationOutcome outcome;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final partial = outcome.partial;
+    final color = partial ? AppColors.accent : AppColors.danger;
+    final icon = partial ? Icons.help_rounded : Icons.cancel_rounded;
+    final subtitle = partial
+        ? 'Les éléments partagés ne suffisent pas : précisez votre réponse pour confirmer.'
+        : 'Votre réponse ne correspond pas au détail enregistré. Réessayez avec plus de précision.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _Handle(),
+        Center(
+          child: Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 42, color: color),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          outcome.decision.label,
+          style: AppText.h1.copyWith(color: color),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(subtitle, style: AppText.body, textAlign: TextAlign.center),
+        const SizedBox(height: AppSpacing.lg),
+        if (outcome.neutral) ...[
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: AppColors.info,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Aucun détail secret n’est enregistré pour cette annonce : '
+                    'la réponse reste en sursis tant que le propriétaire n’a pas '
+                    'fourni de preuve supplémentaire.',
+                    style: AppText.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Text('Score de correspondance', style: AppText.label),
+                    const Spacer(),
+                    Text(
+                      '${outcome.score}/100',
+                      style: AppText.label.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  child: LinearProgressIndicator(
+                    value: outcome.score / 100,
+                    minHeight: 7,
+                    backgroundColor: AppColors.border,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (outcome.matched.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text('Éléments reconnus', style: AppText.h3),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final detail in outcome.matched)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.foundSoft,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                    child: Text(
+                      detail,
+                      style: AppText.caption.copyWith(
+                        color: AppColors.found,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (outcome.contradictions.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text('Contradictions', style: AppText.h3),
+            const SizedBox(height: AppSpacing.xs),
+            for (final contradiction in outcome.contradictions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 15,
+                      color: AppColors.danger,
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        contradiction,
+                        style: AppText.caption.copyWith(
+                          color: AppColors.danger,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+        const SizedBox(height: AppSpacing.xl),
+        AppButton(
+          label: 'Réessayer',
+          icon: Icons.refresh_rounded,
+          onPressed: onRetry,
+        ),
+      ],
+    );
+  }
+}
+
 class _SuccessState extends StatelessWidget {
-  const _SuccessState({required this.match});
+  const _SuccessState({required this.match, this.outcome});
 
   final ItemMatch match;
+  final VerificationOutcome? outcome;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +505,34 @@ class _SuccessState extends StatelessWidget {
           style: AppText.body,
           textAlign: TextAlign.center,
         ),
+        if (outcome != null && outcome!.matched.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final detail in outcome!.matched)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.foundSoft,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Text(
+                    detail,
+                    style: AppText.caption.copyWith(
+                      color: AppColors.found,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         Container(
           padding: const EdgeInsets.all(AppSpacing.md),

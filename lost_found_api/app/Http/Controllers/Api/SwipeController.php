@@ -199,6 +199,7 @@ class SwipeController extends Controller
             'longitude' => $item->longitude,
             'occurred_at' => $item->occurred_at?->toIso8601String(),
             'status' => $item->status,
+            'image_url' => $item->image_path ? '/storage/'.$item->image_path : null,
             'user' => $item->user ? [
                 'id' => $item->user->id,
                 'name' => $item->user->name,

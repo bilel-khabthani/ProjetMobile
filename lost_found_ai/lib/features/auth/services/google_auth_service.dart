@@ -9,22 +9,64 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/api_client.dart';
 import '../../../data/providers.dart';
 
-/// Service gérant la vraie authentification avec Google via le plugin officiel `google_sign_in`.
+/// Service gérant la connexion avec Google.
+///
+/// Deux chemins, pour n'exiger qu'**une seule** étape de choix de compte :
+///  * le flux natif `google_sign_in`, uniquement lorsque le build est
+///    enregistré dans Google Cloud Console (voir [googleServerClientId]) ;
+///  * le sélecteur de comptes intégré, chemin par défaut (émulateur, démo), qui
+///    ne nécessite aucune configuration.
 class GoogleAuthHelper {
+  /// ID client Web OAuth Google, passé comme `serverClientId` Android.
+  ///
+  /// Le flux natif ne peut réussir que si le build est enregistré dans Google
+  /// Cloud Console : un client OAuth Android pour `fr.campus.lost_found_ai`
+  /// associé à l'empreinte SHA-1 du certificat de signature. Sans cet
+  /// enregistrement, `GoogleSignIn.signIn()` ouvre quand même le sélecteur de
+  /// comptes natif puis échoue avec DEVELOPER_ERROR (10) : l'utilisateur aurait
+  /// alors deux fenêtres de choix de compte à la suite.
+  ///
+  /// On n'ouvre donc le flux natif que lorsque l'ID est fourni :
+  ///
+  /// ```
+  /// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>
+  /// ```
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+  );
+
+  /// Le flux natif n'est tenté que pour un build enregistré (voir
+  /// [googleServerClientId]) ; sinon le sélecteur intégré prend le relais.
+  static bool get _isNativeGoogleSignInConfigured => googleServerClientId.isNotEmpty;
+
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: googleServerClientId.isEmpty ? null : googleServerClientId,
     scopes: const <String>[
       'email',
       'profile',
     ],
   );
 
-  /// Lance le flux réel de connexion Google Play Services / Google Sign-In.
+  /// Ouvre l'unique étape de choix de compte puis connecte l'utilisateur.
   static Future<void> handleGoogleSignIn(
     BuildContext context,
     WidgetRef ref, {
     VoidCallback? onLoadingStart,
     VoidCallback? onLoadingEnd,
   }) async {
+    if (!_isNativeGoogleSignInConfigured) {
+      // Build non enregistré : le sélecteur natif échouerait de toute façon
+      // après avoir demandé un compte. On propose directement le sélecteur
+      // intégré, qui reste l'unique demande de compte.
+      _showAccountSelectorSheet(
+        context,
+        ref,
+        onLoadingStart: onLoadingStart,
+        onLoadingEnd: onLoadingEnd,
+      );
+      return;
+    }
+
     try {
       // Déconnecte toute session locale pour toujours ouvrir le sélecteur de compte natif
       try {
@@ -46,7 +88,7 @@ class GoogleAuthHelper {
         final auth = await account.authentication;
         idToken = auth.idToken;
       } catch (_) {
-        // En mode Android direct sans serverClientId, l'idToken n'est pas requis
+        // L'API accepte les données de profil lorsque le jeton n'est pas disponible.
       }
 
       await ref.read(sessionProvider.notifier).signInWithGoogle(
@@ -66,17 +108,11 @@ class GoogleAuthHelper {
       );
       context.go(AppRoutes.home);
     } on PlatformException catch (error) {
+      // Le sélecteur natif vient de s'afficher : on n'ouvre jamais un second
+      // sélecteur de compte par-dessus (c'était le double affichage). L'échec
+      // est signalé simplement, à charge de l'équipe de finaliser
+      // l'enregistrement OAuth (voir [googleServerClientId]).
       final details = error.message ?? error.code;
-
-      // ApiException 10 (DEVELOPER_ERROR) : se produit sur émulateur quand le SHA-1
-      // n'est pas encore enregistré dans Google Cloud Console.
-      // On ouvre le sélecteur de compte Google pour choisir le compte souhaité !
-      if (details.contains('10') || error.code == '10' || error.code == 'sign_in_failed') {
-        if (!context.mounted) return;
-        _showAccountSelectorSheet(context, ref, onLoadingStart: onLoadingStart, onLoadingEnd: onLoadingEnd);
-        return;
-      }
-
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -101,7 +137,7 @@ class GoogleAuthHelper {
     }
   }
 
-  /// Sélecteur de compte Google élégant pour émulateur & démo soutenance.
+  /// Sélecteur de compte Google intégré — chemin par défaut (émulateur, démo).
   static void _showAccountSelectorSheet(
     BuildContext context,
     WidgetRef ref, {

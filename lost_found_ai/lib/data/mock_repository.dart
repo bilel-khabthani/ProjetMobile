@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../core/ai/text_agreement_engine.dart';
 import 'models/item.dart';
 import 'models/item_match.dart';
 import 'models/reward.dart';
@@ -52,18 +53,29 @@ class MockRepository {
     return _matches[id] ?? _seedMatches().first;
   }
 
-  Future<bool> verifyAnswer({
+  /// Verification demo : le meme moteur d'accord textuel que l'API evalue la
+  /// reponse du proprietaire contre un detail secret connu d'avance.
+  Future<VerificationOutcome> verifyAnswer({
     required String matchId,
     required String answer,
   }) async {
     await _delay(_medium);
-    final normalized = _normalize(answer);
-    if (normalized.isEmpty) return false;
-    final current = _matches[matchId];
-    if (current == null) return false;
-    final accepted = matchId == 'match-sac' ? 'bleue' : 'noir';
-    return _normalize(accepted).contains(normalized) ||
-        normalized.contains(_normalize(accepted));
+    const secrets = <String, String?>{
+      'match-sac': 'bleue',
+      'match-cles': 'vert',
+      'match-telephone': 'noir',
+    };
+    final result = const TextAgreementEngine().scoreAnswer(
+      answer,
+      secrets[matchId],
+    );
+    return VerificationOutcome(
+      score: result.score,
+      decision: VerificationDecision.fromCode(result.decision),
+      matched: result.matched,
+      contradictions: result.contradictions,
+      neutral: result.neutral,
+    );
   }
 
   Future<void> publishItem({
@@ -177,20 +189,6 @@ class MockRepository {
     }
     final list = base.reversed.toList();
     return list;
-  }
-
-  static String _normalize(String value) {
-    final cleaned = value
-        .toLowerCase()
-        .replaceAll(RegExp(r'[àâä]'), 'a')
-        .replaceAll(RegExp(r'[éèêë]'), 'e')
-        .replaceAll(RegExp(r'[îï]'), 'i')
-        .replaceAll(RegExp(r'[ôö]'), 'o')
-        .replaceAll(RegExp(r'[ûü]'), 'u')
-        .replaceAll(RegExp(r'[ç]'), 'c')
-        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
-        .trim();
-    return cleaned;
   }
 
   static Future<void> _delay(Duration duration) {

@@ -6,6 +6,7 @@ use App\Mail\CouponVoucherMail;
 use App\Models\ItemMatch;
 use App\Models\User;
 use App\Models\UserCoupon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -143,6 +144,7 @@ class TrustService
                 try {
                     Mail::to($finder->email)->send(new CouponVoucherMail($coupon));
                 } catch (\Throwable $e) {
+                    Log::error('Echec d\'envoi de l\'e-mail de coupon (restitution) a '.$finder->email.' : '.$e->getMessage());
                 }
             }
 
