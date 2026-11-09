@@ -25,7 +25,7 @@ class ChatSecurityTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('body', 'Bonjour, je pense que c\'est mon sac.')
-            ->assertJsonPath('sender_id', $owner->id);
+            ->assertJsonPath('sender.id', $owner->id);
 
         $message = Message::sole();
 
@@ -75,7 +75,7 @@ class ChatSecurityTest extends TestCase
         $this->assertDatabaseCount('messages', 0);
     }
 
-    public function test_recipient_can_report_a_message_but_not_their_own(): void
+    public function test_participant_can_report_a_message(): void
     {
         $owner = $this->verifiedUser();
         $finder = $this->verifiedUser();
@@ -87,20 +87,37 @@ class ChatSecurityTest extends TestCase
             'body' => 'Message suspect',
         ]);
 
-        $this->actingAs($owner, 'sanctum')
-            ->postJson("/api/matches/{$match->id}/messages/{$message->id}/report", [
-                'reason' => 'Contenu abusif',
-            ])
-            ->assertUnprocessable();
-
         $this->actingAs($finder, 'sanctum')
             ->postJson("/api/matches/{$match->id}/messages/{$message->id}/report", [
                 'reason' => 'Contenu abusif',
             ])
-            ->assertOk()
-            ->assertJsonPath('report_reason', 'Contenu abusif');
+            ->assertCreated()
+            ->assertJsonPath('type', 'COMPORTEMENT_ABUSIF');
 
-        $this->assertNotNull($message->fresh()->reported_at);
+        $this->assertDatabaseCount('moderation_events', 1);
+        $this->assertDatabaseCount('claims', 1);
+    }
+
+    public function test_outsider_cannot_report_a_message(): void
+    {
+        $owner = $this->verifiedUser();
+        $finder = $this->verifiedUser();
+        $match = $this->match($owner, $finder, ItemMatch::STATUS_VERIFIED);
+        $outsider = $this->verifiedUser();
+
+        $message = Message::create([
+            'match_id' => $match->id,
+            'sender_id' => $owner->id,
+            'body' => 'Message suspect',
+        ]);
+
+        $this->actingAs($outsider, 'sanctum')
+            ->postJson("/api/matches/{$match->id}/messages/{$message->id}/report", [
+                'reason' => 'Contenu abusif',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('moderation_events', 0);
     }
 
     public function test_low_trust_participant_cannot_open_chat(): void

@@ -35,8 +35,9 @@ class SwipeAiService
         'autre' => 'autre',
     ];
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly TextAgreementService $agreement,
+    ) {
         $this->config = (array) config('swipe_ai', []);
     }
 
@@ -149,6 +150,13 @@ class SwipeAiService
         $lost = $match->lostItem;
         $found = $match->foundItem;
 
+        $agreement = $lost && $found
+            ? $this->agreement->analyze(
+                $lost->title.' '.$lost->description,
+                $found->title.' '.$found->description.' '.$found->place_label,
+            )
+            : ['score' => 0, 'shared' => [], 'contradictions' => []];
+
         return [
             'score_global' => (int) $match->global_score,
             'dimensions' => [
@@ -156,6 +164,7 @@ class SwipeAiService
                 'temps' => (int) $match->time_score,
                 'texte' => (int) $match->text_score,
             ],
+            'accord_texte' => $agreement,
             'distance_km' => $this->distanceKm($match),
             'objet_perdu' => $this->itemContext($lost),
             'objet_trouve' => $this->itemContext($found),
@@ -243,6 +252,7 @@ PROMPT;
             'icebreaker' => $icebreaker !== ''
                 ? $icebreaker
                 : $this->heuristic($context)['icebreaker'],
+            'agreement' => $this->agreementPayload($context),
             'source' => 'openai',
         ];
     }
@@ -254,12 +264,22 @@ PROMPT;
         $dimensions = $context['dimensions'] ?? [];
         $lost = $context['objet_perdu'] ?? [];
         $found = $context['objet_trouve'] ?? [];
+
+        $agreement = $this->agreementPayload($context);
+        $shared = $agreement['shared'];
+        $contradictions = $agreement['contradictions'];
+
+        // Une contradiction explicite doit faire baisser la confiance : le
+        // texte est un indice, pas une preuve.
+        $score = max(0, min(100, $score - min(30, count($contradictions) * 12)));
         $verdict = $this->verdictForScore($score);
 
         $reasons = [];
 
-        if (($dimensions['texte'] ?? 0) >= 75) {
-            $reasons[] = 'Les descriptions partagent plusieurs mots-clés forts.';
+        if ($shared !== []) {
+            $reasons[] = 'Détails partagés : '.implode(', ', array_slice($shared, 0, 4)).'.';
+        } elseif (($dimensions['texte'] ?? 0) >= 70) {
+            $reasons[] = 'Les descriptions se recoupent sur plusieurs mots-clés.';
         }
 
         if (($dimensions['localisation'] ?? 0) >= 80) {
@@ -303,7 +323,24 @@ PROMPT;
             'reasons' => array_slice($reasons, 0, 4),
             'tags' => array_slice($tags, 0, 4),
             'icebreaker' => $icebreaker,
+            'agreement' => $agreement,
             'source' => 'heuristic',
+        ];
+    }
+
+    /**
+     * Forme stable de l'accord textuel transmise au client Flutter.
+     *
+     * @return array{score: int, shared: array<int, string>, contradictions: array<int, string>}
+     */
+    private function agreementPayload(array $context): array
+    {
+        $agreement = $context['accord_texte'] ?? [];
+
+        return [
+            'score' => max(0, min(100, (int) ($agreement['score'] ?? 0))),
+            'shared' => $this->stringList($agreement['shared'] ?? [], 6),
+            'contradictions' => $this->stringList($agreement['contradictions'] ?? [], 4),
         ];
     }
 

@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\Moderation\ModerationManager;
+use App\Services\Moderation\ModerationService;
+use App\Services\Moderation\TextNormalizer;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +17,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ModerationService::class, fn () => new ModerationManager(
+            $this->app->make(TextNormalizer::class),
+        ));
     }
 
     /**
@@ -44,6 +49,12 @@ class AppServiceProvider extends ServiceProvider
             $email = strtolower((string) $request->input('email'));
 
             return Limit::perMinute(5)->by($email.'|'.$request->ip());
+        });
+
+        // Chat : limite les envois par utilisateur pour freiner le spam et les
+        // tentatives de contournement de la moderation.
+        RateLimiter::for('chat', function (Request $request): Limit {
+            return Limit::perMinute(20)->by((string) $request->user()?->id.'|'.$request->ip());
         });
     }
 }

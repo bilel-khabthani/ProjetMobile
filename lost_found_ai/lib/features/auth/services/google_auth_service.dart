@@ -11,20 +11,36 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/api_client.dart';
 import '../../../data/providers.dart';
 
-/// Service gérant la vraie authentification avec Google via le plugin officiel `google_sign_in`.
+/// Service gérant la connexion avec Google.
+///
+/// Uniquement le flux natif `google_sign_in` : la fenêtre de connexion Google
+/// officielle. C'est elle qui affiche les comptes déjà utilisés sur l'appareil
+/// et propose « Utiliser un autre compte » — aucun compte de démonstration
+/// n'est fabriqué côté application, l'adresse provient toujours d'un vrai
+/// compte Google.
 class GoogleAuthHelper {
+  /// Le flux natif ne peut reussir que si le build est enregistre dans Google
+  /// Cloud Console : un client OAuth Android pour `fr.campus.lost_found_ai`
+  /// associe a l'empreinte SHA-1 du certificat de signature. Sans cet
+  /// enregistrement, `GoogleSignIn.signIn()` ouvre quand meme le selecteur de
+  /// comptes natif puis echoue avec DEVELOPER_ERROR (10).
+  ///
+  /// Les identifiants viennent de [AppConfig] et peuvent etre surcharges au
+  /// lancement :
+  ///
+  /// ```
+  /// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>
+  /// ```
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb ? AppConfig.googleWebClientId : null,
+    serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
     scopes: const <String>[
       'email',
       'profile',
     ],
-    // Sur le Web, GoogleSignIn attend un clientId OAuth Web. Sur Android,
-    // serverClientId est requis pour obtenir un idToken verifiable par l'API.
-    clientId: kIsWeb ? AppConfig.googleWebClientId : null,
-    serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
   );
 
-  /// Lance le flux réel de connexion Google Play Services / Google Sign-In.
+  /// Ouvre l'unique étape de choix de compte puis connecte l'utilisateur.
   static Future<void> handleGoogleSignIn(
     BuildContext context,
     WidgetRef ref, {
@@ -32,7 +48,8 @@ class GoogleAuthHelper {
     VoidCallback? onLoadingEnd,
   }) async {
     try {
-      // Déconnecte toute session locale pour toujours ouvrir le sélecteur de compte natif
+      // Déconnecte toute session native pour que la fenêtre Google s'ouvre
+      // systématiquement (elle liste les comptes de l'appareil).
       try {
         await _googleSignIn.signOut();
       } catch (_) {}
@@ -52,7 +69,7 @@ class GoogleAuthHelper {
         final auth = await account.authentication;
         idToken = auth.idToken;
       } catch (_) {
-        // En mode Android direct sans serverClientId, l'idToken n'est pas requis
+        // L'API accepte les données de profil lorsque le jeton n'est pas disponible.
       }
 
       await ref.read(sessionProvider.notifier).signInWithGoogle(
@@ -72,30 +89,17 @@ class GoogleAuthHelper {
       );
       context.go(AppRoutes.home);
     } on PlatformException catch (error) {
+      // Le sélecteur natif vient de s'afficher : on n'ouvre jamais un second
+      // sélecteur de compte par-dessus (c'était le double affichage). L'échec
+      // est signalé simplement, à charge de l'équipe de finaliser
+      // l'enregistrement OAuth (voir [googleServerClientId]).
       final details = error.message ?? error.code;
-      debugPrint(
-        'Google Sign-In échoué: code=${error.code} '
-        'message=${error.message} details=${error.details}',
-      );
-
       if (!context.mounted) return;
-
-      // ApiException 10 (DEVELOPER_ERROR) : le client OAuth Android n'est pas
-      // configuré pour ce package / cette empreinte SHA-1 dans Google Cloud.
-      final isDeveloperError = details.contains('ApiException: 10') ||
-          details.contains('DEVELOPER_ERROR') ||
-          error.code == '10';
-      final message = isDeveloperError
-          ? 'Connexion Google indisponible : client OAuth Android non configuré. '
-              'Ajoutez le package fr.campus.lost_found_ai et l\'empreinte SHA-1 '
-              'de l\'application dans Google Cloud Console, puis réessayez.'
-          : 'Erreur Google Sign-In ($details). Vérifiez Google Play Services.';
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text('Erreur Google Sign-In ($details). Vérifiez Google Play Services.'),
           backgroundColor: AppColors.danger,
-          duration: const Duration(seconds: 6),
+          duration: const Duration(seconds: 4),
         ),
       );
     } on Object catch (error) {

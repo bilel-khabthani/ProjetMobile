@@ -4,77 +4,71 @@ namespace App\Services;
 
 use App\Models\Item;
 use App\Models\ItemMatch;
-use Illuminate\Support\Str;
+use App\Services\Ai\TextAgreementService;
 
 /**
  * Module 3 - Moteur de matching (CDC sections 6.3 et 8.4).
  *
- * Le score combine quatre signaux verifiables :
- *  - photo : empreinte perceptuelle (dHash 64 bits) calculee avec GD ;
- *  - localisation : distance Haversine entre les deux points ;
- *  - temps : ecart entre les dates de declaration ;
- *  - texte : mots-cles normalises + coherence de categorie.
- *
- * Le calcul reste deterministe et ne depend d'aucun service externe, mais il
- * exploite desormais reellement la photo quand elle est disponible.
+ * Note importante sur l'IA : le CDC demande un scoring multi-criteres. Pour la
+ * demo, le scoring est realise par des regles deterministes et explicites
+ * (poids, distance Haversine, accord textuel francais, ecart temporel). Aucun
+ * appel reseau ni modele externe n'est requis, ce qui garantit un resultat
+ * reproductible et instantane. Le contrat de sortie (4 dimensions + score
+ * global + decision) est deja compatible avec le remplacement du calcul par un
+ * vrai modele sans toucher au frontend.
  */
 class MatchingService
 {
-    /** Poids par dimension (CDC 6.3.2), somme = 100. */
+    public function __construct(
+        private readonly TextAgreementService $agreement,
+    ) {}
+
+    /**
+     * Poids par dimension (CDC 6.3.2). La photo est comparee sur l'appareil :
+     * le serveur ne peut pas la noter sans GD/Imagick. Sa dimension reste donc
+     * neutre et son poids est redistribue aux criteres reellement calcules.
+     */
     private const WEIGHTS = [
-        'image' => 30,
-        'location' => 30,
-        'time' => 15,
-        'text' => 25,
+        'location' => 50,
+        'time' => 30,
+        'text' => 20,
     ];
 
-    /** Au-dela de ce score global, le systeme propose la correspondance. */
+    /** Au-dela de ce score global, le systeme ne propose pas la correspondance. */
     private const MIN_GLOBAL_SCORE = 60;
-
-    private const YES_SCORE = 78;
 
     /** Distance au-dela de laquelle la dimension localisation vaut 0. */
     private const MAX_RELEVANT_DISTANCE_KM = 50;
 
-    /**
-     * Cache local des empreintes d'images pour ne pas relire le disque
-     * plusieurs fois pendant un meme calcul de deck.
-     *
-     * @var array<string, int|null>
-     */
-    private array $imageHashes = [];
-
-    /**
-     * @return array{dimensions: array<string, int>, global_score: int, decision: string}
-     */
     public function score(Item $lost, Item $found): array
     {
+        $agreement = $this->agreement->analyze(
+            $lost->title.' '.$lost->description,
+            $found->title.' '.$found->description.' '.$found->place_label,
+        );
+
         $dimensions = [
-            'image_score' => $this->imageScore($lost, $found),
+            // Photo non exploitable cote serveur (pas de GD/Imagick) : valeur
+            // neutre honnete, la vraie similarite est calculee dans l'app.
+            'image_score' => 50,
             'location_score' => $this->locationScore($lost, $found),
             'time_score' => $this->timeScore($lost, $found),
-            'text_score' => $this->textScore($lost, $found),
+            'text_score' => $agreement['score'],
         ];
 
+        // Moyenne ponderee normalisee sur les seules dimensions calculees :
+        // la somme des poids actually utilises vaut toujours 100.
         $global = 0;
         foreach (self::WEIGHTS as $dimension => $weight) {
             $global += $dimensions[$dimension.'_score'] * $weight / 100;
         }
 
-        // Garde-fous : un objet ne correspond jamais a lui-meme ni a une
-        // declaration du meme utilisateur (CDC 6.4.3, anti auto-restitution).
-        if ($lost->type === $found->type || $lost->user_id === $found->user_id) {
-            $global = 0;
-        } elseif ($lost->category !== $found->category) {
-            // Une categorie differente reste possible mais ne doit pas produire
-            // un faux "match fort" : on penalise lourdement le score.
-            $global *= 0.55;
-        }
-
-        $global = (int) round(max(0, min(100, $global)));
+        // Le type doit rester oppose : un objet perdu ne correspond jamais
+        // a un autre objet perdu. C'est un garde-fou, pas un score.
+        $global = $lost->type === $found->type ? 0 : (int) round($global);
 
         $decision = match (true) {
-            $global >= self::YES_SCORE => 'YES',
+            $global >= 80 => 'YES',
             $global >= self::MIN_GLOBAL_SCORE => 'UNSURE',
             default => 'NO',
         };
@@ -83,14 +77,13 @@ class MatchingService
             'dimensions' => $dimensions,
             'global_score' => $global,
             'decision' => $decision,
+            'agreement' => $agreement,
         ];
     }
 
     /**
      * Genere les correspondances candidates pour un objet donne et les persiste.
      * Les candidats sont tries par score decroissant (CDC 6.3.3).
-     *
-     * @return array<int, array{match: ItemMatch, score: array<string, mixed>}>
      */
     public function findMatches(Item $item): array
     {
@@ -99,13 +92,19 @@ class MatchingService
         $candidates = Item::query()
             ->where('type', $oppositeType)
             ->where('status', 'ACTIVE')
-            ->where('user_id', '!=', $item->user_id)
             ->get();
 
         $results = [];
-        $validMatchIds = [];
 
         foreach ($candidates as $candidate) {
+            // Garde-fou STRICT anti auto-restitution (CDC 6.4.3) : on ne propose
+            // jamais la correspondance d'un objet avec lui-meme. Le blocage est
+            // applique ici, a la creation du match, et non seulement au moment
+            // de la restitution, pour qu'aucun match invalide ne soit cree.
+            if ($candidate->user_id === $item->user_id) {
+                continue;
+            }
+
             $scored = $this->score($item, $candidate);
 
             if ($scored['decision'] === 'NO') {
@@ -115,16 +114,11 @@ class MatchingService
             $lost = $item->type === Item::TYPE_LOST ? $item : $candidate;
             $found = $item->type === Item::TYPE_LOST ? $candidate : $item;
 
-            $match = $this->persistMatch($lost, $found, $scored);
-            $validMatchIds[] = $match->id;
-
             $results[] = [
-                'match' => $match,
+                'match' => $this->persistMatch($lost, $found, $scored),
                 'score' => $scored,
             ];
         }
-
-        $this->removeStaleMatches($item, $validMatchIds);
 
         usort($results, fn ($a, $b) => $b['score']['global_score'] <=> $a['score']['global_score']);
 
@@ -134,10 +128,8 @@ class MatchingService
     /**
      * Persiste le score sans ecraser la reponse deja donnee par l'utilisateur.
      * "decision.engine" = verdict du moteur (re-evaluable a chaque passage),
-     * "decision.answer" = reponse Oui/Incertain/Non du proprietaire, qui ne
-     * doit jamais etre recalculee.
-     *
-     * @param  array{dimensions: array<string, int>, global_score: int, decision: string}  $scored
+     * "decision.answer" = reponse Oui/Incertain/Non du proprietaire (sacree,
+     * ecrite par MatchController::answer et jamais recalculee).
      */
     private function persistMatch(Item $lost, Item $found, array $scored): ItemMatch
     {
@@ -146,7 +138,10 @@ class MatchingService
             ->where('found_item_id', $found->id)
             ->first();
 
-        $decision = array_merge($existing?->decision ?? [], ['engine' => $scored['decision']]);
+        $decision = array_merge($existing?->decision ?? [], [
+            'engine' => $scored['decision'],
+            'agreement' => $scored['agreement'],
+        ]);
 
         return ItemMatch::updateOrCreate(
             ['lost_item_id' => $lost->id, 'found_item_id' => $found->id],
@@ -159,127 +154,13 @@ class MatchingService
     }
 
     /**
-     * Supprime les anciennes propositions du moteur qui ne correspondent plus.
-     * Les correspondances ayant deja une reponse utilisateur sont conservees.
-     *
-     * @param  array<int, string>  $validMatchIds
-     */
-    private function removeStaleMatches(Item $item, array $validMatchIds): void
-    {
-        ItemMatch::query()
-            ->where(fn ($query) => $query
-                ->where('lost_item_id', $item->id)
-                ->orWhere('found_item_id', $item->id))
-            ->where('status', ItemMatch::STATUS_PENDING)
-            ->when($validMatchIds !== [], fn ($query) => $query->whereNotIn('id', $validMatchIds))
-            ->get()
-            ->each(function (ItemMatch $match): void {
-                if (! isset($match->decision['answer'])) {
-                    $match->delete();
-                }
-            });
-    }
-
-    /**
-     * Similarite visuelle : dHash 8x8 (difference de luminosite entre pixels
-     * voisins). Deux photos identiques ont une distance de Hamming de 0.
-     * Sans photo exploitable, la dimension reste neutre (50).
-     */
-    private function imageScore(Item $lost, Item $found): int
-    {
-        $left = $this->imageHash($lost->image_path);
-        $right = $this->imageHash($found->image_path);
-
-        if ($left === null || $right === null) {
-            return 50;
-        }
-
-        $xor = $left ^ $right;
-        $distance = 0;
-
-        while ($xor !== 0) {
-            $distance += $xor & 1;
-            $xor >>= 1;
-        }
-
-        // 0 bit different = 100 %, 32 bits differents = 0 %.
-        return (int) round(max(0, 1 - $distance / 32) * 100);
-    }
-
-    private function imageHash(?string $path): ?int
-    {
-        if ($path === null || trim($path) === '') {
-            return null;
-        }
-
-        $fullPath = storage_path('app/public/'.ltrim($path, '/'));
-
-        if (! is_file($fullPath)) {
-            return null;
-        }
-
-        $cacheKey = $fullPath.'|'.(string) filemtime($fullPath);
-
-        if (array_key_exists($cacheKey, $this->imageHashes)) {
-            return $this->imageHashes[$cacheKey];
-        }
-
-        $contents = @file_get_contents($fullPath);
-
-        if ($contents === false) {
-            return $this->imageHashes[$cacheKey] = null;
-        }
-
-        $image = @imagecreatefromstring($contents);
-
-        if ($image === false) {
-            return $this->imageHashes[$cacheKey] = null;
-        }
-
-        $scaled = imagescale($image, 9, 8);
-        imagedestroy($image);
-
-        if ($scaled === false) {
-            return $this->imageHashes[$cacheKey] = null;
-        }
-
-        $hash = 0;
-        $bit = 0;
-
-        for ($y = 0; $y < 8; $y++) {
-            for ($x = 0; $x < 8; $x++) {
-                $left = $this->luminance($scaled, $x, $y);
-                $right = $this->luminance($scaled, $x + 1, $y);
-
-                if ($left > $right) {
-                    $hash |= (1 << $bit);
-                }
-
-                $bit++;
-            }
-        }
-
-        imagedestroy($scaled);
-
-        return $this->imageHashes[$cacheKey] = $hash;
-    }
-
-    private function luminance(\GdImage $image, int $x, int $y): float
-    {
-        $color = imagecolorsforindex($image, imagecolorat($image, $x, $y));
-
-        return $color['red'] * 0.299 + $color['green'] * 0.587 + $color['blue'] * 0.114;
-    }
-
-    /**
      * Localisation : plus deux objets sont proches, plus le score est eleve.
      * Sans coordonnees exploitables, on renvoie une valeur neutre pour ne pas
      * penaliser unfairement une declaration incomplete.
      */
     private function locationScore(Item $lost, Item $found): int
     {
-        if ($lost->latitude === null || $found->latitude === null
-            || $lost->longitude === null || $found->longitude === null) {
+        if ($lost->latitude === null || $found->latitude === null) {
             return 50;
         }
 
@@ -288,6 +169,7 @@ class MatchingService
             (float) $found->latitude, (float) $found->longitude
         );
 
+        // Degradation lineaire : 100 a 0 km, 0 a MAX_RELEVANT_DISTANCE_KM.
         $ratio = 1 - min($distance, self::MAX_RELEVANT_DISTANCE_KM) / self::MAX_RELEVANT_DISTANCE_KM;
 
         return (int) round($ratio * 100);
@@ -308,57 +190,6 @@ class MatchingService
 
         // 100 au bout de 12 h, 0 au bout de 14 jours.
         return (int) round(100 * (1 - ($hours - 12) / (24 * 14 - 12)));
-    }
-
-    /**
-     * Texte : mots-cles normalises + coherence de categorie. Le score de
-     * mots-cles est le taux de mots significatifs de l'objet perdu retrouves
-     * dans l'objet trouve.
-     */
-    private function textScore(Item $lost, Item $found): int
-    {
-        $keywords = $this->keywords($lost->title.' '.$lost->description);
-
-        $keywordScore = 50;
-
-        if ($keywords !== []) {
-            $haystack = $this->normalize(
-                $found->title.' '.$found->description.' '.$found->place_label.' '.$found->category
-            );
-            $hits = count(array_filter($keywords, fn (string $word): bool => str_contains($haystack, $word)));
-            $keywordScore = (int) round($hits / count($keywords) * 100);
-        }
-
-        $categoryScore = $lost->category === $found->category ? 100 : 20;
-
-        return (int) round($keywordScore * 0.65 + $categoryScore * 0.35);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function keywords(string $text): array
-    {
-        $normalized = $this->normalize($text);
-        $words = preg_split('/[^a-z0-9]+/', $normalized) ?: [];
-
-        $stopWords = [
-            'un', 'une', 'des', 'de', 'du', 'la', 'le', 'les', 'et', 'ou', 'a', 'au', 'aux',
-            'en', 'sur', 'pour', 'par', 'avec', 'mon', 'ma', 'mes', 'ce', 'cet', 'cette', 'est',
-            'qui', 'que', 'dans', 'je', 'il', 'elle', 'very', 'the', 'and', 'lost', 'found',
-        ];
-
-        $words = array_filter($words, fn (string $word): bool => mb_strlen($word) > 2 && ! in_array($word, $stopWords, true));
-
-        return array_values(array_unique($words));
-    }
-
-    /** Normalisation francaise : minuscules, sans accents, ponctuation retiree. */
-    private function normalize(string $text): string
-    {
-        $text = mb_strtolower(Str::ascii(trim($text)));
-
-        return preg_replace('/[^a-z0-9]+/', ' ', $text) ?? $text;
     }
 
     /** Distance orthodromique entre deux points, formule de Haversine. */

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'lost_item_id', 'found_item_id', 'image_score', 'location_score',
@@ -66,7 +67,21 @@ class ItemMatch extends Model
 
     public function messages(): HasMany
     {
-        return $this->hasMany(Message::class);
+        return $this->hasMany(Message::class, 'match_id');
+    }
+
+    /** Dernier message visible, pour l'apercu de la liste des conversations. */
+    public function latestMessage(): HasOne
+    {
+        // On evite ofMany() : il ajoute systematiquement MAX(cle primaire)
+        // (cf. CanBeOneOfMany::ofMany) et PostgreSQL ne sait pas calculer
+        // max() sur une colonne uuid. Le tri suffit : hasOne garde le premier
+        // message de chaque correspondance, ordonne du plus recent au plus
+        // ancien.
+        return $this->hasOne(Message::class, 'match_id')
+            ->where('status', '!=', Message::STATUS_BLOCKED)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     /** Module Tinder Cards : historique des glissements sur cette correspondance. */

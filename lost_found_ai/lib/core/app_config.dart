@@ -46,4 +46,33 @@ class AppConfig {
     'USE_MOCK_DATA',
     defaultValue: false,
   );
+
+  /// Diffusion temps reel via Laravel Reverb.
+  ///
+  /// La cle publique Reverb n'est pas un secret (elle identifie l'application
+  /// aupres du serveur WebSocket). Pour un autre poste ou un appareil physique,
+  /// surcharger l'hote au lancement :
+  ///   flutter run --dart-define=REVERB_HOST=192.168.1.20
+  static const String reverbAppKey = String.fromEnvironment(
+    'REVERB_APP_KEY',
+    defaultValue: 'xlxomr3qqdynftonmcxy',
+  );
+
+  static const String reverbHost = String.fromEnvironment(
+    'REVERB_HOST',
+    defaultValue: '10.0.2.2',
+  );
+
+  static const int reverbPort = int.fromEnvironment(
+    'REVERB_PORT',
+    defaultValue: 8081,
+  );
+
+  static const String reverbScheme = String.fromEnvironment(
+    'REVERB_SCHEME',
+    defaultValue: 'http',
+  );
+
+  /// Origine HTTP de l'API, sans le suffixe /api (utile pour /broadcasting/auth).
+  static String get apiOrigin => Uri.parse(apiBaseUrl).origin;
 }

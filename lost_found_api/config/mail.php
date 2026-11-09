@@ -14,7 +14,20 @@ return [
     |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    'default' => env('MAIL_MAILER', 'smtp'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Redirect
+    |--------------------------------------------------------------------------
+    |
+    | Les comptes de démonstration utilisent des adresses @campus.fr qui ne
+    | possèdent pas de boîte réelle. Quand cette valeur est renseignée, les
+    | e-mails destinés à ces comptes sont redirigés vers cette adresse.
+    |
+    */
+
+    'demo_redirect' => env('MAIL_DEMO_REDIRECT'),
 
     /*
     |--------------------------------------------------------------------------

@@ -569,9 +569,8 @@ class _VerifyBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final verified =
-        (ref.watch(verificationProvider)?.success == true &&
-            ref.watch(verificationProvider)?.matchId == match.id) ||
-        match.chatUnlocked;
+        ref.watch(verificationProvider)?.success == true &&
+        ref.watch(verificationProvider)?.matchId == match.id;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(
@@ -589,8 +588,10 @@ class _VerifyBar extends ConsumerWidget {
               label: 'Contacter ${match.finderName.split(' ').first}',
               icon: Icons.chat_bubble_rounded,
               variant: AppButtonVariant.success,
-              onPressed: () =>
-                  context.push(AppRoutes.chatDetail(match.id)),
+              onPressed: () {
+                ref.invalidate(matchProvider(match.id));
+                context.push(AppRoutes.chatDetail(match.id));
+              },
             )
           : AppButton(
               label: AppStrings.answerQuestion,

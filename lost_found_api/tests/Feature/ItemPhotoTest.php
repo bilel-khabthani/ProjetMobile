@@ -58,7 +58,15 @@ class ItemPhotoTest extends TestCase
         Storage::disk('public')->assertExists($item->image_path);
 
         $this->actingAs($user, 'sanctum')
-            ->patchJson("/api/items/{$item->id}", ['remove_image' => true])
+            ->patchJson("/api/items/{$item->id}", [
+                'type' => 'FOUND',
+                'category' => 'cles',
+                'title' => 'Trousseau de cles',
+                'description' => 'Trois cles avec un porte-cles rouge.',
+                'place_label' => 'Bibliotheque',
+                'occurred_at' => now()->toIso8601String(),
+                'remove_image' => true,
+            ])
             ->assertOk()
             ->assertJsonPath('image_url', null);
 
@@ -87,6 +95,12 @@ class ItemPhotoTest extends TestCase
 
         $this->actingAs($user, 'sanctum')->post("/api/items/{$item->id}", [
             '_method' => 'PUT',
+            'type' => 'LOST',
+            'category' => 'telephone',
+            'title' => 'Telephone noir',
+            'description' => 'Telephone noir avec une coque transparente.',
+            'place_label' => 'Amphitheatre B',
+            'occurred_at' => now()->toIso8601String(),
             'image' => UploadedFile::fake()->image('apres.jpg', 400, 400),
         ], ['Accept' => 'application/json'])->assertOk();
 

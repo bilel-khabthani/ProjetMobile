@@ -30,13 +30,24 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
   bool _sendingEmail = false;
 
   Future<void> _sendToGmail() async {
+    final userEmail = ref.read(sessionProvider)?.email;
+    if (userEmail == null || userEmail.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Aucune adresse e-mail disponible sur votre compte.'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() => _sendingEmail = true);
     HapticFeedback.lightImpact();
 
     try {
       final msg = await ref.read(repositoryProvider).sendCouponEmail(
             widget.coupon.id,
-            targetEmail: 'jomaafares9@gmail.com',
+            targetEmail: userEmail,
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -344,7 +355,7 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
 
                   const SizedBox(height: 16),
 
-                  // Bouton d'action directe : Envoyer à Gmail
+                  // Bouton d'action directe : envoyer le bon à l'utilisateur connecté
                   FilledButton.icon(
                     onPressed: _sendingEmail ? null : _sendToGmail,
                     icon: _sendingEmail
@@ -354,7 +365,7 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : const Icon(Icons.mark_email_read_rounded, size: 18),
-                    label: Text(_sendingEmail ? 'Envoi en cours...' : 'Envoyer à jomaafares9@gmail.com'),
+                    label: Text(_sendingEmail ? 'Envoi en cours...' : 'Envoyer par e-mail'),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFEA4335), // Google Red
                       padding: const EdgeInsets.symmetric(vertical: 12),

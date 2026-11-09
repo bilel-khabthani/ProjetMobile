@@ -14,6 +14,9 @@ use Illuminate\Support\Str;
 
 class RewardController extends Controller
 {
+    /** Dernière erreur d'envoi d'e-mail, remontée au client le cas échéant. */
+    protected ?string $lastMailError = null;
+
     /**
      * Catalogue des récompenses disponibles à l'échange.
      */
@@ -143,10 +146,14 @@ class RewardController extends Controller
         ]);
 
         // Envoi automatique par e-mail avec PDF joint
-        $this->safeSendCouponMail($coupon);
+        $emailSent = $this->safeSendCouponMail($coupon);
+        $message = $emailSent
+            ? 'Félicitations ! Votre coupon '.$reward->partner_name.' a été généré et envoyé par e-mail.'
+            : 'Coupon '.$reward->partner_name.' généré. L\'e-mail n\'a pas pu être envoyé, vous pouvez le télécharger depuis « Mes Bons ».';
 
         return response()->json([
-            'message' => 'Félicitations ! Votre coupon '.$reward->partner_name.' a été généré et envoyé par e-mail.',
+            'message' => $message,
+            'email_sent' => $emailSent,
             'coupon' => $coupon,
             'new_balance' => $user->fresh()->reward_points,
         ], 201);
@@ -166,11 +173,12 @@ class RewardController extends Controller
         // Sauvegarder également une copie physique dans public/vouchers
         try {
             $dir = public_path('vouchers');
-            if (!file_exists($dir)) {
+            if (! file_exists($dir)) {
                 mkdir($dir, 0755, true);
             }
-            file_put_contents($dir . '/Bon-Reduction-' . $coupon->code . '.pdf', $pdfBytes);
-        } catch (\Throwable) {}
+            file_put_contents($dir.'/Bon-Reduction-'.$coupon->code.'.pdf', $pdfBytes);
+        } catch (\Throwable) {
+        }
 
         return response($pdfBytes, 200, [
             'Content-Type' => 'application/pdf',
@@ -194,13 +202,14 @@ class RewardController extends Controller
 
         if (! $sent) {
             return response()->json([
-                'status' => 'logged',
-                'message' => 'Le coupon a été généré et archivé dans le journal de messagerie.',
-            ]);
+                'status' => 'failed',
+                'message' => "L'e-mail n'a pas pu être envoyé à ".$targetEmail.'. Vérifiez la configuration e-mail du serveur.',
+            ], 502);
         }
 
         return response()->json([
             'status' => 'sent',
+            'email_sent' => true,
             'message' => 'Le bon de réduction a été envoyé avec succès à '.$targetEmail.' avec le PDF en pièce jointe !',
         ]);
     }
@@ -371,26 +380,37 @@ class RewardController extends Controller
     }
 
     /**
-     * Envoie l'e-mail avec sécurité anti-plantage si la passerelle SMTP est désactivée.
+     * Envoie l'e-mail du coupon (avec PDF joint) au destinataire ressorti du
+     * coupon ou a l'adresse demandee. Toute anomalie est journalisee : un
+     * echec de messagerie ne doit jamais passer inapercu.
      */
     protected function safeSendCouponMail(UserCoupon $coupon, ?string $toEmail = null): bool
     {
+        $this->lastMailError = null;
+
         try {
-            $dest = $toEmail ?: ($coupon->user->email ?? 'jomaafares9@gmail.com');
-            // Si l'e-mail est le compte de démo fictif (@campus.fr), envoyer à l'adresse de test réelle configurée
-            if (str_ends_with($dest, '@campus.fr')) {
-                $configured = config('mail.from.address') ?: 'jomaafares9@gmail.com';
-                if ($configured && !str_ends_with($configured, '@campus.fr')) {
-                    $dest = $configured;
-                }
+            $dest = $toEmail ?: $coupon->user?->email;
+
+            // Les comptes de démo utilisent @campus.fr (boîte inexistante).
+            // On ne redirige que si MAIL_DEMO_REDIRECT est explicitement configuré.
+            $demoRedirect = config('mail.demo_redirect');
+            if ($demoRedirect && (! $dest || str_ends_with($dest, '@campus.fr'))) {
+                $dest = $demoRedirect;
             }
+
+            if (! $dest) {
+                throw new \RuntimeException('Aucune adresse e-mail destinataire.');
+            }
+
             Mail::to($dest)->send(new CouponVoucherMail($coupon));
-            Log::info("E-mail envoyé avec succès avec PDF joint à : {$dest}");
+            Log::info("E-mail de coupon envoye avec PDF joint a : {$dest}");
+
             return true;
         } catch (\Throwable $e) {
-            Log::warning('Échec d\'envoi e-mail pour le coupon '.$coupon->id.': '.$e->getMessage());
+            $this->lastMailError = $e->getMessage();
+            Log::error('Echec d\'envoi de l\'e-mail du coupon '.$coupon->id.' : '.$this->lastMailError);
+
             return false;
         }
     }
 }
-
