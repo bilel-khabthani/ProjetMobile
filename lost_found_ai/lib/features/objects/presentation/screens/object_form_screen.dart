@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/perceptual_hash.dart';
 import '../../../../core/router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -71,8 +72,9 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
     if (_prefilled) return;
     _prefilled = true;
     try {
-      final object =
-          await ref.read(objectDetailProvider(widget.objectId!).future);
+      final object = await ref.read(
+        objectDetailProvider(widget.objectId!).future,
+      );
       if (!mounted) return;
       setState(() {
         _type = object.type;
@@ -107,6 +109,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
       !_submitting &&
       _titleController.text.trim().isNotEmpty &&
       _descriptionController.text.trim().isNotEmpty &&
+      (_type == ItemType.found || _secretController.text.trim().length >= 3) &&
       (_placeController.text.trim().isNotEmpty ||
           (_latitude != null && _longitude != null));
 
@@ -123,14 +126,18 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.photo_camera_rounded,
-                    color: AppColors.primary),
+                leading: const Icon(
+                  Icons.photo_camera_rounded,
+                  color: AppColors.primary,
+                ),
                 title: const Text('Prendre une photo'),
                 onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded,
-                    color: AppColors.primary),
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: AppColors.primary,
+                ),
                 title: const Text('Choisir dans la galerie'),
                 onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
               ),
@@ -177,7 +184,9 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   }
 
   Future<void> _pickOnMap() async {
-    final result = await context.push<LocationData>(AppRoutes.objectsMapSelection);
+    final result = await context.push<LocationData>(
+      AppRoutes.objectsMapSelection,
+    );
     if (result == null || !mounted) return;
     setState(() {
       _latitude = result.latitude;
@@ -225,10 +234,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
@@ -237,7 +243,9 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
     setState(() => _submitting = true);
 
     http.MultipartFile? image;
+    String? imageHash;
     if (_imageBytes != null) {
+      imageHash = await PerceptualHash.of(_imageBytes!);
       image = http.MultipartFile.fromBytes(
         'image',
         _imageBytes!,
@@ -263,6 +271,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
           removeImage: _removeImage,
           clearLocation: !_gpsEnabled,
           image: image,
+          imageHash: imageHash,
         );
         if (!mounted) return;
         ref.invalidate(objectDetailProvider(widget.objectId!));
@@ -287,6 +296,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
           _phoneController.text.trim(),
           _secretController.text.trim(),
           image,
+          imageHash,
         );
         if (!mounted) return;
         ref.invalidate(allObjectsProvider);
@@ -447,8 +457,8 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   }
 
   Widget _buildImagePicker() {
-    final hasImage = _imageBytes != null ||
-        (_existingImageUrl != null && !_removeImage);
+    final hasImage =
+        _imageBytes != null || (_existingImageUrl != null && !_removeImage);
     return PressableScale(
       onTap: _pickImage,
       child: Container(
@@ -469,9 +479,8 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                     Image.network(
                       _existingImageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Center(
-                        child: ItemArtwork(category: _category),
-                      ),
+                      errorBuilder: (_, _, _) =>
+                          Center(child: ItemArtwork(category: _category)),
                     ),
                   Positioned(
                     right: 10,
@@ -488,8 +497,11 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const AppIcon('camera-linear',
-                              size: 14, color: Colors.white),
+                          const AppIcon(
+                            'camera-linear',
+                            size: 14,
+                            color: Colors.white,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Changer',
@@ -538,17 +550,17 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                       borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: const Center(
-                      child: AppIcon('gallery-linear',
-                          size: 26, color: AppColors.primary),
+                      child: AppIcon(
+                        'gallery-linear',
+                        size: 26,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text('Ajouter une photo', style: AppText.bodyStrong),
                   const SizedBox(height: 2),
-                  Text(
-                    'Optionnel — JPG ou PNG',
-                    style: AppText.caption,
-                  ),
+                  Text('Optionnel — JPG ou PNG', style: AppText.caption),
                 ],
               ),
       ),
@@ -568,8 +580,11 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
         children: [
           Row(
             children: [
-              const AppIcon('lock-keyhole-linear',
-                  size: 16, color: AppColors.mintDark),
+              const AppIcon(
+                'lock-keyhole-linear',
+                size: 16,
+                color: AppColors.mintDark,
+              ),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'Détail secret de vérification',
@@ -700,8 +715,11 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const AppIcon('map-point-linear',
-                          size: 17, color: AppColors.primary),
+                      : const AppIcon(
+                          'map-point-linear',
+                          size: 17,
+                          color: AppColors.primary,
+                        ),
                   label: Text(_locating ? 'Localisation…' : 'Ma position'),
                 ),
               ),
@@ -709,8 +727,11 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _pickOnMap,
-                  icon: const AppIcon('map-linear',
-                      size: 17, color: AppColors.primary),
+                  icon: const AppIcon(
+                    'map-linear',
+                    size: 17,
+                    color: AppColors.primary,
+                  ),
                   label: const Text('Sur la carte'),
                 ),
               ),
@@ -743,8 +764,11 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
         ),
         child: Row(
           children: [
-            const AppIcon('calendar-linear',
-                size: 18, color: AppColors.primary),
+            const AppIcon(
+              'calendar-linear',
+              size: 18,
+              color: AppColors.primary,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Text(
               '${_occurredAt.day.toString().padLeft(2, '0')}/'
@@ -755,8 +779,10 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
               style: AppText.bodyStrong,
             ),
             const Spacer(),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textTertiary),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textTertiary,
+            ),
           ],
         ),
       ),

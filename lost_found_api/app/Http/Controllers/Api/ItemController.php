@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Services\ImageHashService;
 use App\Services\MatchingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -100,7 +101,7 @@ class ItemController extends Controller
         );
     }
 
-    public function store(Request $request, MatchingService $matching)
+    public function store(Request $request, MatchingService $matching, ImageHashService $imageHasher)
     {
         $data = $this->validatedItem($request);
         $imagePath = $this->storeImage($request);
@@ -110,6 +111,7 @@ class ItemController extends Controller
             'user_id' => $request->user()->id,
             'status' => 'ACTIVE',
             'image_path' => $imagePath,
+            'image_hash' => $this->resolveImageHash($request, $imagePath, $imageHasher),
         ]);
 
         // Chaque annonce declaree genere immediatement ses cartes : le moteur
@@ -125,7 +127,7 @@ class ItemController extends Controller
         return response()->json($this->payload($item, $request));
     }
 
-    public function update(Request $request, Item $item, MatchingService $matching)
+    public function update(Request $request, Item $item, MatchingService $matching, ImageHashService $imageHasher)
     {
         $this->authorizeOwner($request, $item, 'Vous ne pouvez modifier que vos propres annonces.');
 
@@ -145,9 +147,11 @@ class ItemController extends Controller
         if ($request->hasFile('image')) {
             $this->deleteImage($item);
             $data['image_path'] = $this->storeImage($request);
+            $data['image_hash'] = $this->resolveImageHash($request, $data['image_path'], $imageHasher);
         } elseif ($request->boolean('remove_image')) {
             $this->deleteImage($item);
             $data['image_path'] = null;
+            $data['image_hash'] = null;
         }
 
         $item->update($data);
@@ -250,11 +254,12 @@ class ItemController extends Controller
             'place_label' => ['nullable', 'string', 'min:2', 'max:160'],
             'occurred_at' => ['required', 'date'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'image_hash' => ['nullable', 'string', 'regex:/^[01]{64}$/'],
             'remove_image' => ['sometimes', 'boolean'],
             'clear_location' => ['sometimes', 'boolean'],
         ]);
 
-        unset($data['image'], $data['remove_image'], $data['clear_location']);
+        unset($data['image'], $data['image_hash'], $data['remove_image'], $data['clear_location']);
 
         $hasPlace = isset($data['place_label']) && trim((string) $data['place_label']) !== '';
         $hasPoint = isset($data['latitude'], $data['longitude']);
@@ -283,6 +288,31 @@ class ItemController extends Controller
         if ($item->image_path) {
             Storage::disk('public')->delete($item->image_path);
         }
+    }
+
+    /**
+     * Empreinte perceptuelle utilisee par le moteur de matching.
+     *
+     * L'application calcule l'empreinte sur l'appareil et l'envoie avec la
+     * photo : le build GD du serveur ne decode pas toujours le JPEG. Si le
+     * client n'en fournit pas, on retombe sur un calcul serveur (PNG, BMP...).
+     */
+    private function resolveImageHash(
+        Request $request,
+        ?string $imagePath,
+        ImageHashService $imageHasher,
+    ): ?string {
+        if ($imagePath === null) {
+            return null;
+        }
+
+        $clientHash = trim((string) $request->input('image_hash', ''));
+
+        if (preg_match('/^[01]{64}$/', $clientHash) === 1) {
+            return $clientHash;
+        }
+
+        return $imageHasher->hash(Storage::disk('public')->path($imagePath));
     }
 
     private function authorizeOwner(Request $request, Item $item, string $message): void

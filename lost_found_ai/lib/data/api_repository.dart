@@ -25,7 +25,7 @@ class ForgotPasswordResult {
 /// Repository branche sur l'API Laravel.
 class ApiRepository {
   ApiRepository({ApiClient? client})
-      : _client = client ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
+    : _client = client ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
 
   final ApiClient _client;
 
@@ -53,12 +53,14 @@ class ApiRepository {
     required String phone,
     required String password,
   }) async {
-    final json = await _client.post('/auth/register', {
-      'name': name,
-      'email': email,
-      'phone': phone,
-      'password': password,
-    }) as Map<String, dynamic>;
+    final json =
+        await _client.post('/auth/register', {
+              'name': name,
+              'email': email,
+              'phone': phone,
+              'password': password,
+            })
+            as Map<String, dynamic>;
     _client.token = json['token'] as String?;
     lastDemoOtp = json['demo_otp'] as String?;
     return _toUser(json['user'] as Map<String, dynamic>);
@@ -68,10 +70,12 @@ class ApiRepository {
     required String email,
     required String password,
   }) async {
-    final json = await _client.post('/auth/login', {
-      'email': email,
-      'password': password,
-    }) as Map<String, dynamic>;
+    final json =
+        await _client.post('/auth/login', {
+              'email': email,
+              'password': password,
+            })
+            as Map<String, dynamic>;
     _client.token = json['token'] as String?;
     lastDemoOtp = null;
     return _toUser(json['user'] as Map<String, dynamic>);
@@ -92,7 +96,8 @@ class ApiRepository {
     if (googleId != null) body['google_id'] = googleId;
     if (avatar != null) body['avatar'] = avatar;
 
-    final json = await _client.post('/auth/google', body) as Map<String, dynamic>;
+    final json =
+        await _client.post('/auth/google', body) as Map<String, dynamic>;
     _client.token = json['token'] as String?;
     lastDemoOtp = null;
     return _toUser(json['user'] as Map<String, dynamic>);
@@ -100,20 +105,22 @@ class ApiRepository {
 
   /// Demande un code de verification au serveur. Retourne le code en demo.
   Future<String?> requestOtp(String phone) async {
-    final json = await _client.post('/auth/otp/request', {
-      'phone': phone,
-    }) as Map<String, dynamic>;
+    final json =
+        await _client.post('/auth/otp/request', {'phone': phone})
+            as Map<String, dynamic>;
     final otp = json['demo_otp'] as String?;
     lastDemoOtp = otp;
     return otp;
   }
 
   /// Valide le code et retourne le profil rafraichi (phone_verified=true).
-  Future<AppUser> verifyOtp({required String phone, required String code}) async {
-    final json = await _client.post('/auth/otp/verify', {
-      'phone': phone,
-      'code': code,
-    }) as Map<String, dynamic>;
+  Future<AppUser> verifyOtp({
+    required String phone,
+    required String code,
+  }) async {
+    final json =
+        await _client.post('/auth/otp/verify', {'phone': phone, 'code': code})
+            as Map<String, dynamic>;
     final user = json['user'] as Map<String, dynamic>?;
     if (user != null) return _toUser(user);
     return _toUser(await _client.get('/me') as Map<String, dynamic>);
@@ -122,9 +129,9 @@ class ApiRepository {
   /// Mot de passe oublie : indique si l'e-mail a ete envoye et, en local,
   /// l'adresse de livraison ainsi que le code de demonstration.
   Future<ForgotPasswordResult> forgotPassword({required String email}) async {
-    final json = await _client.post('/auth/forgot-password', {
-      'email': email,
-    }) as Map<String, dynamic>;
+    final json =
+        await _client.post('/auth/forgot-password', {'email': email})
+            as Map<String, dynamic>;
     final otp = json['demo_otp'] as String?;
     lastDemoOtp = otp;
     return ForgotPasswordResult(
@@ -200,7 +207,8 @@ class ApiRepository {
     if (phone != null && phone.isNotEmpty) {
       payload['phone'] = phone;
     }
-    final json = await _client.patch('/auth/me', payload) as Map<String, dynamic>;
+    final json =
+        await _client.patch('/auth/me', payload) as Map<String, dynamic>;
     // Un changement de numero re-definit phone_verified=false : le serveur
     // renvoie alors un nouveau code a saisir sur l'ecran de verification.
     lastDemoOtp = json['demo_otp'] as String?;
@@ -209,9 +217,7 @@ class ApiRepository {
 
   Future<List<ItemMatch>> fetchMatches() async {
     final matches = await _client.get('/matches') as List<dynamic>;
-    return matches
-        .map((raw) => _toMatch(raw as Map<String, dynamic>))
-        .toList();
+    return matches.map((raw) => _toMatch(raw as Map<String, dynamic>)).toList();
   }
 
   Future<ItemMatch> fetchMatch(String id) async {
@@ -234,9 +240,9 @@ class ApiRepository {
       query['before'] = before.toUtc().toIso8601String();
     }
     final suffix = Uri(queryParameters: query).query;
-    final json = await _client.get(
-      '/matches/$matchId/messages?$suffix',
-    ) as List<dynamic>;
+    final json =
+        await _client.get('/matches/$matchId/messages?$suffix')
+            as List<dynamic>;
     return json
         .map(
           (raw) => ChatMessage.fromJson(
@@ -251,9 +257,9 @@ class ApiRepository {
     required String matchId,
     required String body,
   }) async {
-    final json = await _client.post('/matches/$matchId/messages', {
-      'body': body,
-    }) as Map<String, dynamic>;
+    final json =
+        await _client.post('/matches/$matchId/messages', {'body': body})
+            as Map<String, dynamic>;
     return ChatMessage.fromJson(json, currentUserId: currentUserId);
   }
 
@@ -278,14 +284,13 @@ class ApiRepository {
     required String matchId,
     required String answer,
   }) async {
-    final json = await _client.post(
-      '/matches/$matchId/answer',
-      {'answer_text': answer.trim()},
-    ) as Map<String, dynamic>;
+    final json =
+        await _client.post('/matches/$matchId/answer', {
+              'answer_text': answer.trim(),
+            })
+            as Map<String, dynamic>;
     final raw = json['verification'] ?? json['decision']?['verification'];
-    return VerificationOutcome.fromJson(
-      (raw as Map?)?.cast<String, dynamic>(),
-    );
+    return VerificationOutcome.fromJson((raw as Map?)?.cast<String, dynamic>());
   }
 
   Future<void> publishItem({
@@ -313,8 +318,8 @@ class ApiRepository {
     if (mine.isNotEmpty) {
       final last = mine.first as Map<String, dynamic>;
       try {
-      await _client.get('/items/${last['id']}/matches');
-    } catch (_) {}
+        await _client.get('/items/${last['id']}/matches');
+      } catch (_) {}
     }
   }
 
@@ -375,7 +380,8 @@ class ApiRepository {
             (raw) => TrustEvent(
               label: _eventLabel(raw['type'] as String? ?? ''),
               points: (raw['points'] as num?)?.toInt() ?? 0,
-              at: DateTime.tryParse(raw['created_at'] as String? ?? '') ??
+              at:
+                  DateTime.tryParse(raw['created_at'] as String? ?? '') ??
                   DateTime.now(),
               automatic: raw['validated_by'] == 'SYSTEME',
             ),
@@ -399,13 +405,17 @@ class ApiRepository {
   /// Module 4 : Catalogue des récompenses partenaires (Glovo, Yassir, Restos)
   Future<List<Reward>> fetchRewards() async {
     final list = await _client.get('/rewards') as List<dynamic>;
-    return list.map((raw) => Reward.fromJson(raw as Map<String, dynamic>)).toList();
+    return list
+        .map((raw) => Reward.fromJson(raw as Map<String, dynamic>))
+        .toList();
   }
 
   /// Module 4 : Liste des coupons de l'utilisateur
   Future<List<UserCoupon>> fetchMyCoupons() async {
     final list = await _client.get('/rewards/my-coupons') as List<dynamic>;
-    return list.map((raw) => UserCoupon.fromJson(raw as Map<String, dynamic>)).toList();
+    return list
+        .map((raw) => UserCoupon.fromJson(raw as Map<String, dynamic>))
+        .toList();
   }
 
   /// Module 4 : Solde de points, statut du tour gratuit et historique
@@ -416,13 +426,16 @@ class ApiRepository {
 
   /// Module 4 : Échange de points contre un coupon
   Future<Map<String, dynamic>> redeemReward(int rewardId) async {
-    final json = await _client.post('/rewards/$rewardId/redeem', {}) as Map<String, dynamic>;
+    final json =
+        await _client.post('/rewards/$rewardId/redeem', {})
+            as Map<String, dynamic>;
     return json;
   }
 
   /// Module 4 : Mini-jeu — Roue de la Chance
   Future<SpinResult> spinWheel() async {
-    final json = await _client.post('/rewards/wheel/spin', {}) as Map<String, dynamic>;
+    final json =
+        await _client.post('/rewards/wheel/spin', {}) as Map<String, dynamic>;
     return SpinResult.fromJson(json);
   }
 
@@ -431,13 +444,17 @@ class ApiRepository {
     final payload = (targetEmail != null && targetEmail.trim().isNotEmpty)
         ? {'email': targetEmail.trim()}
         : <String, dynamic>{};
-    final json = await _client.post('/rewards/coupons/$couponId/send-email', payload) as Map<String, dynamic>;
+    final json =
+        await _client.post('/rewards/coupons/$couponId/send-email', payload)
+            as Map<String, dynamic>;
     return json['message'] as String? ?? 'E-mail envoyé avec succès.';
   }
 
   /// Module 4 : Marquer un coupon comme utilisé
   Future<UserCoupon> markCouponUsed(String couponId) async {
-    final json = await _client.post('/rewards/coupons/$couponId/use', {}) as Map<String, dynamic>;
+    final json =
+        await _client.post('/rewards/coupons/$couponId/use', {})
+            as Map<String, dynamic>;
     return UserCoupon.fromJson(json['coupon'] as Map<String, dynamic>);
   }
 
@@ -476,13 +493,16 @@ class ApiRepository {
   Item _toItem(Map<String, dynamic> json) {
     return Item(
       id: json['id'] as String? ?? '',
-      type: (json['type'] as String?) == 'LOST' ? ItemType.lost : ItemType.found,
+      type: (json['type'] as String?) == 'LOST'
+          ? ItemType.lost
+          : ItemType.found,
       category: _categoryFromCode(json['category'] as String?),
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       place: json['place_label'] as String? ?? '',
       occurredAt:
-          DateTime.tryParse(json['occurred_at'] as String? ?? '') ?? DateTime.now(),
+          DateTime.tryParse(json['occurred_at'] as String? ?? '') ??
+          DateTime.now(),
       distanceMeters: 0,
       status: ItemStatus.active,
     );
@@ -492,7 +512,18 @@ class ApiRepository {
     final date = DateTime.tryParse(iso ?? '');
     if (date == null) return 'Date inconnue';
     const months = [
-      'janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre',
+      'janvier',
+      'fevrier',
+      'mars',
+      'avril',
+      'mai',
+      'juin',
+      'juillet',
+      'aout',
+      'septembre',
+      'octobre',
+      'novembre',
+      'decembre',
     ];
     final local = date.toLocal();
     final day = local.day.toString().padLeft(2, '0');
@@ -515,8 +546,7 @@ class ApiRepository {
     final otherItem = iAmFinder ? lost : found;
     final otherUser = iAmFinder ? lostUser : foundUser;
 
-    final decision =
-        (json['decision'] as Map?)?.cast<String, dynamic>() ?? {};
+    final decision = (json['decision'] as Map?)?.cast<String, dynamic>() ?? {};
     final rawVerification = decision['verification'] ?? json['verification'];
 
     return ItemMatch(
@@ -528,9 +558,7 @@ class ApiRepository {
       foundItemTitle: otherItem?['title'] as String? ?? '',
       foundItemPlace: otherItem?['place_label'] as String? ?? '',
       foundItemTimeLabel: _timeLabel(otherItem?['occurred_at'] as String?),
-      foundItemCategory: _categoryFromCode(
-        otherItem?['category'] as String?,
-      ),
+      foundItemCategory: _categoryFromCode(otherItem?['category'] as String?),
       finderName: otherUser?['name'] as String? ?? 'Utilisateur',
       finderInitials: _initials(otherUser?['name'] as String? ?? 'U'),
       finderReputation: (otherUser?['trust_score'] as num?)?.toDouble() ?? 50,
@@ -547,7 +575,7 @@ class ApiRepository {
         global: (scores['global'] as num?)?.toDouble() ?? 0,
       ),
       verificationQuestion:
-          'Confirmez-vous que cet objet correspond a votre declaration ?',
+          'Quel détail secret avez-vous renseigné pour cet objet perdu ?',
       minutesAgo: _minutesAgo(json['created_at'] as String?),
       myItemImageUrl: resolveItemImageUrl(myItem?['image_url'] as String?),
       foundItemImageUrl: resolveItemImageUrl(
@@ -583,11 +611,10 @@ class ApiRepository {
           .map((value) => value.toString())
           .where((value) => value.trim().isNotEmpty)
           .toList(),
-      contradictions:
-          ((data['contradictions'] as List<dynamic>?) ?? const [])
-              .map((value) => value.toString())
-              .where((value) => value.trim().isNotEmpty)
-              .toList(),
+      contradictions: ((data['contradictions'] as List<dynamic>?) ?? const [])
+          .map((value) => value.toString())
+          .where((value) => value.trim().isNotEmpty)
+          .toList(),
     );
   }
 
@@ -597,28 +624,27 @@ class ApiRepository {
         status == 'RECOVERED';
   }
 
-
   String _categoryCode(ItemCategory category) => switch (category) {
-        ItemCategory.bag => 'sac',
-        ItemCategory.phone => 'telephone',
-        ItemCategory.keys => 'cles',
-        ItemCategory.documents => 'papiers',
-        ItemCategory.clothing => 'vetement',
-        ItemCategory.glasses => 'lunettes',
-        ItemCategory.wallet => 'portefeuille',
-        ItemCategory.other => 'autre',
-      };
+    ItemCategory.bag => 'sac',
+    ItemCategory.phone => 'telephone',
+    ItemCategory.keys => 'cles',
+    ItemCategory.documents => 'papiers',
+    ItemCategory.clothing => 'vetement',
+    ItemCategory.glasses => 'lunettes',
+    ItemCategory.wallet => 'portefeuille',
+    ItemCategory.other => 'autre',
+  };
 
   ItemCategory _categoryFromCode(String? code) => switch (code) {
-        'sac' => ItemCategory.bag,
-        'telephone' => ItemCategory.phone,
-        'cles' => ItemCategory.keys,
-        'papiers' => ItemCategory.documents,
-        'vetement' => ItemCategory.clothing,
-        'lunettes' => ItemCategory.glasses,
-        'portefeuille' => ItemCategory.wallet,
-        _ => ItemCategory.other,
-      };
+    'sac' => ItemCategory.bag,
+    'telephone' => ItemCategory.phone,
+    'cles' => ItemCategory.keys,
+    'papiers' => ItemCategory.documents,
+    'vetement' => ItemCategory.clothing,
+    'lunettes' => ItemCategory.glasses,
+    'portefeuille' => ItemCategory.wallet,
+    _ => ItemCategory.other,
+  };
 
   String _titleFrom(String description) {
     final trimmed = description.trim();
@@ -634,11 +660,11 @@ class ApiRepository {
   }
 
   String _eventLabel(String type) => switch (type) {
-        'RESTITUTION_CONFIRMEE' => 'Restitution confirmee',
-        'DECLARATION_FAUSSE' => 'Declaration fausse',
-        'ABSENCE_RDV' => 'Absence au rendez-vous',
-        _ => type,
-      };
+    'RESTITUTION_CONFIRMEE' => 'Restitution confirmee',
+    'DECLARATION_FAUSSE' => 'Declaration fausse',
+    'ABSENCE_RDV' => 'Absence au rendez-vous',
+    _ => type,
+  };
 
   AppUser _toUser(Map<String, dynamic> json) {
     final id = json['id']?.toString() ?? '';
@@ -659,7 +685,6 @@ class ApiRepository {
     );
   }
 
-
   String _initials(String name) {
     final parts = name
         .trim()
@@ -670,9 +695,3 @@ class ApiRepository {
     return letters.isEmpty ? 'LF' : letters;
   }
 }
-
-
-
-
-
-

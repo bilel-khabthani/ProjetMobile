@@ -18,15 +18,17 @@ final objectsRepositoryProvider = Provider<ObjectsRepository>((ref) {
   return ObjectsRepository(client: client);
 });
 
-final objectsProvider = FutureProvider.family<List<LostFoundObject>, ObjectFilter>(
-  (ref, filter) async {
-    if (AppConfig.useMockData) {
-      return [];
-    }
-    final repository = ref.watch(objectsRepositoryProvider);
-    return repository.searchObjects(filter);
-  },
-);
+final objectsProvider =
+    FutureProvider.family<List<LostFoundObject>, ObjectFilter>((
+      ref,
+      filter,
+    ) async {
+      if (AppConfig.useMockData) {
+        return [];
+      }
+      final repository = ref.watch(objectsRepositoryProvider);
+      return repository.searchObjects(filter);
+    });
 
 final allObjectsProvider = FutureProvider<List<LostFoundObject>>((ref) async {
   if (AppConfig.useMockData) {
@@ -52,8 +54,10 @@ final foundObjectsProvider = FutureProvider<List<LostFoundObject>>((ref) async {
   return repository.fetchObjects(type: ItemType.found);
 });
 
-final objectDetailProvider =
-    FutureProvider.family<LostFoundObject, String>((ref, id) async {
+final objectDetailProvider = FutureProvider.family<LostFoundObject, String>((
+  ref,
+  id,
+) async {
   if (AppConfig.useMockData) {
     return LostFoundObject(
       id: id,
@@ -82,29 +86,33 @@ final myObjectsProvider = FutureProvider<List<LostFoundObject>>((ref) async {
 });
 
 final myObjectsByStatusProvider =
-    FutureProvider.family<List<LostFoundObject>, ItemStatus>((ref, status) async {
-  if (AppConfig.useMockData) {
-    return [];
-  }
-  final allMyObjects = await ref.watch(myObjectsProvider.future);
-  return allMyObjects.where((obj) => obj.status == status).toList();
-});
+    FutureProvider.family<List<LostFoundObject>, ItemStatus>((
+      ref,
+      status,
+    ) async {
+      if (AppConfig.useMockData) {
+        return [];
+      }
+      final allMyObjects = await ref.watch(myObjectsProvider.future);
+      return allMyObjects.where((obj) => obj.status == status).toList();
+    });
 
 final nearbyObjectsProvider =
-    FutureProvider.family<List<LostFoundObject>, NearbySearchParams>(
-  (ref, params) async {
-    if (AppConfig.useMockData) {
-      return [];
-    }
-    final repository = ref.watch(objectsRepositoryProvider);
-    return repository.fetchNearbyObjects(
-      latitude: params.latitude,
-      longitude: params.longitude,
-      radiusKm: params.radiusKm,
-      type: params.type,
-    );
-  },
-);
+    FutureProvider.family<List<LostFoundObject>, NearbySearchParams>((
+      ref,
+      params,
+    ) async {
+      if (AppConfig.useMockData) {
+        return [];
+      }
+      final repository = ref.watch(objectsRepositoryProvider);
+      return repository.fetchNearbyObjects(
+        latitude: params.latitude,
+        longitude: params.longitude,
+        radiusKm: params.radiusKm,
+        type: params.type,
+      );
+    });
 
 final objectsStatsProvider = FutureProvider<ObjectsStats>((ref) async {
   if (AppConfig.useMockData) {
@@ -147,6 +155,7 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
     String? contactPhone,
     String? secretDetail,
     http.MultipartFile? image,
+    String? imageHash,
   ) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
@@ -163,6 +172,7 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
         contactPhone: contactPhone,
         secretDetail: secretDetail,
         image: image,
+        imageHash: imageHash,
       );
 
       state = state.copyWith(isLoading: false, createdObject: object);
@@ -188,6 +198,7 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
     bool removeImage = false,
     bool clearLocation = false,
     http.MultipartFile? image,
+    String? imageHash,
   }) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
@@ -207,6 +218,7 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
         removeImage: removeImage,
         clearLocation: clearLocation,
         image: image,
+        imageHash: imageHash,
       );
 
       state = state.copyWith(
@@ -288,8 +300,8 @@ class ObjectFormState {
 
 final objectFormProvider =
     StateNotifierProvider<ObjectFormNotifier, ObjectFormState>((ref) {
-  return ObjectFormNotifier(ref.watch(objectsRepositoryProvider));
-});
+      return ObjectFormNotifier(ref.watch(objectsRepositoryProvider));
+    });
 
 /// Retry helper for object list/detail providers.
 void invalidateObjectProviders(WidgetRef ref, {String? id}) {

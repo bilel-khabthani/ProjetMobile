@@ -4,7 +4,7 @@ enum ItemType { lost, found }
 
 extension ItemTypeX on ItemType {
   /// API wire value used by ObjectsRepository (uppercase).
-  String get apiValue => this == ItemType.lost ? 'lost' : 'found';
+  String get apiValue => this == ItemType.lost ? 'LOST' : 'FOUND';
 
   /// Short display label for badges.
   String get shortLabel => this == ItemType.lost ? 'PERDU' : 'TROUVÉ';
@@ -143,7 +143,8 @@ class Item {
 
   factory Item.fromJson(Map<String, dynamic> json) {
     final user = json['user'];
-    final owner = json['owner_name'] as String? ??
+    final owner =
+        json['owner_name'] as String? ??
         (user is Map ? user['name'] as String? : null);
     return Item(
       id: json['id']?.toString() ?? '',
@@ -154,7 +155,8 @@ class Item {
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       place: json['place_label'] as String? ?? '',
-      occurredAt: DateTime.tryParse(json['occurred_at'] as String? ?? '') ??
+      occurredAt:
+          DateTime.tryParse(json['occurred_at'] as String? ?? '') ??
           DateTime.now(),
       distanceMeters: (json['distance_meters'] as num?)?.toInt() ?? 0,
       status: itemStatusFromCode(json['status'] as String?),

@@ -568,9 +568,38 @@ class _VerifyBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final verified =
-        ref.watch(verificationProvider)?.success == true &&
-        ref.watch(verificationProvider)?.matchId == match.id;
+    final Widget action;
+    if (match.isVerified && match.canChat) {
+      action = AppButton(
+        label: 'Contacter ${match.counterpartName.split(' ').first}',
+        icon: Icons.chat_bubble_rounded,
+        variant: AppButtonVariant.success,
+        onPressed: () {
+          ref.invalidate(matchProvider(match.id));
+          context.push(AppRoutes.chatDetail(match.id));
+        },
+      );
+    } else if (match.isVerified) {
+      action = _VerificationNotice(
+        icon: Icons.lock_outline_rounded,
+        message:
+            match.chatLockedReason ??
+            'Le chat sera disponible dès que les conditions de confiance seront réunies.',
+      );
+    } else if (match.iAmFinder) {
+      action = const _VerificationNotice(
+        icon: Icons.hourglass_top_rounded,
+        message:
+            'En attente de la vérification du propriétaire. Le chat s’ouvrira '
+            'automatiquement après confirmation.',
+      );
+    } else {
+      action = AppButton(
+        label: AppStrings.answerQuestion,
+        icon: Icons.quiz_rounded,
+        onPressed: () => showVerificationSheet(context, match),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(
@@ -583,21 +612,37 @@ class _VerifyBar extends ConsumerWidget {
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.divider)),
       ),
-      child: verified
-          ? AppButton(
-              label: 'Contacter ${match.finderName.split(' ').first}',
-              icon: Icons.chat_bubble_rounded,
-              variant: AppButtonVariant.success,
-              onPressed: () {
-                ref.invalidate(matchProvider(match.id));
-                context.push(AppRoutes.chatDetail(match.id));
-              },
-            )
-          : AppButton(
-              label: AppStrings.answerQuestion,
-              icon: Icons.quiz_rounded,
-              onPressed: () => showVerificationSheet(context, match),
+      child: action,
+    );
+  }
+}
+
+class _VerificationNotice extends StatelessWidget {
+  const _VerificationNotice({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              message,
+              style: AppText.caption.copyWith(color: AppColors.primaryDark),
             ),
+          ),
+        ],
+      ),
     );
   }
 }

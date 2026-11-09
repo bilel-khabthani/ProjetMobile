@@ -26,7 +26,7 @@ class ItemPhotoTest extends TestCase
             'place_label' => 'Vestiaire A',
             'occurred_at' => now()->toIso8601String(),
             'contact_phone' => '+21620123456',
-            'image' => UploadedFile::fake()->image('sac.jpg', 640, 480),
+            'image' => UploadedFile::fake()->image('sac.png', 640, 480),
         ], ['Accept' => 'application/json']);
 
         $response->assertCreated()
@@ -35,6 +35,8 @@ class ItemPhotoTest extends TestCase
 
         $item = Item::sole();
         $this->assertNotNull($item->image_path);
+        $this->assertNotNull($item->image_hash);
+        $this->assertSame(64, strlen($item->image_hash));
         Storage::disk('public')->assertExists($item->image_path);
         $this->assertSame('/storage/'.$item->image_path, $response->json('image_url'));
     }
@@ -71,6 +73,7 @@ class ItemPhotoTest extends TestCase
             ->assertJsonPath('image_url', null);
 
         $this->assertNull($item->fresh()->image_path);
+        $this->assertNull($item->fresh()->image_hash);
         Storage::disk('public')->assertMissing($item->image_path);
     }
 
@@ -86,7 +89,7 @@ class ItemPhotoTest extends TestCase
             'description' => 'Telephone noir avec une coque transparente.',
             'place_label' => 'Amphitheatre B',
             'occurred_at' => now()->toIso8601String(),
-            'image' => UploadedFile::fake()->image('avant.jpg', 400, 400),
+            'image' => UploadedFile::fake()->image('avant.png', 400, 400),
         ], ['Accept' => 'application/json'])->assertCreated()->json();
 
         $item = Item::findOrFail($created['id']);
@@ -101,7 +104,7 @@ class ItemPhotoTest extends TestCase
             'description' => 'Telephone noir avec une coque transparente.',
             'place_label' => 'Amphitheatre B',
             'occurred_at' => now()->toIso8601String(),
-            'image' => UploadedFile::fake()->image('apres.jpg', 400, 400),
+            'image' => UploadedFile::fake()->image('apres.png', 400, 400),
         ], ['Accept' => 'application/json'])->assertOk();
 
         $newPath = $item->fresh()->image_path;

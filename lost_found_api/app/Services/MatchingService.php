@@ -21,17 +21,30 @@ class MatchingService
 {
     public function __construct(
         private readonly TextAgreementService $agreement,
+        private readonly ImageHashService $imageHasher,
     ) {}
 
     /**
-     * Poids par dimension (CDC 6.3.2). La photo est comparee sur l'appareil :
-     * le serveur ne peut pas la noter sans GD/Imagick. Sa dimension reste donc
-     * neutre et son poids est redistribue aux criteres reellement calcules.
+     * Poids par dimension (CDC 6.3.2) lorsque les deux annonces ont une photo
+     * exploitable. La similarite visuelle est alors le signal le plus fort :
+     * deux photos du meme objet se ressemblent meme si les descriptions sont
+     * differentes.
      */
-    private const WEIGHTS = [
-        'location' => 50,
-        'time' => 30,
+    private const WEIGHTS_WITH_IMAGE = [
+        'image' => 35,
+        'location' => 30,
+        'time' => 15,
         'text' => 20,
+    ];
+
+    /**
+     * Poids utilises si au moins une des deux annonces n'a pas de photo : le
+     * poids de l'image est redistribue aux criteres reellement calcules.
+     */
+    private const WEIGHTS_WITHOUT_IMAGE = [
+        'location' => 45,
+        'time' => 25,
+        'text' => 30,
     ];
 
     /** Au-dela de ce score global, le systeme ne propose pas la correspondance. */
@@ -47,19 +60,25 @@ class MatchingService
             $found->title.' '.$found->description.' '.$found->place_label,
         );
 
+        $imageScore = $this->imageHasher->similarity($lost->image_hash, $found->image_hash);
+
         $dimensions = [
-            // Photo non exploitable cote serveur (pas de GD/Imagick) : valeur
-            // neutre honnete, la vraie similarite est calculee dans l'app.
-            'image_score' => 50,
+            // Valeur neutre si une photo manque : la dimension n'est alors pas
+            // prise en compte dans le score global (voir les poids ci-dessus).
+            'image_score' => $imageScore ?? 50,
             'location_score' => $this->locationScore($lost, $found),
             'time_score' => $this->timeScore($lost, $found),
             'text_score' => $agreement['score'],
         ];
 
-        // Moyenne ponderee normalisee sur les seules dimensions calculees :
-        // la somme des poids actually utilises vaut toujours 100.
+        $weights = $imageScore === null
+            ? self::WEIGHTS_WITHOUT_IMAGE
+            : self::WEIGHTS_WITH_IMAGE;
+
+        // Moyenne ponderee normalisee sur les dimensions disponibles : la
+        // somme des poids utilises vaut toujours 100.
         $global = 0;
-        foreach (self::WEIGHTS as $dimension => $weight) {
+        foreach ($weights as $dimension => $weight) {
             $global += $dimensions[$dimension.'_score'] * $weight / 100;
         }
 

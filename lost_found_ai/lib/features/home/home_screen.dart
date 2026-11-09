@@ -141,14 +141,27 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          PressableScale(child: InkWell(onTap: () => context.push(AppRoutes.profile), borderRadius: BorderRadius.circular(999), child: Avatar(initials: initials, size: 48))),
+          PressableScale(
+            child: InkWell(
+              onTap: () => context.push(AppRoutes.profile),
+              borderRadius: BorderRadius.circular(999),
+              child: Avatar(initials: initials, size: 48),
+            ),
+          ),
           const SizedBox(width: AppSpacing.xs),
           IconButton(
-            icon: const Icon(Icons.card_giftcard_rounded, color: AppColors.accent),
+            icon: const Icon(
+              Icons.card_giftcard_rounded,
+              color: AppColors.accent,
+            ),
             onPressed: () => context.push(AppRoutes.rewards),
             tooltip: 'Récompenses & Coupons',
           ),
-          IconButton(icon: const Icon(Icons.settings_rounded), onPressed: () => context.push(AppRoutes.profile), tooltip: 'Profil'),
+          IconButton(
+            icon: const Icon(Icons.settings_rounded),
+            onPressed: () => context.push(AppRoutes.profile),
+            tooltip: 'Profil',
+          ),
         ],
       ),
     );
@@ -169,7 +182,7 @@ class _ActionRow extends StatelessWidget {
             subtitle: AppStrings.actionLostSubtitle,
             color: AppColors.lost,
             background: AppColors.lostSoft,
-            onTap: () => context.push(AppRoutes.publish),
+            onTap: () => context.push('${AppRoutes.publish}?type=lost'),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -180,7 +193,7 @@ class _ActionRow extends StatelessWidget {
             subtitle: AppStrings.actionFoundSubtitle,
             color: AppColors.found,
             background: AppColors.foundSoft,
-            onTap: () => context.push(AppRoutes.publish),
+            onTap: () => context.push('${AppRoutes.publish}?type=found'),
           ),
         ),
       ],
@@ -414,7 +427,10 @@ class _RewardsBanner extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF59E0B),
                           borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -746,9 +762,7 @@ class _ActivitySection extends StatelessWidget {
           icon: item.type == ItemType.lost
               ? Icons.search_off_rounded
               : Icons.redeem_rounded,
-          color: item.type == ItemType.lost
-              ? AppColors.lost
-              : AppColors.found,
+          color: item.type == ItemType.lost ? AppColors.lost : AppColors.found,
           title: 'Annonce « ${item.title} » publiée',
           subtitle:
               '${item.place.isEmpty ? item.category.label : item.place} · ${_relativeTime(item.occurredAt)}',
@@ -758,18 +772,19 @@ class _ActivitySection extends StatelessWidget {
           icon: Icons.auto_awesome_rounded,
           color: AppColors.primary,
           title: '${AppStrings.notifNewMatch} · ${match.foundItemTitle}',
-          subtitle:
-              '${match.scores.global.round()} % de correspondance',
+          subtitle: '${match.scores.global.round()} % de correspondance',
         ),
     ];
 
     if (entries.isEmpty) {
-      entries.add(const _ActivityItem(
-        icon: Icons.history_rounded,
-        color: AppColors.textTertiary,
-        title: 'Aucune activité récente',
-        subtitle: 'Vos annonces et correspondances apparaîtront ici.',
-      ));
+      entries.add(
+        const _ActivityItem(
+          icon: Icons.history_rounded,
+          color: AppColors.textTertiary,
+          title: 'Aucune activité récente',
+          subtitle: 'Vos annonces et correspondances apparaîtront ici.',
+        ),
+      );
     }
 
     return Padding(
@@ -847,13 +862,6 @@ class _ActivityItem extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
-
 String _relativeTime(DateTime dt) {
   final diff = DateTime.now().difference(dt);
   if (diff.inMinutes < 1) return 'a l\'instant';
@@ -865,7 +873,3 @@ String _relativeTime(DateTime dt) {
   final month = dt.month.toString().padLeft(2, '0');
   return '$day/$month/${dt.year}';
 }
-
-
-
-

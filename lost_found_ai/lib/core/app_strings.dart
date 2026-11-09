@@ -117,11 +117,11 @@ abstract final class AppStrings {
   static const String answerQuestion = 'Répondre à la question';
   static const String verificationTitle = 'Vérification';
   static const String verificationSubtitle =
-      'Pour protéger les vrais propriétaires, répondez à une question secrète.';
-  static const String verificationQuestionLabel =
-      'Question posée par la personne';
+      'Pour protéger les vrais propriétaires, rappelez le détail secret '
+      'renseigné lors de votre déclaration.';
+  static const String verificationQuestionLabel = 'Question de sécurité';
   static const String fieldAnswer = 'Votre réponse';
-  static const String fieldAnswerHint = 'Votre réponse';
+  static const String fieldAnswerHint = 'Ex : étiquette bleue à l’intérieur';
   static const String verify = 'Vérifier ma réponse';
   static const String answerWrong = 'Réponse incorrecte. Réessayez.';
   static const String answerCorrect = 'Propriétaire vérifié !';
@@ -135,7 +135,8 @@ abstract final class AppStrings {
   static const String chatSafety =
       'Vos échanges sont analysés pour votre sécurité. Ne partagez jamais vos mots de passe.';
   static const String chatQuickHello = 'Bonjour, merci de m’avoir contacté !';
-  static const String chatQuickMeet = 'Où et quand pouvons-nous nous retrouver ?';
+  static const String chatQuickMeet =
+      'Où et quand pouvons-nous nous retrouver ?';
   static const String chatQuickProof = 'Puis-je vous montrer une preuve ?';
   static const String chatAttachSoon = 'L’envoi de photos arrive bientôt.';
 

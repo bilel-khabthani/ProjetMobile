@@ -10,7 +10,7 @@ import '../models/objects_stats.dart';
 
 class ObjectsRepository {
   ObjectsRepository({ApiClient? client})
-      : _client = client ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
+    : _client = client ?? ApiClient(baseUrl: AppConfig.apiBaseUrl);
 
   final ApiClient _client;
 
@@ -51,7 +51,9 @@ class ObjectsRepository {
     try {
       final res = await _client.get(uri.toString());
       final list = _extractList(res);
-      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      return list
+          .map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -61,7 +63,9 @@ class ObjectsRepository {
     try {
       final json = await _client.get('/items/$id');
       if (json is Map<String, dynamic>) {
-        final data = json['data'] is Map<String, dynamic> ? json['data'] as Map<String, dynamic> : json;
+        final data = json['data'] is Map<String, dynamic>
+            ? json['data'] as Map<String, dynamic>
+            : json;
         return LostFoundObject.fromJson(data);
       }
       throw ApiException(500, 'Format de réponse invalide');
@@ -74,7 +78,9 @@ class ObjectsRepository {
     try {
       final res = await _client.get('/items/mine');
       final list = _extractList(res);
-      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      return list
+          .map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -92,6 +98,7 @@ class ObjectsRepository {
     String? contactPhone,
     String? secretDetail,
     http.MultipartFile? image,
+    String? imageHash,
   }) async {
     try {
       if (image != null) {
@@ -108,17 +115,24 @@ class ObjectsRepository {
         request.fields['place_label'] = placeLabel;
         request.fields['occurred_at'] = occurredAt.toUtc().toIso8601String();
         if (latitude != null) request.fields['latitude'] = latitude.toString();
-        if (longitude != null) request.fields['longitude'] = longitude.toString();
+        if (longitude != null) {
+          request.fields['longitude'] = longitude.toString();
+        }
         if (contactPhone != null && contactPhone.isNotEmpty) {
           request.fields['contact_phone'] = contactPhone;
         }
         if (secretDetail != null && secretDetail.isNotEmpty) {
           request.fields['secret_detail'] = secretDetail;
         }
+        if (imageHash != null && imageHash.length == 64) {
+          request.fields['image_hash'] = imageHash;
+        }
 
         request.files.add(image);
 
-        final response = await request.send().timeout(const Duration(seconds: 30));
+        final response = await request.send().timeout(
+          const Duration(seconds: 30),
+        );
         final body = await response.stream.bytesToString();
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -126,7 +140,8 @@ class ObjectsRepository {
           return LostFoundObject.fromJson(json);
         } else {
           final json = jsonDecode(body) as Map<String, dynamic>;
-          final message = json['message']?.toString() ?? 'Erreur ${response.statusCode}';
+          final message =
+              json['message']?.toString() ?? 'Erreur ${response.statusCode}';
           throw ApiException(response.statusCode, message);
         }
       } else {
@@ -145,7 +160,8 @@ class ObjectsRepository {
             'secret_detail': secretDetail,
         };
 
-        final json = await _client.post('/items', payload) as Map<String, dynamic>;
+        final json =
+            await _client.post('/items', payload) as Map<String, dynamic>;
         return LostFoundObject.fromJson(json);
       }
     } catch (e) {
@@ -168,6 +184,7 @@ class ObjectsRepository {
     bool removeImage = false,
     bool clearLocation = false,
     http.MultipartFile? image,
+    String? imageHash,
   }) async {
     try {
       if (image != null) {
@@ -183,17 +200,30 @@ class ObjectsRepository {
         if (title != null) request.fields['title'] = title;
         if (description != null) request.fields['description'] = description;
         if (placeLabel != null) request.fields['place_label'] = placeLabel;
-        if (occurredAt != null) request.fields['occurred_at'] = occurredAt.toUtc().toIso8601String();
+        if (occurredAt != null) {
+          request.fields['occurred_at'] = occurredAt.toUtc().toIso8601String();
+        }
         if (latitude != null) request.fields['latitude'] = latitude.toString();
-        if (longitude != null) request.fields['longitude'] = longitude.toString();
-        if (contactPhone != null) request.fields['contact_phone'] = contactPhone;
-        if (secretDetail != null) request.fields['secret_detail'] = secretDetail;
+        if (longitude != null) {
+          request.fields['longitude'] = longitude.toString();
+        }
+        if (contactPhone != null) {
+          request.fields['contact_phone'] = contactPhone;
+        }
+        if (secretDetail != null) {
+          request.fields['secret_detail'] = secretDetail;
+        }
         if (removeImage) request.fields['remove_image'] = '1';
         if (clearLocation) request.fields['clear_location'] = '1';
+        if (imageHash != null && imageHash.length == 64) {
+          request.fields['image_hash'] = imageHash;
+        }
 
         request.files.add(image);
 
-        final response = await request.send().timeout(const Duration(seconds: 30));
+        final response = await request.send().timeout(
+          const Duration(seconds: 30),
+        );
         final body = await response.stream.bytesToString();
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -201,7 +231,8 @@ class ObjectsRepository {
           return LostFoundObject.fromJson(json);
         } else {
           final json = jsonDecode(body) as Map<String, dynamic>;
-          final message = json['message']?.toString() ?? 'Erreur ${response.statusCode}';
+          final message =
+              json['message']?.toString() ?? 'Erreur ${response.statusCode}';
           throw ApiException(response.statusCode, message);
         }
       } else {
@@ -211,7 +242,9 @@ class ObjectsRepository {
         if (title != null) payload['title'] = title;
         if (description != null) payload['description'] = description;
         if (placeLabel != null) payload['place_label'] = placeLabel;
-        if (occurredAt != null) payload['occurred_at'] = occurredAt.toUtc().toIso8601String();
+        if (occurredAt != null) {
+          payload['occurred_at'] = occurredAt.toUtc().toIso8601String();
+        }
         if (latitude != null) payload['latitude'] = latitude;
         if (longitude != null) payload['longitude'] = longitude;
         if (contactPhone != null) payload['contact_phone'] = contactPhone;
@@ -219,7 +252,8 @@ class ObjectsRepository {
         if (removeImage) payload['remove_image'] = true;
         if (clearLocation) payload['clear_location'] = true;
 
-        final json = await _client.put('/items/$id', payload) as Map<String, dynamic>;
+        final json =
+            await _client.put('/items/$id', payload) as Map<String, dynamic>;
         return LostFoundObject.fromJson(json);
       }
     } catch (e) {
@@ -237,7 +271,8 @@ class ObjectsRepository {
 
   Future<LostFoundObject> resolveObject(String id) async {
     try {
-      final json = await _client.patch('/items/$id/resolve', {}) as Map<String, dynamic>;
+      final json =
+          await _client.patch('/items/$id/resolve', {}) as Map<String, dynamic>;
       final item = json['item'] as Map<String, dynamic>?;
       if (item != null) {
         return LostFoundObject.fromJson(item);
@@ -262,12 +297,19 @@ class ObjectsRepository {
       };
       if (type != null) params['type'] = type.apiValue;
 
-      final queryString = params.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&');
+      final queryString = params.entries
+          .map(
+            (e) =>
+                '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
+          )
+          .join('&');
       final path = '/items/nearby?$queryString';
 
       final json = await _client.get(path);
       final list = _extractList(json);
-      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      return list
+          .map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -277,7 +319,9 @@ class ObjectsRepository {
     try {
       final json = await _client.get('/items/nearby-found');
       final list = _extractList(json);
-      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      return list
+          .map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -295,7 +339,9 @@ class ObjectsRepository {
 
       final json = await _client.get(uri.toString());
       final list = _extractList(json);
-      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      return list
+          .map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -303,14 +349,21 @@ class ObjectsRepository {
 
   Future<ObjectsStats> fetchObjectsStats() async {
     try {
-      final json = await _client.get('/objects/statistics') as Map<String, dynamic>;
+      final json =
+          await _client.get('/objects/statistics') as Map<String, dynamic>;
       return ObjectsStats.fromJson(json);
     } catch (_) {
       final allObjects = await fetchObjects();
       final totalLost = allObjects.where((o) => o.type == ItemType.lost).length;
-      final totalFound = allObjects.where((o) => o.type == ItemType.found).length;
-      final active = allObjects.where((o) => o.status == ItemStatus.active).length;
-      final recovered = allObjects.where((o) => o.status == ItemStatus.recovered).length;
+      final totalFound = allObjects
+          .where((o) => o.type == ItemType.found)
+          .length;
+      final active = allObjects
+          .where((o) => o.status == ItemStatus.active)
+          .length;
+      final recovered = allObjects
+          .where((o) => o.status == ItemStatus.recovered)
+          .length;
       final recent = allObjects.take(5).toList();
 
       return ObjectsStats(
@@ -329,8 +382,12 @@ class ObjectsRepository {
 
       final myLost = myObjects.where((o) => o.type == ItemType.lost).length;
       final myFound = myObjects.where((o) => o.type == ItemType.found).length;
-      final myActive = myObjects.where((o) => o.status == ItemStatus.active).length;
-      final myRecovered = myObjects.where((o) => o.status == ItemStatus.recovered).length;
+      final myActive = myObjects
+          .where((o) => o.status == ItemStatus.active)
+          .length;
+      final myRecovered = myObjects
+          .where((o) => o.status == ItemStatus.recovered)
+          .length;
 
       return MyObjectsStats(
         myLostObjects: myLost,

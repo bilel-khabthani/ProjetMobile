@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'user_id',
-    'type', 'category', 'title', 'description', 'secret_detail', 'image_path', 'contact_phone',
+    'type', 'category', 'title', 'description', 'secret_detail', 'image_path', 'image_hash', 'contact_phone',
     'latitude', 'longitude', 'place_label', 'occurred_at', 'status',
 ])]
 class Item extends Model
