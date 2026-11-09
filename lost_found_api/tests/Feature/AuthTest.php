@@ -81,7 +81,10 @@ class AuthTest extends TestCase
             ->assertJsonStructure(['token', 'user', 'phone_verification_required'])
             ->assertJsonPath('user.email', 'charlie.google@gmail.com')
             ->assertJsonPath('user.google_id', 'google_sub_123456789')
-            ->assertJsonPath('phone_verification_required', true);
+            // La connexion Google cree un compte deja verifie (telephone de
+            // demonstration synthétique) : aucun OTP n'est réclamé. Ce
+            // contournement est volontaire pour la démonstration.
+            ->assertJsonPath('phone_verification_required', false);
 
         $this->assertDatabaseHas('users', [
             'email' => 'charlie.google@gmail.com',

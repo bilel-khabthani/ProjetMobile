@@ -55,6 +55,9 @@ class AiInsight {
     required this.tags,
     required this.icebreaker,
     required this.source,
+    this.agreementScore = 0,
+    this.sharedDetails = const [],
+    this.contradictions = const [],
   });
 
   final AiVerdict verdict;
@@ -64,15 +67,51 @@ class AiInsight {
   final List<String> tags;
   final String icebreaker;
 
-  /// "openai" quand un vrai modele a repondu, "heuristic" / "demo" sinon.
+  /// "openai" quand un vrai modele a repondu, "heuristic" / "demo" / "local" sinon.
   final String source;
 
+  /// Score d'accord textuel (0-100) calcule par le moteur francais local.
+  final int agreementScore;
+
+  /// Details distinctifs partages par les deux annonces.
+  final List<String> sharedDetails;
+
+  /// Caracteristiques incompatibles detectees (couleur, taille, position...).
+  final List<String> contradictions;
+
   bool get isLiveAi => source == 'openai';
+
+  /// Recopie l'analyse avec des signaux locaux, sans perdre le verdict serveur.
+  AiInsight copyWith({
+    int? agreementScore,
+    List<String>? sharedDetails,
+    List<String>? contradictions,
+    String? source,
+  }) {
+    return AiInsight(
+      verdict: verdict,
+      confidence: confidence,
+      summary: summary,
+      reasons: reasons,
+      tags: tags,
+      icebreaker: icebreaker,
+      source: source ?? this.source,
+      agreementScore: agreementScore ?? this.agreementScore,
+      sharedDetails: sharedDetails ?? this.sharedDetails,
+      contradictions: contradictions ?? this.contradictions,
+    );
+  }
 
   factory AiInsight.fromJson(Map<String, dynamic>? json) {
     final data = json ?? const <String, dynamic>{};
     final rawReasons = data['reasons'] as List<dynamic>? ?? const [];
     final rawTags = data['tags'] as List<dynamic>? ?? const [];
+    final agreement =
+        (data['agreement'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final rawShared = agreement['shared'] as List<dynamic>? ?? const [];
+    final rawContradictions =
+        agreement['contradictions'] as List<dynamic>? ?? const [];
 
     return AiInsight(
       verdict: AiVerdict.fromCode(data['verdict'] as String?),
@@ -92,6 +131,17 @@ class AiInsight {
           .toList(),
       icebreaker: data['icebreaker'] as String? ?? '',
       source: data['source'] as String? ?? 'heuristic',
+      agreementScore: ((agreement['score'] as num?)?.toInt() ?? 0)
+          .clamp(0, 100)
+          .toInt(),
+      sharedDetails: rawShared
+          .map((detail) => detail.toString())
+          .where((detail) => detail.trim().isNotEmpty)
+          .toList(),
+      contradictions: rawContradictions
+          .map((detail) => detail.toString())
+          .where((detail) => detail.trim().isNotEmpty)
+          .toList(),
     );
   }
 
@@ -127,6 +177,8 @@ class SwipeCandidate {
     required this.finderRecoveredCount,
     required this.scores,
     required this.ai,
+    this.lostImageUrl,
+    this.foundImageUrl,
   });
 
   final String matchId;
@@ -151,6 +203,12 @@ class SwipeCandidate {
 
   final MatchScores scores;
   final AiInsight ai;
+
+  /// Photo de l'annonce perdue (null si absente).
+  final String? lostImageUrl;
+
+  /// Photo de l'annonce trouvee (null si absente).
+  final String? foundImageUrl;
 
   /// Distance lisible, ou le lieu de decouverte si la geolocalisation manque.
   String get distanceLabel {
@@ -204,6 +262,8 @@ class SwipeCandidate {
         global: (scores['global'] as num?)?.toDouble() ?? 0,
       ),
       ai: AiInsight.fromJson((json['ai'] as Map?)?.cast<String, dynamic>()),
+      lostImageUrl: resolveItemImageUrl(lost['image_url'] as String?),
+      foundImageUrl: resolveItemImageUrl(found['image_url'] as String?),
     );
   }
 }

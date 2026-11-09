@@ -4,13 +4,14 @@ namespace App\Services;
 
 use App\Models\Item;
 use App\Models\ItemMatch;
+use App\Services\Ai\TextAgreementService;
 
 /**
  * Module 3 - Moteur de matching (CDC sections 6.3 et 8.4).
  *
  * Note importante sur l'IA : le CDC demande un scoring multi-criteres. Pour la
  * demo, le scoring est realise par des regles deterministes et explicites
- * (poids, distance Haversine, similarite de texte, ecart temporel). Aucun
+ * (poids, distance Haversine, accord textuel francais, ecart temporel). Aucun
  * appel reseau ni modele externe n'est requis, ce qui garantit un resultat
  * reproductible et instantane. Le contrat de sortie (4 dimensions + score
  * global + decision) est deja compatible avec le remplacement du calcul par un
@@ -18,11 +19,14 @@ use App\Models\ItemMatch;
  */
 class MatchingService
 {
+    public function __construct(
+        private readonly TextAgreementService $agreement,
+    ) {}
+
     /**
-     * Poids par dimension (CDC 6.3.2). En demo l'image n'est pas exploitable,
-     * la cle 'image' est donc absente de cette table et son poids est redistribue
-     * aux dimensions reellement calculees. Les poids restants sont renormalises,
-     * ce qui evite de fausser la moyenne avec une dimension neutre.
+     * Poids par dimension (CDC 6.3.2). La photo est comparee sur l'appareil :
+     * le serveur ne peut pas la noter sans GD/Imagick. Sa dimension reste donc
+     * neutre et son poids est redistribue aux criteres reellement calcules.
      */
     private const WEIGHTS = [
         'location' => 50,
@@ -38,11 +42,18 @@ class MatchingService
 
     public function score(Item $lost, Item $found): array
     {
+        $agreement = $this->agreement->analyze(
+            $lost->title.' '.$lost->description,
+            $found->title.' '.$found->description.' '.$found->place_label,
+        );
+
         $dimensions = [
-            'image_score' => 100,
+            // Photo non exploitable cote serveur (pas de GD/Imagick) : valeur
+            // neutre honnete, la vraie similarite est calculee dans l'app.
+            'image_score' => 50,
             'location_score' => $this->locationScore($lost, $found),
             'time_score' => $this->timeScore($lost, $found),
-            'text_score' => $this->textScore($lost, $found),
+            'text_score' => $agreement['score'],
         ];
 
         // Moyenne ponderee normalisee sur les seules dimensions calculees :
@@ -66,6 +77,7 @@ class MatchingService
             'dimensions' => $dimensions,
             'global_score' => $global,
             'decision' => $decision,
+            'agreement' => $agreement,
         ];
     }
 
@@ -126,7 +138,10 @@ class MatchingService
             ->where('found_item_id', $found->id)
             ->first();
 
-        $decision = array_merge($existing?->decision ?? [], ['engine' => $scored['decision']]);
+        $decision = array_merge($existing?->decision ?? [], [
+            'engine' => $scored['decision'],
+            'agreement' => $scored['agreement'],
+        ]);
 
         return ItemMatch::updateOrCreate(
             ['lost_item_id' => $lost->id, 'found_item_id' => $found->id],
@@ -175,60 +190,6 @@ class MatchingService
 
         // 100 au bout de 12 h, 0 au bout de 14 jours.
         return (int) round(100 * (1 - ($hours - 12) / (24 * 14 - 12)));
-    }
-
-    /**
-     * Texte : comparaison par mots-cles normalises (minuscules, sans accents).
-     * Le score est le taux de mots-cles du titre de l'objet perdu qui
-     * apparaissent dans le titre, la description ou le lieu de l'objet trouve.
-     */
-    private function textScore(Item $lost, Item $found): int
-    {
-        $keywords = $this->keywords($lost->title.' '.$lost->description);
-
-        if ($keywords === []) {
-            return 50;
-        }
-
-        $haystack = $this->normalize($found->title.' '.$found->description.' '.$found->place_label);
-        $hits = count(array_filter($keywords, fn ($word) => str_contains($haystack, $word)));
-
-        return (int) round($hits / count($keywords) * 100);
-    }
-
-    /** Mots-cles retenus : on retire les mots vides et trop courts. */
-    private function keywords(string $text): array
-    {
-        $normalized = $this->normalize($text);
-        $words = preg_split('/[^a-z0-9]+/', $normalized) ?: [];
-
-        $stopWords = [
-            'un', 'une', 'des', 'de', 'du', 'la', 'le', 'les', 'et', 'ou', 'a', 'au', 'aux',
-            'en', 'sur', 'pour', 'par', 'avec', 'mon', 'ma', 'mes', 'ce', 'cet', 'cette', 'est',
-            'qui', 'que', 'dans', 'je', 'il', 'elle', 'very', 'the', 'and',
-        ];
-
-        $words = array_filter($words, fn ($word) => mb_strlen($word) > 2 && ! in_array($word, $stopWords, true));
-
-        return array_values(array_unique($words));
-    }
-
-    /** Normalisation francaise : minuscules + suppression des accents. */
-    private function normalize(string $text): string
-    {
-        $text = mb_strtolower(trim($text));
-        $text = strtr($text, [
-            'Ã ' => 'a', 'Ã¢' => 'a', 'Ã¤' => 'a', 'Ã¡' => 'a', 'Ã£' => 'a',
-            'Ã§' => 'c',
-            'Ã¨' => 'e', 'Ã©' => 'e', 'Ãª' => 'e', 'Ã«' => 'e',
-            'Ã®' => 'i', 'Ã¯' => 'i', 'Ã­' => 'i',
-            'Ã´' => 'o', 'Ã¶' => 'o', 'Ã³' => 'o', 'Ãµ' => 'o',
-            'Ã¹' => 'u', 'Ã»' => 'u', 'Ã¼' => 'u', 'Ãº' => 'u',
-            'Ã¿' => 'y',
-            'Å“' => 'oe', 'Ã¦' => 'ae',
-        ]);
-
-        return preg_replace('/\s+/', ' ', $text) ?? $text;
     }
 
     /** Distance orthodromique entre deux points, formule de Haversine. */

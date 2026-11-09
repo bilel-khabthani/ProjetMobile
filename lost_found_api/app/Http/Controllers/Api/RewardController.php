@@ -204,7 +204,6 @@ class RewardController extends Controller
             return response()->json([
                 'status' => 'failed',
                 'message' => "L'e-mail n'a pas pu être envoyé à ".$targetEmail.'. Vérifiez la configuration e-mail du serveur.',
-                'error' => $this->lastMailError,
             ], 502);
         }
 
@@ -381,7 +380,9 @@ class RewardController extends Controller
     }
 
     /**
-     * Envoie l'e-mail avec sécurité anti-plantage si la passerelle SMTP est désactivée.
+     * Envoie l'e-mail du coupon (avec PDF joint) au destinataire ressorti du
+     * coupon ou a l'adresse demandee. Toute anomalie est journalisee : un
+     * echec de messagerie ne doit jamais passer inapercu.
      */
     protected function safeSendCouponMail(UserCoupon $coupon, ?string $toEmail = null): bool
     {
@@ -402,12 +403,12 @@ class RewardController extends Controller
             }
 
             Mail::to($dest)->send(new CouponVoucherMail($coupon));
-            Log::info("E-mail envoyé avec succès avec PDF joint à : {$dest}");
+            Log::info("E-mail de coupon envoye avec PDF joint a : {$dest}");
 
             return true;
         } catch (\Throwable $e) {
             $this->lastMailError = $e->getMessage();
-            Log::warning('Échec d\'envoi e-mail pour le coupon '.$coupon->id.': '.$this->lastMailError);
+            Log::error('Echec d\'envoi de l\'e-mail du coupon '.$coupon->id.' : '.$this->lastMailError);
 
             return false;
         }

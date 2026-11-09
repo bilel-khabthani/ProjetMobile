@@ -1,3 +1,4 @@
+import '../core/ai/text_agreement_engine.dart';
 import '../core/app_config.dart';
 import 'api_client.dart';
 import 'models/chat_message.dart';
@@ -270,21 +271,21 @@ class ApiRepository {
     });
   }
 
-  Future<bool> verifyAnswer({
+  /// Envoie une reponse libre a la question de verification. Le serveur la
+  /// compare au detail secret de l'annonce perdue et renvoie le score, la
+  /// decision ainsi que les details parts / contradictoires detectes.
+  Future<VerificationOutcome> verifyAnswer({
     required String matchId,
     required String answer,
   }) async {
-    final normalized = answer.trim().toUpperCase();
-    final decision = switch (normalized) {
-      'OUI' || 'YES' || '1' => 'YES',
-      'NON' || 'NO' || '0' => 'NO',
-      _ => 'UNSURE',
-    };
     final json = await _client.post(
       '/matches/$matchId/answer',
-      {'answer': decision},
+      {'answer_text': answer.trim()},
     ) as Map<String, dynamic>;
-    return json['status'] != 'PENDING';
+    final raw = json['verification'] ?? json['decision']?['verification'];
+    return VerificationOutcome.fromJson(
+      (raw as Map?)?.cast<String, dynamic>(),
+    );
   }
 
   Future<void> publishItem({
@@ -507,13 +508,16 @@ class ApiRepository {
     final dims = scores['dimensions'] as Map<String, dynamic>? ?? {};
     final lostUser = lost?['user'] as Map<String, dynamic>?;
     final foundUser = found?['user'] as Map<String, dynamic>?;
-
     // Le serveur indique le role de l'utilisateur connecte : le proprietaire
     // voit son annonce perdue en premier, celui qui a trouve voit l'inverse.
     final iAmFinder = json['viewer_role'] == 'finder';
     final myItem = iAmFinder ? found : lost;
     final otherItem = iAmFinder ? lost : found;
     final otherUser = iAmFinder ? lostUser : foundUser;
+
+    final decision =
+        (json['decision'] as Map?)?.cast<String, dynamic>() ?? {};
+    final rawVerification = decision['verification'] ?? json['verification'];
 
     return ItemMatch(
       id: json['id'] as String? ?? '',
@@ -545,7 +549,19 @@ class ApiRepository {
       verificationQuestion:
           'Confirmez-vous que cet objet correspond a votre declaration ?',
       minutesAgo: _minutesAgo(json['created_at'] as String?),
+      myItemImageUrl: resolveItemImageUrl(myItem?['image_url'] as String?),
+      foundItemImageUrl: resolveItemImageUrl(
+        otherItem?['image_url'] as String?,
+      ),
       status: json['status'] as String? ?? 'PENDING',
+      verificationAttempts:
+          (json['verification_attempts'] as num?)?.toInt() ?? 0,
+      agreement: _toAgreement(decision['agreement']),
+      verificationOutcome: rawVerification is Map
+          ? VerificationOutcome.fromJson(
+              rawVerification.cast<String, dynamic>(),
+            )
+          : null,
       canChat: json['can_chat'] as bool? ?? _statusAllowsChat(json['status']),
       chatLockedReason: json['chat_locked_reason'] as String?,
       lastMessage: json['last_message'] as String?,
@@ -554,6 +570,24 @@ class ApiRepository {
       ),
       lastMessageIsMine: json['last_message_is_mine'] as bool? ?? false,
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// Accord textuel stocke dans `decision.agreement` par le moteur.
+  TextAgreement? _toAgreement(dynamic raw) {
+    if (raw is! Map) return null;
+    final data = raw.cast<String, dynamic>();
+    return TextAgreement(
+      score: ((data['score'] as num?)?.toInt() ?? 0).clamp(0, 100),
+      shared: ((data['shared'] as List<dynamic>?) ?? const [])
+          .map((value) => value.toString())
+          .where((value) => value.trim().isNotEmpty)
+          .toList(),
+      contradictions:
+          ((data['contradictions'] as List<dynamic>?) ?? const [])
+              .map((value) => value.toString())
+              .where((value) => value.trim().isNotEmpty)
+              .toList(),
     );
   }
 

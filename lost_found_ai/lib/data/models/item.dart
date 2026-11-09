@@ -1,3 +1,5 @@
+import '../../core/app_config.dart';
+
 enum ItemType { lost, found }
 
 extension ItemTypeX on ItemType {
@@ -173,15 +175,13 @@ double? _asDouble(dynamic value) {
 }
 
 /// Préfixe une URL relative renvoyée par Laravel (`/storage/...`).
+///
+/// On s'appuie sur [AppConfig.serverBaseUrl] pour que le Web utilise
+/// `127.0.0.1` et l'émulateur Android `10.0.2.2`, sans URL codée en dur.
 String? resolveItemImageUrl(String? raw) {
   if (raw == null || raw.isEmpty) return null;
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  final origin = Uri.parse(
-    const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:8000/api',
-    ),
-  ).origin;
+  final origin = AppConfig.serverBaseUrl;
   return raw.startsWith('/') ? '$origin$raw' : '$origin/$raw';
 }
 

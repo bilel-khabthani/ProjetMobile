@@ -12,6 +12,7 @@ use App\Models\ItemMatch;
 use App\Models\Message;
 use App\Models\ModerationEvent;
 use App\Models\User;
+use App\Services\Ai\TextAgreementService;
 use App\Services\Moderation\ModerationResult;
 use App\Services\Moderation\ModerationService;
 use App\Services\TrustService;
@@ -20,6 +21,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Modules 3, 4 et 5 - Verification d'un match, restitution et chat.
@@ -138,6 +140,7 @@ class MatchController extends Controller
             'longitude' => $item->longitude,
             'occurred_at' => $item->occurred_at?->toIso8601String(),
             'status' => $item->status,
+            'image_url' => $item->image_path ? '/storage/'.$item->image_path : null,
             'user' => $item->user ? [
                 'id' => $item->user->id,
                 'name' => $item->user->name,
@@ -148,37 +151,77 @@ class MatchController extends Controller
     }
 
     /**
-     * Module 2 - Verification : reponse Oui / Incertain / Non (exigence EF-06).
-     * L'apercu est non engageant, le score n'est pas modifie par la reponse.
+     * Module 2 - Verification : reponse libre du proprietaire comparee au
+     * detail secret par le moteur d'accord textuel (exigence EF-06).
+     *
+     * Le trouveur ne peut jamais repondre a la place du proprietaire. Le champ
+     * binaire `answer` reste accepte pour les glissements Tinder Cards ; le
+     * formulaire de verification envoie `answer_text`.
      */
-    public function answer(Request $request, ItemMatch $match)
-    {
+    public function answer(
+        Request $request,
+        ItemMatch $match,
+        TextAgreementService $agreement
+    ) {
         Gate::authorize('view', $match);
 
-        $match->loadMissing('lostItem:id,user_id');
+        $match->loadMissing('lostItem');
 
         if ($match->lostItem?->user_id !== $request->user()->id) {
             abort(403, 'Seul le propriétaire de l\'objet perdu peut répondre à la vérification.');
         }
 
         $data = $request->validate([
-            'answer' => ['required', Rule::in(['YES', 'UNSURE', 'NO'])],
+            'answer' => ['nullable', Rule::in(['YES', 'UNSURE', 'NO'])],
+            'answer_text' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $answerText = trim((string) ($data['answer_text'] ?? ''));
+
+        if ($answerText !== '') {
+            $evaluation = $agreement->scoreAnswer(
+                $answerText,
+                $match->lostItem?->secret_detail,
+            );
+            $decision = $evaluation['decision'];
+        } elseif (isset($data['answer'])) {
+            $evaluation = [
+                'score' => $data['answer'] === 'YES' ? 100 : 0,
+                'decision' => $data['answer'],
+                'matched' => [],
+                'contradictions' => [],
+                'neutral' => false,
+            ];
+            $decision = $data['answer'];
+        } else {
+            throw ValidationException::withMessages([
+                'answer_text' => 'Repondez a la question de verification.',
+            ]);
+        }
 
         $match->update([
             // On conserve "decision.engine" (verdict du moteur) : la reponse
             // utilisateur vit dans "decision.answer".
-            'decision' => array_merge($match->decision ?? [], ['answer' => $data['answer']]),
+            'decision' => array_merge($match->decision ?? [], [
+                'answer' => $decision,
+                'verification' => $evaluation,
+            ]),
             'verification_attempts' => $match->verification_attempts + 1,
         ]);
 
-        if ($data['answer'] === 'YES' && $match->status === ItemMatch::STATUS_PENDING) {
+        if ($decision === 'YES' && $match->status === ItemMatch::STATUS_PENDING) {
             $match->update(['status' => ItemMatch::STATUS_VERIFIED, 'verified_at' => now()]);
         }
 
-        return response()->json(
-            $this->toMatchJson($match->fresh('lostItem.user', 'foundItem.user'), $request->user())
+        $payload = $this->toMatchJson(
+            $match->fresh('lostItem.user', 'foundItem.user'),
+            $request->user()
         );
+
+        return response()->json([
+            ...$payload,
+            'verification' => $evaluation,
+        ]);
     }
 
     /**
