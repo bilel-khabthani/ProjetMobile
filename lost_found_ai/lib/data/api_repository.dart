@@ -237,6 +237,40 @@ class ApiRepository {
     }
   }
 
+  Future<Item> fetchItem(String id) async {
+    final json = await _client.get('/items/$id') as Map<String, dynamic>;
+    return Item.fromJson(json);
+  }
+
+  Future<void> deleteItem(String id) async {
+    await _client.delete('/items/$id');
+  }
+
+  Future<List<Item>> fetchCatalog(ItemCatalogQuery query) async {
+    final items = <Item>[];
+    final seen = <String>{};
+    var page = 1;
+    var lastPage = 1;
+    while (page <= lastPage && page <= 5) {
+      final json = await _client.get('/items?${query.toQuery(page: page)}');
+      if (json is! Map<String, dynamic>) break;
+      final data = json['data'];
+      if (data is List) {
+        for (final raw in data) {
+          if (raw is! Map<String, dynamic>) continue;
+          final item = Item.fromJson(raw);
+          if (seen.add(item.id)) items.add(item);
+        }
+      }
+      final meta = json['meta'];
+      if (meta is Map) {
+        lastPage = (meta['last_page'] as num?)?.toInt() ?? page;
+      }
+      page++;
+    }
+    return items;
+  }
+
   Future<List<Item>> fetchMyItems() async {
     final items = await _client.get('/items/mine') as List<dynamic>;
     return items.map((raw) => _toItem(raw as Map<String, dynamic>)).toList();
@@ -463,9 +497,11 @@ class ApiRepository {
       };
 
   AppUser _toUser(Map<String, dynamic> json) {
+    final id = json['id']?.toString() ?? '';
     final name = json['name'] as String? ?? 'Utilisateur';
     final trust = (json['trust_score'] as num?)?.toDouble() ?? 50;
     return AppUser(
+      id: id,
       name: name,
       email: json['email'] as String? ?? '',
       initials: _initials(name),

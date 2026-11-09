@@ -68,6 +68,7 @@ class AppUser {
     required this.initials,
     required this.reputation,
     required this.recoveredCount,
+    this.id = '',
     this.phone = '',
     // La demonstration hors ligne simule un compte deja verifie.
     this.phoneVerified = true,
@@ -75,6 +76,7 @@ class AppUser {
     this.googleId,
   });
 
+  final String id;
   final String name;
   final String email;
   final String initials;

@@ -51,8 +51,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   String _messageOf(Object error) =>
       error is ApiException ? error.message : 'Connexion impossible. Reessayez.';
 
-  Future<void> _submit() async {
-    final valid = _formKey.currentState?.validate() ?? false;
+  /// Remplit les champs avec le compte de demonstration (numero deja verifie)
+  /// puis se connecte directement : aucun numero reel n'est demande.
+  Future<void> _useDemoAccount() async {
+    _emailController.text = AppStrings.demoAccountEmail;
+    _passwordController.text = AppStrings.demoAccountPassword;
+    FocusScope.of(context).unfocus();
+    await _submit();
+  }
+
+  Future<void> _submit() async {    final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
 
     setState(() => _loading = true);
@@ -104,6 +112,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   title: AppStrings.signInTitle,
                   subtitle: AppStrings.signInSubtitle,
                 ),
+                const SizedBox(height: AppSpacing.lg),
+                _DemoAccountCard(onUse: _useDemoAccount),
                 const SizedBox(height: AppSpacing.xl),
                 SocialAuthButtons(
                   loading: _googleLoading,
@@ -182,6 +192,57 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Encart d'acces rapide au compte de demonstration : les identifiants sont
+/// visibles et un seul bouton connecte l'utilisateur sans numero de telephone.
+class _DemoAccountCard extends StatelessWidget {
+  const _DemoAccountCard({required this.onUse});
+
+  final VoidCallback onUse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bolt_rounded, size: 18, color: AppColors.primary),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                AppStrings.demoAccountTitle,
+                style: AppText.label.copyWith(color: AppColors.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '${AppStrings.demoAccountEmail} · ${AppStrings.demoAccountPassword}',
+            style: AppText.bodyStrong,
+          ),
+          const SizedBox(height: 2),
+          Text(AppStrings.demoAccountBody, style: AppText.caption),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: AppStrings.useDemoAccount,
+            variant: AppButtonVariant.secondary,
+            icon: Icons.bolt_rounded,
+            height: 46,
+            onPressed: onUse,
+          ),
+        ],
       ),
     );
   }

@@ -55,6 +55,13 @@ class HomeScreen extends ConsumerWidget {
                   child: _RewardsBanner(),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                  child: _ObjectsBanner(),
+                ),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
               const SliverToBoxAdapter(
                 child: Padding(
@@ -122,7 +129,7 @@ class _Header extends StatelessWidget {
                 Text(
                   '${_greeting()}${name.isEmpty ? '' : ' $name'}',
                   style: AppText.h1,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
@@ -394,11 +401,15 @@ class _RewardsBanner extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        'Bons & Roue de la Chance',
-                        style: AppText.bodyStrong.copyWith(
-                          fontSize: 15,
-                          color: const Color(0xFF78350F),
+                      Flexible(
+                        child: Text(
+                          'Bons & Roue de la Chance',
+                          style: AppText.bodyStrong.copyWith(
+                            fontSize: 15,
+                            color: const Color(0xFF78350F),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -432,6 +443,110 @@ class _RewardsBanner extends StatelessWidget {
             const Icon(
               Icons.chevron_right_rounded,
               color: Color(0xFFB45309),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ObjectsBanner extends StatelessWidget {
+  const _ObjectsBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: () => context.push(AppRoutes.objects),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE4F6ED), Color(0xFFD0F0E2)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: AppColors.found.withValues(alpha: 0.28),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.found,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x332FB57C),
+                    blurRadius: 16,
+                    offset: Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.inventory_2_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Catalogue des Objets',
+                          style: AppText.bodyStrong.copyWith(
+                            fontSize: 15,
+                            color: const Color(0xFF065F46),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.found,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(
+                          'EXPLORER',
+                          style: AppText.caption.copyWith(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Parcourez les annonces ou visualisez la carte interactive',
+                    style: AppText.caption.copyWith(
+                      color: const Color(0xFF047857),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.found,
               size: 20,
             ),
           ],

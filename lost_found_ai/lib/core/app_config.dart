@@ -15,6 +15,15 @@ class AppConfig {
     return 'http://10.0.2.2:8000/api';
   }
 
+  /// Racine du serveur, sans le prefixe `/api` : utilisee pour construire les
+  /// URL des fichiers stockes (photos d'objets) renvoyees par l'API.
+  static String get serverBaseUrl {
+    final base = apiBaseUrl;
+    return base.endsWith('/api')
+        ? base.substring(0, base.length - '/api'.length)
+        : base;
+  }
+
   /// Met a true pour reafficher la demonstration hors ligne si le serveur
   /// n'est pas lance. A false en fonctionnement normal : les donnees
   /// proviennent alors de PostgreSQL via l'API Laravel.

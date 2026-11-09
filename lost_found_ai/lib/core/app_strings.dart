@@ -19,6 +19,13 @@ abstract final class AppStrings {
   static const String signInTitle = 'Content de vous revoir';
   static const String signInSubtitle = 'Connectez-vous pour voir vos annonces.';
 
+  static const String demoAccountTitle = 'Compte de démonstration';
+  static const String demoAccountEmail = 'amina@campus.fr';
+  static const String demoAccountPassword = 'campus2026';
+  static const String demoAccountBody =
+      'Numéro déjà vérifié : aucun numéro réel ni code SMS nécessaire.';
+  static const String useDemoAccount = 'Entrer avec le compte démo';
+
   static const String fieldName = 'Prénom et nom';
   static const String fieldNameHint = 'Yasmine Benali';
   static const String fieldEmail = 'Adresse e-mail';
