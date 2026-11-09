@@ -81,10 +81,12 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
       ref.invalidate(rewardWalletProvider);
 
       if (!mounted) return;
+      final emailSent = res['email_sent'] != false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(res['message'] as String? ?? 'Coupon obtenu avec succès !'),
-          backgroundColor: AppColors.success,
+          backgroundColor: emailSent ? AppColors.success : AppColors.warning,
+          duration: Duration(seconds: emailSent ? 4 : 6),
         ),
       );
 

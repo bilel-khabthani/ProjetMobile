@@ -115,7 +115,7 @@ class SessionNotifier extends StateNotifier<AppUser?> {
     state = await _api.verifyOtp(phone: phone, code: code);
   }
 
-  Future<String?> forgotPassword({required String email}) =>
+  Future<ForgotPasswordResult> forgotPassword({required String email}) =>
       _api.forgotPassword(email: email);
 
   Future<void> resetPassword({
@@ -165,7 +165,16 @@ final sessionProvider = StateNotifierProvider<SessionNotifier, AppUser?>(
   (ref) => SessionNotifier(ref.watch(apiRepositoryProvider)),
 );
 
+/// Identifiant de l'utilisateur connecte. Tous les providers qui contiennent
+/// des donnees personnelles le surveillent : quand on se deconnecte ou qu'on
+/// change de compte, ils se rechargent automatiquement et ne peuvent plus
+/// afficher les donnees de l'utilisateur precedent.
+final sessionUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(sessionProvider)?.id,
+);
+
 final matchesProvider = FutureProvider<List<ItemMatch>>((ref) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return MockRepository().fetchMatches();
   }
@@ -173,6 +182,7 @@ final matchesProvider = FutureProvider<List<ItemMatch>>((ref) async {
 });
 
 final matchProvider = FutureProvider.family<ItemMatch, String>((ref, id) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return MockRepository().fetchMatch(id);
   }
@@ -181,6 +191,7 @@ final matchProvider = FutureProvider.family<ItemMatch, String>((ref, id) async {
 
 /// Module 4 : score de confiance de l'utilisateur connecte.
 final trustProvider = FutureProvider<TrustSummary>((ref) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return const TrustSummary(
       score: 72,
@@ -201,9 +212,10 @@ class VerificationResult {
 }
 
 final verificationProvider =
-    StateNotifierProvider<VerificationNotifier, VerificationResult?>(
-      (ref) => VerificationNotifier(ref.watch(repositoryProvider)),
-    );
+    StateNotifierProvider<VerificationNotifier, VerificationResult?>((ref) {
+      ref.watch(sessionUserIdProvider);
+      return VerificationNotifier(ref.watch(repositoryProvider));
+    });
 
 class VerificationNotifier extends StateNotifier<VerificationResult?> {
   VerificationNotifier(this._repository) : super(null);
@@ -225,9 +237,10 @@ class VerificationNotifier extends StateNotifier<VerificationResult?> {
 }
 
 /// Module 5 : envoi d'une reclamation depuis l'ecran de correspondance.
-final claimProvider = StateNotifierProvider<ClaimNotifier, bool>(
-  (ref) => ClaimNotifier(ref.watch(repositoryProvider)),
-);
+final claimProvider = StateNotifierProvider<ClaimNotifier, bool>((ref) {
+  ref.watch(sessionUserIdProvider);
+  return ClaimNotifier(ref.watch(repositoryProvider));
+});
 
 class ClaimNotifier extends StateNotifier<bool> {
   ClaimNotifier(this._repository) : super(false);
@@ -266,14 +279,15 @@ class ClaimNotifier extends StateNotifier<bool> {
   void reset() => state = false;
 }
 final myItemsProvider = FutureProvider<List<Item>>((ref) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return const [];
   }
   return ref.watch(repositoryProvider).fetchMyItems();
 });
 
-
 final nearbyFoundProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return const [];
   }
@@ -323,7 +337,10 @@ class SwipeDeckState {
 /// Charge le deck et applique les décisions de façon optimiste.
 class SwipeDeckNotifier extends AsyncNotifier<SwipeDeckState> {
   @override
-  Future<SwipeDeckState> build() => _load();
+  Future<SwipeDeckState> build() {
+    ref.watch(sessionUserIdProvider);
+    return _load();
+  }
 
   Future<SwipeDeckState> _load() async {
     final repository = ref.read(repositoryProvider);
@@ -412,6 +429,7 @@ final rewardsProvider = FutureProvider<List<Reward>>((ref) async {
 });
 
 final myCouponsProvider = FutureProvider<List<UserCoupon>>((ref) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return ref.watch(mockRepositoryProvider).fetchMyCoupons();
   }
@@ -419,6 +437,7 @@ final myCouponsProvider = FutureProvider<List<UserCoupon>>((ref) async {
 });
 
 final rewardWalletProvider = FutureProvider<RewardWallet>((ref) async {
+  ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return ref.watch(mockRepositoryProvider).fetchRewardWallet();
   }

@@ -32,7 +32,8 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
   bool _markingUsed = false;
 
   void _showEmailDialog() {
-    final emailCtrl = TextEditingController(text: 'jomaafares9@gmail.com');
+    final userEmail = ref.read(sessionProvider)?.email ?? '';
+    final emailCtrl = TextEditingController(text: userEmail);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -77,7 +78,7 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
             ),
             const SizedBox(height: 8),
             const Text(
-              '💡 Astuce : En mode test local, l\'e-mail avec son PDF joint est immédiatement consultable dans votre navigateur sur http://127.0.0.1:8000/mail-preview',
+              '💡 Astuce : l\'e-mail contient le bon officiel en PDF. En développement, consultez-le dans Mailpit sur http://127.0.0.1:8025',
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
           ],

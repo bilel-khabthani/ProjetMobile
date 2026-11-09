@@ -7,6 +7,20 @@ import 'models/reward.dart';
 import 'models/swipe_candidate.dart';
 import 'models/trust.dart';
 
+/// Resultat d'une demande de reinitialisation : indique si un e-mail a
+/// vraiment ete envoye et, en local, ou il a ete livre.
+class ForgotPasswordResult {
+  const ForgotPasswordResult({
+    required this.mailSent,
+    this.demoOtp,
+    this.deliveredTo,
+  });
+
+  final bool mailSent;
+  final String? demoOtp;
+  final String? deliveredTo;
+}
+
 /// Repository branche sur l'API Laravel.
 class ApiRepository {
   ApiRepository({ApiClient? client})
@@ -104,14 +118,19 @@ class ApiRepository {
     return _toUser(await _client.get('/me') as Map<String, dynamic>);
   }
 
-  /// Mot de passe oublie : retourne le code (demo) ou null si inconnu.
-  Future<String?> forgotPassword({required String email}) async {
+  /// Mot de passe oublie : indique si l'e-mail a ete envoye et, en local,
+  /// l'adresse de livraison ainsi que le code de demonstration.
+  Future<ForgotPasswordResult> forgotPassword({required String email}) async {
     final json = await _client.post('/auth/forgot-password', {
       'email': email,
     }) as Map<String, dynamic>;
     final otp = json['demo_otp'] as String?;
     lastDemoOtp = otp;
-    return otp;
+    return ForgotPasswordResult(
+      mailSent: json['mail_sent'] as bool? ?? true,
+      demoOtp: otp,
+      deliveredTo: json['delivered_to'] as String?,
+    );
   }
 
   Future<void> resetPassword({
@@ -138,6 +157,7 @@ class ApiRepository {
       if (error.statusCode != 401) rethrow;
     } finally {
       _client.token = null;
+      currentUserId = null;
     }
   }
 

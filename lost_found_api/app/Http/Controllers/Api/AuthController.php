@@ -259,20 +259,47 @@ class AuthController extends Controller
         $normalizedEmail = strtolower($data['email']);
         Cache::put("pwd:{$normalizedEmail}", $code, now()->addMinutes(15));
 
+        $mailSent = false;
+        $mailError = null;
+        $deliveredTo = null;
+
         if ($user !== null) {
+            $deliveredTo = $this->deliveryAddress($user->email);
+
             try {
-                Mail::to($user->email)->send(new ResetPasswordOtpMail($code, $user));
+                Mail::to($deliveredTo)->send(new ResetPasswordOtpMail($code, $user));
+                $mailSent = true;
             } catch (\Throwable $e) {
-                Log::error('Erreur lors de l\'envoi de l\'e-mail OTP : '.$e->getMessage());
+                $mailError = $e->getMessage();
+                Log::error('Erreur lors de l\'envoi de l\'e-mail OTP : '.$mailError);
             }
+        }
+
+        // Never answer "e-mail sent" when the transport rejected the message:
+        // the user would wait for a code that can never arrive.
+        if ($user !== null && ! $mailSent) {
+            $failure = [
+                'message' => "Impossible d'envoyer l'e-mail de réinitialisation. Vérifiez la configuration e-mail du serveur puis réessayez.",
+                'mail_sent' => false,
+            ];
+
+            if (app()->environment(['local', 'testing'])) {
+                $failure['demo_otp'] = $code;
+                $failure['error'] = $mailError;
+                $failure['delivered_to'] = $deliveredTo;
+            }
+
+            return response()->json($failure, 502);
         }
 
         $response = [
             'message' => 'Si un compte est associé à cette adresse e-mail, un code de réinitialisation vous a été envoyé par e-mail.',
+            'mail_sent' => $user !== null,
         ];
 
         if (app()->environment(['local', 'testing'])) {
             $response['demo_otp'] = $code;
+            $response['delivered_to'] = $deliveredTo;
         }
 
         return response()->json($response);
@@ -347,6 +374,22 @@ class AuthController extends Controller
     }
 
     /**
+     * En local, redirige les e-mails d'authentification vers une vraie boite
+     * (MAIL_DEMO_REDIRECT) : les comptes de demonstration utilisent des
+     * adresses @campus.fr qui ne peuvent pas recevoir de courrier.
+     */
+    private function deliveryAddress(string $fallback): string
+    {
+        $redirect = config('mail.demo_redirect');
+
+        if (is_string($redirect) && $redirect !== '' && app()->environment(['local', 'testing'])) {
+            return $redirect;
+        }
+
+        return $fallback;
+    }
+
+    /**
      * Genere un code a six chiffres, le stocke en cache cinq minutes,
      * et l'envoie par e-mail a l'utilisateur.
      */
@@ -355,7 +398,7 @@ class AuthController extends Controller
         $code = $this->storeOtp($phone);
         if ($user !== null) {
             try {
-                Mail::to($user->email)->send(new PhoneVerificationOtpMail($code, $user));
+                Mail::to($this->deliveryAddress($user->email))->send(new PhoneVerificationOtpMail($code, $user));
             } catch (\Throwable $e) {
                 Log::error('Erreur envoi OTP téléphone : '.$e->getMessage());
             }

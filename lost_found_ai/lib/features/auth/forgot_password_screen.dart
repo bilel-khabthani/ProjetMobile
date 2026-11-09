@@ -88,23 +88,38 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     });
 
     try {
-      await ref
+      final result = await ref
           .read(sessionProvider.notifier)
           .forgotPassword(email: email);
       if (!mounted) return;
 
+      if (!result.mailSent) {
+        setState(() {
+          _codeSent = false;
+          _error =
+              'Aucun compte n\'est associé à cette adresse e-mail. Utilisez l\'adresse d\'un compte existant.';
+        });
+        return;
+      }
+
+      final deliveredTo = result.deliveredTo;
+      final where = deliveredTo != null && deliveredTo != email
+          ? ' (boîte de test : $deliveredTo)'
+          : '';
+
       _startCooldown();
       setState(() {
         _codeSent = true;
-        _info = 'Un code de vérification OTP a été envoyé par e-mail à $email.';
+        _info =
+            'Un code de vérification OTP a été envoyé par e-mail à $email$where.';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isResend
-                ? 'Nouveau code OTP envoyé par e-mail.'
-                : 'Code OTP envoyé à votre adresse e-mail.',
+                ? 'Nouveau code OTP envoyé par e-mail$where.'
+                : 'Code OTP envoyé à votre adresse e-mail$where.',
           ),
           backgroundColor: AppColors.success,
         ),

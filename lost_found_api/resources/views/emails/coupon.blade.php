@@ -64,11 +64,11 @@
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
                 <strong style="color: #0369a1; font-size: 15px;">📧 Service E-mail & Bon PDF Actif</strong><br>
-                <span style="color: #0284c7; font-size: 13px;">Compte : <strong>jomaafares9@gmail.com</strong> (SMTP Gmail connecté)</span>
+                <span style="color: #0284c7; font-size: 13px;">Expéditeur SMTP : <strong>{{ config('mail.from.address') }}</strong></span>
             </div>
             <div style="display: flex; gap: 8px;">
                 <a href="/send-test-email" style="background: #16a34a; color: white; padding: 9px 14px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block;">
-                    ✉️ Envoyer à mon Gmail
+                    ✉️ Envoyer un e-mail de test
                 </a>
                 <a href="/coupons/{{ $coupon->code }}/pdf" target="_blank" style="background: #0284c7; color: white; padding: 9px 14px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; display: inline-block;">
                     📄 Télécharger PDF
