@@ -70,7 +70,9 @@ class _DetailBody extends ConsumerWidget {
     final dateLabel =
         '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    final accent = item.type == ItemType.lost ? AppColors.lost : AppColors.found;
+    final accent = item.type == ItemType.lost
+        ? AppColors.lost
+        : AppColors.found;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
@@ -85,7 +87,11 @@ class _DetailBody extends ConsumerWidget {
                     color: item.type == ItemType.lost
                         ? AppColors.lostSoft
                         : AppColors.foundSoft,
-                    child: Icon(Icons.inventory_2_outlined, size: 48, color: accent),
+                    child: Icon(
+                      Icons.inventory_2_outlined,
+                      size: 48,
+                      color: accent,
+                    ),
                   )
                 : Image.network(
                     item.imageUrl!,
@@ -130,6 +136,52 @@ class _DetailBody extends ConsumerWidget {
         ),
         if (item.isMine && (item.secretDetail?.isNotEmpty ?? false))
           _InfoRow(label: 'Détail secret', value: item.secretDetail!),
+        if (item.isMine &&
+            item.type == ItemType.lost &&
+            (item.secretDetail?.trim().isEmpty ?? true)) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.accentSoft,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.shield_outlined,
+                  color: AppColors.accent,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Détail secret manquant',
+                        style: AppText.bodyStrong.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Ajoutez un détail secret en modifiant cette annonce pour pouvoir vérifier une correspondance et débloquer le chat.',
+                        style: AppText.caption.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (item.hasCoordinates) ...[
           const SizedBox(height: 12),
           ClipRRect(
@@ -146,7 +198,8 @@ class _DetailBody extends ConsumerWidget {
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'fr.campus.lost_found_ai',
                   ),
                   MarkerLayer(
@@ -211,15 +264,15 @@ class _DetailBody extends ConsumerWidget {
       ref.invalidate(nearbyFoundProvider);
       ref.invalidate(matchesProvider);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Annonce supprimée.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Annonce supprimée.')));
       context.pop();
     } on ApiException catch (error) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.userMessage)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.userMessage)));
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
