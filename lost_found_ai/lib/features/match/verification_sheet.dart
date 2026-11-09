@@ -56,6 +56,11 @@ class _VerificationSheetState extends ConsumerState<VerificationSheet> {
       _loading = false;
       _wrong = !ok;
     });
+    if (ok) {
+      // Le statut du match passe a VERIFIED cote serveur : on rafraichit la
+      // fiche pour deverrouiller immediatement le chat.
+      ref.invalidate(matchProvider(widget.match.id));
+    }
   }
 
   @override

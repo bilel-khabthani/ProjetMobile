@@ -26,11 +26,21 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
   late final TextEditingController _searchController;
   Timer? _debounce;
   ObjectFilter _filter = const ObjectFilter();
+  bool _didInitFilterFromRoute = false;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didInitFilterFromRoute) return;
+    _didInitFilterFromRoute = true;
+    // GoRouterState relies on an InheritedWidget, so it cannot be read from
+    // initState(). didChangeDependencies is the first safe hook.
     final typeParam = GoRouterState.of(context).uri.queryParameters['type'];
     if (typeParam != null) {
       _filter = _filter.copyWith(type: itemTypeFromApiValue(typeParam));
@@ -127,9 +137,9 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
               loading: () => ListView.separated(
                 padding: const EdgeInsets.all(AppSpacing.xl),
                 itemCount: 4,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (_, __) => const SkeletonBox(
+                itemBuilder: (_, _) => const SkeletonBox(
                   width: double.infinity,
                   height: 92,
                   borderRadius: AppRadius.md,
@@ -163,7 +173,7 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
                       AppSpacing.xxxl,
                     ),
                     itemCount: objects.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) {
                       final object = objects[index];
@@ -400,7 +410,7 @@ class _ObjectTile extends StatelessWidget {
                     ? Image.network(
                         object.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorBuilder: (_, _, _) =>
                             ItemArtwork(category: object.category),
                       )
                     : ItemArtwork(category: object.category),

@@ -97,7 +97,7 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -155,7 +155,7 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
                           decoration: BoxDecoration(
                             color: AppColors.accentSoft,
                             borderRadius: BorderRadius.circular(AppRadius.pill),
-                            border: Border.all(color: AppColors.accent.withOpacity(0.4)),
+                            border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
                           ),
                           child: const Text(
                             '🏛️ CAMPUS UNIVERSITAIRE — LOST&FOUND AI',
@@ -186,14 +186,14 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.primary.withOpacity(0.08),
-                          AppColors.accent.withOpacity(0.05),
+                          AppColors.primary.withValues(alpha: 0.08),
+                          AppColors.accent.withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       children: [
@@ -321,9 +321,9 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.08),
+                      color: AppColors.success.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [

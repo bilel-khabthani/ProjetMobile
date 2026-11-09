@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
+import '../../core/router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -568,8 +569,9 @@ class _VerifyBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final verified =
-        ref.watch(verificationProvider)?.success == true &&
-        ref.watch(verificationProvider)?.matchId == match.id;
+        (ref.watch(verificationProvider)?.success == true &&
+            ref.watch(verificationProvider)?.matchId == match.id) ||
+        match.chatUnlocked;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(
@@ -587,13 +589,8 @@ class _VerifyBar extends ConsumerWidget {
               label: 'Contacter ${match.finderName.split(' ').first}',
               icon: Icons.chat_bubble_rounded,
               variant: AppButtonVariant.success,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('La messagerie sécurisée arrive bientôt.'),
-                  ),
-                );
-              },
+              onPressed: () =>
+                  context.push(AppRoutes.chatDetail(match.id)),
             )
           : AppButton(
               label: AppStrings.answerQuestion,

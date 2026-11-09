@@ -210,7 +210,7 @@ class _Hero extends StatelessWidget {
           ? Image.network(
               object.imageUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   ItemArtwork(category: object.category),
             )
           : ItemArtwork(category: object.category),
@@ -293,7 +293,7 @@ class _InfoTile extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );

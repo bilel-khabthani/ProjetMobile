@@ -38,8 +38,10 @@ class LocationService {
       if (!isEnabled) return null;
 
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
 
       // Try to get address from coordinates with timeout

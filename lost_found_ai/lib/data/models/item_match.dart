@@ -36,10 +36,12 @@ class ItemMatch {
     required this.scores,
     required this.verificationQuestion,
     required this.minutesAgo,
+    this.status = 'PENDING',
     this.verification = MatchVerification.pending,
   });
 
   final String id;
+  final String status;
   final String myItemTitle;
   final String myItemPlace;
   final String myItemTimeLabel;
@@ -59,6 +61,10 @@ class ItemMatch {
   final String verificationQuestion;
   final int minutesAgo;
   final MatchVerification verification;
+
+  /// Le chat n'est disponible qu'apres verification de la correspondance.
+  bool get chatUnlocked =>
+      status == 'VERIFIED' || status == 'CONTACTED' || status == 'RECOVERED';
 }
 
 class AppUser {

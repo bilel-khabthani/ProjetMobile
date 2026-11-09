@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Services\MatchingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,8 @@ class ItemController extends Controller
 
     public function index(Request $request)
     {
+        $this->normalizeFilters($request);
+
         $filters = $request->validate([
             'type' => ['nullable', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND])],
             'category' => ['nullable', Rule::in(self::CATEGORIES)],
@@ -37,7 +40,7 @@ class ItemController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $query = Item::query()->with('user:id,name,trust_score');
+        $query = Item::query()->with('user:id,name,trust_score,recovered_count');
 
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -90,7 +93,7 @@ class ItemController extends Controller
     public function mine(Request $request)
     {
         $items = Item::query()
-            ->with('user:id,name,trust_score')
+            ->with('user:id,name,trust_score,recovered_count')
             ->where('user_id', $request->user()->id)
             ->latest()
             ->get();
@@ -100,7 +103,7 @@ class ItemController extends Controller
         );
     }
 
-    public function store(Request $request)
+    public function store(Request $request, MatchingService $matching)
     {
         $data = $this->validatedItem($request);
         $imagePath = $this->storeImage($request);
@@ -112,6 +115,10 @@ class ItemController extends Controller
             'image_path' => $imagePath,
         ]);
 
+        // Le moteur tourne des la publication : l'utilisateur recoit
+        // immediatement ses correspondances (deck de cartes, notifications).
+        $this->refreshMatches($item, $matching);
+
         return response()->json($this->payload($item, $request), 201);
     }
 
@@ -120,11 +127,11 @@ class ItemController extends Controller
         return response()->json($this->payload($item, $request));
     }
 
-    public function update(Request $request, Item $item)
+    public function update(Request $request, Item $item, MatchingService $matching)
     {
         $this->authorizeOwner($request, $item, 'Vous ne pouvez modifier que vos propres annonces.');
 
-        $data = $this->validatedItem($request);
+        $data = $this->validatedItem($request, $item);
 
         if ($request->filled('status')) {
             $data['status'] = $request->validate([
@@ -146,6 +153,10 @@ class ItemController extends Controller
         }
 
         $item->update($data);
+
+        // Un changement de titre, categorie, lieu ou date peut creer ou
+        // invalider des correspondances : on recalcule le moteur.
+        $this->refreshMatches($item, $matching);
 
         return response()->json($this->payload($item->refresh(), $request));
     }
@@ -223,20 +234,72 @@ class ItemController extends Controller
     }
 
     /**
+     * Recalcule les correspondances sans jamais faire echouer la requete
+     * principale : une erreur du moteur est journalisee mais l'annonce reste
+     * enregistree.
+     */
+    private function refreshMatches(Item $item, MatchingService $matching): void
+    {
+        try {
+            $matching->findMatches($item);
+        } catch (\Throwable $error) {
+            Log::warning('Matching impossible pour l\'objet '.$item->id.' : '.$error->getMessage());
+        }
+    }
+
+    /**
+     * Accepte les anciens noms de parametres (search/start_date/limit) pour
+     * rester compatible avec les clients deja deployes.
+     */
+    private function normalizeFilters(Request $request): void
+    {
+        if ($request->filled('type')) {
+            $request->merge(['type' => strtoupper((string) $request->input('type'))]);
+        }
+
+        if ($request->filled('status')) {
+            $request->merge(['status' => strtoupper((string) $request->input('status'))]);
+        }
+
+        if (! $request->filled('q') && $request->filled('search')) {
+            $request->merge(['q' => $request->input('search')]);
+        }
+
+        if (! $request->filled('occurred_from') && $request->filled('start_date')) {
+            $request->merge(['occurred_from' => $request->input('start_date')]);
+        }
+
+        if (! $request->filled('occurred_to') && $request->filled('end_date')) {
+            $request->merge(['occurred_to' => $request->input('end_date')]);
+        }
+
+        if (! $request->filled('per_page') && $request->filled('limit')) {
+            $request->merge(['per_page' => $request->input('limit')]);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function validatedItem(Request $request): array
+    private function validatedItem(Request $request, ?Item $existing = null): array
     {
+        if ($request->filled('type')) {
+            $request->merge(['type' => strtoupper((string) $request->input('type'))]);
+        }
+
+        $required = $existing === null ? 'required' : 'sometimes';
+
         $data = $request->validate([
-            'type' => ['required', Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND])],
-            'category' => ['required', Rule::in(self::CATEGORIES)],
-            'title' => ['required', 'string', 'min:3', 'max:120'],
-            'description' => ['required', 'string', 'min:10', 'max:5000'],
+            'type' => [$required, Rule::in([Item::TYPE_LOST, Item::TYPE_FOUND])],
+            'category' => [$required, Rule::in(self::CATEGORIES)],
+            'title' => [$required, 'string', 'min:3', 'max:120'],
+            'description' => [$required, 'string', 'min:10', 'max:5000'],
             'secret_detail' => ['nullable', 'string', 'max:500'],
+            'contact_phone' => ['nullable', 'string', 'max:30'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
             'place_label' => ['nullable', 'string', 'min:2', 'max:160'],
-            'occurred_at' => ['required', 'date'],
+            'occurred_at' => [$required, 'date'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'remove_image' => ['sometimes', 'boolean'],
             'clear_location' => ['sometimes', 'boolean'],
@@ -244,8 +307,20 @@ class ItemController extends Controller
 
         unset($data['image'], $data['remove_image'], $data['clear_location']);
 
-        $hasPlace = isset($data['place_label']) && trim((string) $data['place_label']) !== '';
-        $hasPoint = isset($data['latitude'], $data['longitude']);
+        $place = array_key_exists('place_label', $data)
+            ? $data['place_label']
+            : $existing?->place_label;
+
+        $latitude = array_key_exists('latitude', $data)
+            ? $data['latitude']
+            : $existing?->latitude;
+
+        $longitude = array_key_exists('longitude', $data)
+            ? $data['longitude']
+            : $existing?->longitude;
+
+        $hasPlace = $place !== null && trim((string) $place) !== '';
+        $hasPoint = $latitude !== null && $longitude !== null;
         $clearsPoint = $request->boolean('clear_location') && ! $request->filled('latitude');
 
         if (! $hasPlace && (! $hasPoint || $clearsPoint)) {
@@ -283,7 +358,7 @@ class ItemController extends Controller
      */
     private function payload(Item $item, Request $request): array
     {
-        $item->loadMissing('user:id,name,trust_score');
+        $item->loadMissing('user:id,name,trust_score,recovered_count');
         $mine = $request->user() !== null && $request->user()->id === $item->user_id;
         $data = $item->toArray();
 

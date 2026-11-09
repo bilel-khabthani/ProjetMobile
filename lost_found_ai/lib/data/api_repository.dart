@@ -1,5 +1,6 @@
 import '../core/app_config.dart';
 import 'api_client.dart';
+import 'models/chat_message.dart';
 import 'models/item.dart';
 import 'models/item_match.dart';
 import 'models/reward.dart';
@@ -205,6 +206,37 @@ class ApiRepository {
       {'answer': decision},
     ) as Map<String, dynamic>;
     return json['status'] != 'PENDING';
+  }
+
+  /// Chat securise : messages echanges sur une correspondance verifiee.
+  Future<List<ChatMessage>> fetchMessages(String matchId) async {
+    final list = await _client.get('/matches/$matchId/messages') as List<dynamic>;
+    return list
+        .map((raw) => ChatMessage.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ChatMessage> sendMessage(String matchId, String body) async {
+    final json = await _client.post(
+      '/matches/$matchId/messages',
+      {'body': body},
+    ) as Map<String, dynamic>;
+    return ChatMessage.fromJson(json);
+  }
+
+  Future<void> markMessagesRead(String matchId) async {
+    await _client.post('/matches/$matchId/messages/read', {});
+  }
+
+  Future<void> reportMessage(
+    String matchId,
+    String messageId,
+    String reason,
+  ) async {
+    await _client.post(
+      '/matches/$matchId/messages/$messageId/report',
+      {'reason': reason},
+    );
   }
 
   Future<void> publishItem({
@@ -428,6 +460,7 @@ class ApiRepository {
     final foundUser = found?['user'] as Map<String, dynamic>?;
     return ItemMatch(
       id: json['id'] as String? ?? '',
+      status: json['status'] as String? ?? 'PENDING',
       myItemTitle: lost?['title'] as String? ?? '',
       myItemPlace: lost?['place_label'] as String? ?? '',
       myItemTimeLabel: _timeLabel(lost?['occurred_at'] as String?),

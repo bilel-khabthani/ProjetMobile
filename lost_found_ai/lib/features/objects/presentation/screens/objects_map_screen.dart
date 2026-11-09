@@ -199,6 +199,8 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
       _categoryFilter = result.category;
       _radiusKm = result.useRadius ? result.radiusKm : null;
       _selected = null;
+      // Recenter the camera on the filtered results.
+      _didInitialFit = false;
     });
   }
 
@@ -210,6 +212,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
       _query = '';
       _searchController.clear();
       _selected = null;
+      _didInitialFit = false;
     });
   }
 
@@ -266,7 +269,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                 options: MapOptions(
                   initialCenter: center,
                   initialZoom: 12.5,
-                  minZoom: 3,
+                  minZoom: 2,
                   maxZoom: 19,
                   onMapReady: () {
                     _mapReady = true;
@@ -276,7 +279,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                       );
                     }
                   },
-                  onTap: (_, __) => setState(() => _selected = null),
+                  onTap: (_, _) => setState(() => _selected = null),
                   onPositionChanged: (camera, _) {
                     if ((camera.zoom - _zoom).abs() >= 0.75) {
                       setState(() => _zoom = camera.zoom);
@@ -355,7 +358,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
               ),
               Positioned(
                 right: 12,
-                bottom: selected != null ? 178 : 24,
+                bottom: selected != null ? 178 : 92,
                 child: Column(
                   children: [
                     _MapControlButton(
@@ -870,7 +873,7 @@ class _SelectedCard extends StatelessWidget {
                       ? Image.network(
                           object.imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
+                          errorBuilder: (_, _, _) =>
                               ItemArtwork(category: object.category),
                         )
                       : ItemArtwork(category: object.category),

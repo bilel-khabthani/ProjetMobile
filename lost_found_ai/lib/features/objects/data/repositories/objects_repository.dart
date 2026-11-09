@@ -43,8 +43,8 @@ class ObjectsRepository {
     if (type != null) params['type'] = type.apiValue;
     if (category != null) params['category'] = category.apiValue;
     if (status != null) params['status'] = status.apiValue;
-    params['limit'] = limit.toString();
-    params['offset'] = offset.toString();
+    params['per_page'] = limit.toString();
+    params['page'] = offset < limit ? '1' : ((offset ~/ limit) + 1).toString();
 
     final uri = Uri(path: '/objects', queryParameters: params);
 
@@ -137,10 +137,12 @@ class ObjectsRepository {
           'description': description,
           'place_label': placeLabel,
           'occurred_at': occurredAt.toUtc().toIso8601String(),
-          if (latitude != null) 'latitude': latitude,
-          if (longitude != null) 'longitude': longitude,
-          if (contactPhone != null && contactPhone.isNotEmpty) 'contact_phone': contactPhone,
-          if (secretDetail != null && secretDetail.isNotEmpty) 'secret_detail': secretDetail,
+          'latitude': ?latitude,
+          'longitude': ?longitude,
+          if (contactPhone != null && contactPhone.isNotEmpty)
+            'contact_phone': contactPhone,
+          if (secretDetail != null && secretDetail.isNotEmpty)
+            'secret_detail': secretDetail,
         };
 
         final json = await _client.post('/items', payload) as Map<String, dynamic>;
@@ -153,6 +155,7 @@ class ObjectsRepository {
 
   Future<LostFoundObject> updateObject(
     String id, {
+    ItemType? type,
     ItemCategory? category,
     String? title,
     String? description,
@@ -162,6 +165,8 @@ class ObjectsRepository {
     double? longitude,
     String? contactPhone,
     String? secretDetail,
+    bool removeImage = false,
+    bool clearLocation = false,
     http.MultipartFile? image,
   }) async {
     try {
@@ -173,6 +178,7 @@ class ObjectsRepository {
         request.headers['Accept'] = 'application/json';
         request.fields['_method'] = 'PUT';
 
+        if (type != null) request.fields['type'] = type.apiValue;
         if (category != null) request.fields['category'] = category.apiValue;
         if (title != null) request.fields['title'] = title;
         if (description != null) request.fields['description'] = description;
@@ -182,6 +188,8 @@ class ObjectsRepository {
         if (longitude != null) request.fields['longitude'] = longitude.toString();
         if (contactPhone != null) request.fields['contact_phone'] = contactPhone;
         if (secretDetail != null) request.fields['secret_detail'] = secretDetail;
+        if (removeImage) request.fields['remove_image'] = '1';
+        if (clearLocation) request.fields['clear_location'] = '1';
 
         request.files.add(image);
 
@@ -198,6 +206,7 @@ class ObjectsRepository {
         }
       } else {
         final payload = <String, dynamic>{};
+        if (type != null) payload['type'] = type.apiValue;
         if (category != null) payload['category'] = category.apiValue;
         if (title != null) payload['title'] = title;
         if (description != null) payload['description'] = description;
@@ -207,6 +216,8 @@ class ObjectsRepository {
         if (longitude != null) payload['longitude'] = longitude;
         if (contactPhone != null) payload['contact_phone'] = contactPhone;
         if (secretDetail != null) payload['secret_detail'] = secretDetail;
+        if (removeImage) payload['remove_image'] = true;
+        if (clearLocation) payload['clear_location'] = true;
 
         final json = await _client.put('/items/$id', payload) as Map<String, dynamic>;
         return LostFoundObject.fromJson(json);

@@ -339,7 +339,7 @@ class _ObjectCard extends StatelessWidget {
                       child: Image.network(
                         object.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorBuilder: (_, _, _) =>
                             ItemArtwork(category: object.category, compact: true),
                       ),
                     )

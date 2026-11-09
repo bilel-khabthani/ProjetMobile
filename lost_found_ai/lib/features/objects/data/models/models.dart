@@ -1,4 +1,4 @@
-/// Barrel du module objets : modeles partages + modeles specifiques.
+// Barrel du module objets : modeles partages + modeles specifiques.
 export '../../../../data/models/item.dart';
 export 'location_model.dart';
 export 'object_filter.dart';

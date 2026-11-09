@@ -76,17 +76,15 @@ class ObjectFilter {
     if (type != null) params['type'] = type!.apiValue;
     if (category != null) params['category'] = category!.apiValue;
     if (status != null) params['status'] = status!.apiValue;
-    if (searchQuery.isNotEmpty) params['search'] = searchQuery;
-    if (startDate != null) params['start_date'] = startDate!.toIso8601String();
-    if (endDate != null) params['end_date'] = endDate!.toIso8601String();
+    if (searchQuery.isNotEmpty) params['q'] = searchQuery;
+    if (startDate != null) params['occurred_from'] = startDate!.toIso8601String();
+    if (endDate != null) params['occurred_to'] = endDate!.toIso8601String();
     if (latitude != null && longitude != null) {
-      params['latitude'] = latitude;
-      params['longitude'] = longitude;
-      params['radius_km'] = radiusKm;
+      params['with_location'] = 1;
     }
 
-    params['limit'] = limit;
-    params['offset'] = offset;
+    params['per_page'] = limit;
+    params['page'] = offset < limit ? 1 : (offset ~/ limit) + 1;
 
     return params;
   }

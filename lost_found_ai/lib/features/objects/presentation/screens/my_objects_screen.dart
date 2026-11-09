@@ -273,7 +273,7 @@ class _MyObjectTile extends StatelessWidget {
                     ? Image.network(
                         object.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
+                        errorBuilder: (_, _, _) =>
                             ItemArtwork(category: object.category),
                       )
                     : ItemArtwork(category: object.category),

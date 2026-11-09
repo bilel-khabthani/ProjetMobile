@@ -81,11 +81,14 @@ class AuthTest extends TestCase
             ->assertJsonStructure(['token', 'user', 'phone_verification_required'])
             ->assertJsonPath('user.email', 'charlie.google@gmail.com')
             ->assertJsonPath('user.google_id', 'google_sub_123456789')
-            ->assertJsonPath('phone_verification_required', true);
+            // Un compte Google est deja verifie par Google : aucun OTP
+            // supplementaire ne doit bloquer l'acces aux services.
+            ->assertJsonPath('phone_verification_required', false);
 
         $this->assertDatabaseHas('users', [
             'email' => 'charlie.google@gmail.com',
             'google_id' => 'google_sub_123456789',
+            'phone_verified' => true,
         ]);
     }
 
@@ -182,4 +185,3 @@ class AuthTest extends TestCase
             ->assertJsonPath('message', 'Code de vérification incorrect ou expiré.');
     }
 }
-

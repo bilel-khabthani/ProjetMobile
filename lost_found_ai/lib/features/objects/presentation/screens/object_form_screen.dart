@@ -54,6 +54,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   Uint8List? _imageBytes;
   String? _imageName;
   String? _existingImageUrl;
+  bool _removeImage = false;
 
   bool get _isEditing => widget.objectId != null;
 
@@ -110,9 +111,39 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
           (_latitude != null && _longitude != null));
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded,
+                    color: AppColors.primary),
+                title: const Text('Prendre une photo'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded,
+                    color: AppColors.primary),
+                title: const Text('Choisir dans la galerie'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(
+      source: source,
       maxWidth: 1600,
       imageQuality: 82,
     );
@@ -122,6 +153,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
     setState(() {
       _imageBytes = bytes;
       _imageName = picked.name;
+      _removeImage = false;
     });
   }
 
@@ -218,6 +250,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
       if (_isEditing) {
         final updated = await notifier.updateObject(
           widget.objectId!,
+          type: _type,
           category: _category,
           title: _titleController.text.trim(),
           description: _descriptionController.text.trim(),
@@ -227,6 +260,8 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
           longitude: _gpsEnabled ? _longitude : null,
           contactPhone: _phoneController.text.trim(),
           secretDetail: _secretController.text.trim(),
+          removeImage: _removeImage,
+          clearLocation: !_gpsEnabled,
           image: image,
         );
         if (!mounted) return;
@@ -412,7 +447,8 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   }
 
   Widget _buildImagePicker() {
-    final hasImage = _imageBytes != null || _existingImageUrl != null;
+    final hasImage = _imageBytes != null ||
+        (_existingImageUrl != null && !_removeImage);
     return PressableScale(
       onTap: _pickImage,
       child: Container(
@@ -433,7 +469,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                     Image.network(
                       _existingImageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Center(
+                      errorBuilder: (_, _, _) => Center(
                         child: ItemArtwork(category: _category),
                       ),
                     ),
@@ -460,6 +496,32 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                             style: AppText.tiny.copyWith(color: Colors.white),
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 10,
+                    top: 10,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _imageBytes = null;
+                          _imageName = null;
+                          _existingImageUrl = null;
+                          _removeImage = true;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),

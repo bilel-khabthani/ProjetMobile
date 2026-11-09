@@ -17,10 +17,14 @@ class MatchController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = $request->user()->id;
+
         $matches = ItemMatch::query()
             ->with('lostItem.user', 'foundItem.user')
-            ->whereHas('lostItem', fn ($q) => $q->where('user_id', $request->user()->id))
-            ->orWhereHas('foundItem', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->where(function ($query) use ($userId) {
+                $query->whereHas('lostItem', fn ($item) => $item->where('user_id', $userId))
+                    ->orWhereHas('foundItem', fn ($item) => $item->where('user_id', $userId));
+            })
             ->latest()
             ->get();
 
@@ -29,8 +33,10 @@ class MatchController extends Controller
         );
     }
 
-    public function show(ItemMatch $match)
+    public function show(Request $request, ItemMatch $match)
     {
+        $this->authorizeParticipant($request, $match);
+
         return response()->json($this->toMatchJson($match->load('lostItem.user', 'foundItem.user')));
     }
 
@@ -86,6 +92,7 @@ class MatchController extends Controller
             'longitude' => $item->longitude,
             'occurred_at' => $item->occurred_at?->toIso8601String(),
             'status' => $item->status,
+            'image_url' => $item->image_path ? '/storage/'.$item->image_path : null,
             'user' => $item->user ? [
                 'id' => $item->user->id,
                 'name' => $item->user->name,
@@ -97,10 +104,12 @@ class MatchController extends Controller
 
     /**
      * Module 2 - Verification : reponse Oui / Incertain / Non (exigence EF-06).
-     * L'apercu est non engageant, le score n'est pas modifie par la reponse.
+     * Seul le proprietaire de l'objet perdu peut repondre "c'est a moi".
      */
     public function answer(Request $request, ItemMatch $match)
     {
+        $this->authorizeOwner($request, $match);
+
         $data = $request->validate([
             'answer' => ['required', Rule::in(['YES', 'UNSURE', 'NO'])],
         ]);
@@ -126,6 +135,8 @@ class MatchController extends Controller
      */
     public function confirmRestitution(Request $request, ItemMatch $match, TrustService $trust)
     {
+        $this->authorizeParticipant($request, $match);
+
         $role = $request->validate([
             'role' => ['required', Rule::in(['owner', 'finder'])],
         ])['role'];
@@ -160,9 +171,11 @@ class MatchController extends Controller
         return response()->json($this->toMatchJson($match->fresh('lostItem.user', 'foundItem.user')));
     }
 
-    /** Chat securise : ouvert seulement apres verification du proprietaire. */
+    /** Chat securise : reserve aux deux participants d'un match verifie. */
     public function messages(Request $request, ItemMatch $match, TrustService $trust)
     {
+        $this->authorizeParticipant($request, $match);
+
         if (! $trust->canOpenChat($request->user(), $match)) {
             return response()->json([
                 'message' => 'Le chat s\'ouvre apres verification du proprietaire et un score de confiance suffisant.',
@@ -179,6 +192,8 @@ class MatchController extends Controller
 
     public function sendMessage(Request $request, ItemMatch $match, TrustService $trust)
     {
+        $this->authorizeParticipant($request, $match);
+
         if (! $trust->canOpenChat($request->user(), $match)) {
             return response()->json(['message' => 'Chat verrouille.'], 403);
         }
@@ -188,9 +203,71 @@ class MatchController extends Controller
         $message = Message::create([
             'match_id' => $match->id,
             'sender_id' => $request->user()->id,
-            'body' => $data['body'],
+            'body' => trim($data['body']),
         ]);
 
         return response()->json($message->load('sender:id,name'), 201);
+    }
+
+    /** Accuse de lecture des messages recus. */
+    public function markMessagesRead(Request $request, ItemMatch $match)
+    {
+        $this->authorizeParticipant($request, $match);
+
+        $updated = Message::query()
+            ->where('match_id', $match->id)
+            ->where('sender_id', '!=', $request->user()->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return response()->json(['updated' => $updated]);
+    }
+
+    /** Signalement d'un message abusif dans le chat securise. */
+    public function reportMessage(Request $request, ItemMatch $match, Message $message)
+    {
+        $this->authorizeParticipant($request, $match);
+
+        abort_unless($message->match_id === $match->id, 404);
+        abort_if($message->sender_id === $request->user()->id, 422, 'Vous ne pouvez pas signaler votre propre message.');
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:40'],
+            'details' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $message->update([
+            'reported_at' => now(),
+            'report_reason' => $data['reason'],
+        ]);
+
+        return response()->json($message->fresh()->load('sender:id,name'));
+    }
+
+    private function authorizeParticipant(Request $request, ItemMatch $match): void
+    {
+        $match->loadMissing(['lostItem', 'foundItem']);
+        $userId = $request->user()->id;
+
+        $isOwner = $match->lostItem?->user_id === $userId;
+        $isFinder = $match->foundItem?->user_id === $userId;
+
+        abort_unless(
+            $isOwner || $isFinder,
+            403,
+            'Cette correspondance ne concerne pas votre compte.'
+        );
+    }
+
+    /** Seul le proprietaire de l'objet perdu peut valider la correspondance. */
+    private function authorizeOwner(Request $request, ItemMatch $match): void
+    {
+        $match->loadMissing('lostItem');
+
+        abort_unless(
+            $match->lostItem?->user_id === $request->user()->id,
+            403,
+            'Seul le proprietaire de l\'objet perdu peut repondre a cette verification.'
+        );
     }
 }

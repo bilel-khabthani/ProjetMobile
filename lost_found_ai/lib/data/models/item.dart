@@ -1,8 +1,10 @@
+import '../../core/app_config.dart';
+
 enum ItemType { lost, found }
 
 extension ItemTypeX on ItemType {
-  /// API wire value used by ObjectsRepository (uppercase).
-  String get apiValue => this == ItemType.lost ? 'lost' : 'found';
+  /// API wire value (uppercase, as expected by the Laravel validation rules).
+  String get apiValue => this == ItemType.lost ? 'LOST' : 'FOUND';
 
   /// Short display label for badges.
   String get shortLabel => this == ItemType.lost ? 'PERDU' : 'TROUVÉ';
@@ -176,13 +178,8 @@ double? _asDouble(dynamic value) {
 String? resolveItemImageUrl(String? raw) {
   if (raw == null || raw.isEmpty) return null;
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  final origin = Uri.parse(
-    const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:8000/api',
-    ),
-  ).origin;
-  return raw.startsWith('/') ? '$origin$raw' : '$origin/$raw';
+  final base = AppConfig.serverBaseUrl;
+  return raw.startsWith('/') ? '$base$raw' : '$base/$raw';
 }
 
 /// Filtres du catalogue perdu / trouvé et de la carte.

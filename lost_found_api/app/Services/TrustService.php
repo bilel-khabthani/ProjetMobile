@@ -48,13 +48,24 @@ class TrustService
     }
 
     /**
-     * Chat autorise seulement si le proprietaire a verifie le match et si
-     * son score de confiance est suffisant (CDC 6.4.3).
+     * Chat autorise seulement pour les deux participants d'une correspondance
+     * verifiee, et si le score de confiance est suffisant (CDC 6.4.3).
+     * Un utilisateur exterieur ne peut jamais lire ni ecrire dans le chat.
      */
     public function canOpenChat(User $user, ItemMatch $match): bool
     {
-        return $match->status !== ItemMatch::STATUS_PENDING
-            && $user->trust_score >= self::MIN_SCORE_TO_CHAT;
+        $match->loadMissing(['lostItem', 'foundItem']);
+
+        $isParticipant = $match->lostItem?->user_id === $user->id
+            || $match->foundItem?->user_id === $user->id;
+
+        return $isParticipant
+            && $user->trust_score >= self::MIN_SCORE_TO_CHAT
+            && in_array($match->status, [
+                ItemMatch::STATUS_VERIFIED,
+                ItemMatch::STATUS_CONTACTED,
+                ItemMatch::STATUS_RECOVERED,
+            ], true);
     }
 
     /**
@@ -107,7 +118,8 @@ class TrustService
 
                 try {
                     Mail::to($finder->email)->send(new CouponVoucherMail($coupon));
-                } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {
+                }
             }
 
             $match->update(['status' => ItemMatch::STATUS_RECOVERED]);

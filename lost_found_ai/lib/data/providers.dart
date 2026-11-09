@@ -5,6 +5,7 @@ import 'api_client.dart';
 import 'api_repository.dart';
 import 'demo_swipe_deck.dart';
 import 'mock_repository.dart';
+import 'models/chat_message.dart';
 import 'models/item_match.dart';
 import 'models/reward.dart';
 import 'models/swipe_candidate.dart';
@@ -174,6 +175,18 @@ final matchProvider = FutureProvider.family<ItemMatch, String>((ref, id) async {
   }
   return ref.watch(repositoryProvider).fetchMatch(id);
 });
+
+/// Chat securise : messages echanges sur une correspondance verifiee.
+/// Le backend refuse l'acces tant que les deux participants ne sont pas
+/// autorises (match verifie + score de confiance suffisant).
+final chatMessagesProvider =
+    FutureProvider.autoDispose.family<List<ChatMessage>, String>((
+      ref,
+      matchId,
+    ) async {
+      if (AppConfig.useMockData) return const [];
+      return ref.watch(repositoryProvider).fetchMessages(matchId);
+    });
 
 /// Module 4 : score de confiance de l'utilisateur connecte.
 final trustProvider = FutureProvider<TrustSummary>((ref) async {

@@ -175,6 +175,7 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
 
   Future<LostFoundObject?> updateObject(
     String id, {
+    ItemType? type,
     ItemCategory? category,
     String? title,
     String? description,
@@ -184,6 +185,8 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
     double? longitude,
     String? contactPhone,
     String? secretDetail,
+    bool removeImage = false,
+    bool clearLocation = false,
     http.MultipartFile? image,
   }) async {
     try {
@@ -191,6 +194,7 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
 
       final object = await _repository.updateObject(
         id,
+        type: type,
         category: category,
         title: title,
         description: description,
@@ -200,6 +204,8 @@ class ObjectFormNotifier extends StateNotifier<ObjectFormState> {
         longitude: longitude,
         contactPhone: contactPhone,
         secretDetail: secretDetail,
+        removeImage: removeImage,
+        clearLocation: clearLocation,
         image: image,
       );
 
