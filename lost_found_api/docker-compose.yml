@@ -25,11 +25,11 @@ services:
       # donc ici egalement pour qu'un `docker compose up` recreant le conteneur
       # garde la bonne configuration. Pour un vrai SMTP, remplacer ces valeurs
       # (MAIL_HOST, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_ENCRYPTION).
-      MAIL_MAILER: smtp
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
-      MAIL_USERNAME: ""
-      MAIL_PASSWORD: ""
+      MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      MAIL_HOST: ${MAIL_HOST:-mailpit}
+      MAIL_PORT: ${MAIL_PORT:-1025}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
     # --no-reload : sans ce drapeau, `artisan serve` ne transmet au sous-processus
     # `php -S` qu'une liste blanche de variables (APP_ENV, PATH, ...). Les
     # variables DB_* definies ci-dessus seraient ignorees et Laravel lirait le
