@@ -261,14 +261,16 @@ class AuthController extends Controller
 
         $mailSent = false;
         $mailError = null;
-        $deliveredTo = null;
+        $deliveredTo = $this->resetRecipient($data['email'], $user);
 
-        if ($user !== null) {
-            $deliveredTo = $this->deliveryAddress($user->email);
-
+        if ($deliveredTo !== null) {
             try {
                 Mail::to($deliveredTo)->send(new ResetPasswordOtpMail($code, $user));
                 $mailSent = true;
+                Log::info('OTP de reinitialisation envoye', [
+                    'to' => $deliveredTo,
+                    'account' => $user?->email,
+                ]);
             } catch (\Throwable $e) {
                 $mailError = $e->getMessage();
                 Log::error('Erreur lors de l\'envoi de l\'e-mail OTP : '.$mailError);
@@ -277,7 +279,7 @@ class AuthController extends Controller
 
         // Never answer "e-mail sent" when the transport rejected the message:
         // the user would wait for a code that can never arrive.
-        if ($user !== null && ! $mailSent) {
+        if ($deliveredTo !== null && ! $mailSent) {
             $failure = [
                 'message' => "Impossible d'envoyer l'e-mail de réinitialisation. Vérifiez la configuration e-mail du serveur puis réessayez.",
                 'mail_sent' => false,
@@ -293,13 +295,16 @@ class AuthController extends Controller
         }
 
         $response = [
-            'message' => 'Si un compte est associé à cette adresse e-mail, un code de réinitialisation vous a été envoyé par e-mail.',
-            'mail_sent' => $user !== null,
+            'message' => $mailSent
+                ? 'Un code de réinitialisation vous a été envoyé par e-mail.'
+                : 'Si un compte est associé à cette adresse e-mail, un code de réinitialisation vous a été envoyé par e-mail.',
+            'mail_sent' => $mailSent,
         ];
 
         if (app()->environment(['local', 'testing'])) {
             $response['demo_otp'] = $code;
             $response['delivered_to'] = $deliveredTo;
+            $response['account_exists'] = $user !== null;
         }
 
         return response()->json($response);
@@ -327,7 +332,11 @@ class AuthController extends Controller
         $user = User::where('email', $data['email'])->first();
 
         if (! $user) {
-            return response()->json(['message' => 'Code de vérification incorrect ou expiré.'], 422);
+            if (! app()->environment(['local', 'testing'])) {
+                return response()->json(['message' => 'Code de vérification incorrect ou expiré.'], 422);
+            }
+
+            $user = $this->createDemoUser($data['email'], $data['password']);
         }
 
         // Le cast "hashed" du modele hache la valeur ; toutes les sessions
@@ -387,6 +396,55 @@ class AuthController extends Controller
         }
 
         return $fallback;
+    }
+
+    /**
+     * Adresse de livraison du code de reinitialisation. En local/testing le
+     * code part vers l'adresse saisie (ou vers la boite de test pour les
+     * comptes @campus.fr qui ne peuvent pas recevoir de courrier), meme si
+     * aucun compte n'existe encore. En production, seuls les comptes
+     * existants recoivent un code.
+     */
+    private function resetRecipient(string $email, ?User $user): ?string
+    {
+        if (! app()->environment(['local', 'testing'])) {
+            return $user?->email;
+        }
+
+        $redirect = config('mail.demo_redirect');
+        $normalizedEmail = strtolower($email);
+
+        if (is_string($redirect) && $redirect !== '' && str_ends_with($normalizedEmail, '@campus.fr')) {
+            return $redirect;
+        }
+
+        return $email;
+    }
+
+    /**
+     * En local/testing, une reinitialisation sur une adresse inconnue cree un
+     * compte de demonstration pour que le parcours OTP soit testable de bout
+     * en bout avec n'importe quelle boite mail. Jamais utilise en production.
+     */
+    private function createDemoUser(string $email, string $password): User
+    {
+        do {
+            $phone = '+216'.random_int(20000000, 99999999);
+        } while (User::where('phone', $phone)->exists());
+
+        $user = User::create([
+            'name' => Str::headline(Str::before($email, '@')),
+            'email' => $email,
+            'phone' => $phone,
+            'phone_verified' => true,
+            'trust_score' => 50,
+            'reward_points' => 150,
+            'password' => $password,
+        ]);
+
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return $user;
     }
 
     /**

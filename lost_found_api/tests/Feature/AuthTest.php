@@ -138,6 +138,61 @@ class AuthTest extends TestCase
         $this->assertTrue(Cache::has('pwd:eve@example.com'));
     }
 
+    public function test_forgot_password_in_local_sends_otp_to_unknown_address(): void
+    {
+        Mail::fake();
+
+        $response = $this->postJson('/api/auth/forgot-password', [
+            'email' => 'newcomer@example.com',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('mail_sent', true)
+            ->assertJsonPath('delivered_to', 'newcomer@example.com')
+            ->assertJsonPath('account_exists', false)
+            ->assertJsonStructure(['demo_otp']);
+
+        Mail::assertSent(ResetPasswordOtpMail::class, function ($mail) {
+            return $mail->hasTo('newcomer@example.com');
+        });
+    }
+
+    public function test_forgot_password_redirects_campus_accounts_to_demo_inbox(): void
+    {
+        config(['mail.demo_redirect' => 'demo@example.com']);
+        Mail::fake();
+
+        $this->postJson('/api/auth/forgot-password', [
+            'email' => 'student@campus.fr',
+        ])->assertOk()
+            ->assertJsonPath('delivered_to', 'demo@example.com');
+
+        Mail::assertSent(ResetPasswordOtpMail::class, function ($mail) {
+            return $mail->hasTo('demo@example.com');
+        });
+    }
+
+    public function test_reset_password_on_unknown_address_creates_demo_account_in_local(): void
+    {
+        $otp = '654321';
+        Cache::put('pwd:newcomer@example.com', $otp, now()->addMinutes(15));
+
+        $response = $this->postJson('/api/auth/reset-password', [
+            'email' => 'newcomer@example.com',
+            'code' => $otp,
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ]);
+
+        $response->assertOk();
+
+        $user = User::where('email', 'newcomer@example.com')->first();
+
+        $this->assertNotNull($user);
+        $this->assertTrue($user->phone_verified);
+        $this->assertTrue(Hash::check('newpassword123', $user->password));
+    }
+
     public function test_user_can_reset_password_with_valid_otp(): void
     {
         $user = User::factory()->create([
@@ -182,4 +237,3 @@ class AuthTest extends TestCase
             ->assertJsonPath('message', 'Code de vérification incorrect ou expiré.');
     }
 }
-
