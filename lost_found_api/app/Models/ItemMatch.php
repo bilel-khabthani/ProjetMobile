@@ -73,11 +73,15 @@ class ItemMatch extends Model
     /** Dernier message visible, pour l'apercu de la liste des conversations. */
     public function latestMessage(): HasOne
     {
+        // On evite ofMany() : il ajoute systematiquement MAX(cle primaire)
+        // (cf. CanBeOneOfMany::ofMany) et PostgreSQL ne sait pas calculer
+        // max() sur une colonne uuid. Le tri suffit : hasOne garde le premier
+        // message de chaque correspondance, ordonne du plus recent au plus
+        // ancien.
         return $this->hasOne(Message::class, 'match_id')
-            ->ofMany(
-                ['created_at' => 'max', 'id' => 'max'],
-                fn ($query) => $query->where('status', '!=', Message::STATUS_BLOCKED),
-            );
+            ->where('status', '!=', Message::STATUS_BLOCKED)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     /** Module Tinder Cards : historique des glissements sur cette correspondance. */

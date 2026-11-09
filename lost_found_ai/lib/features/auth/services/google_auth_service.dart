@@ -12,27 +12,28 @@ import '../../../data/providers.dart';
 /// Service gérant la connexion avec Google.
 ///
 /// Deux chemins, pour n'exiger qu'**une seule** étape de choix de compte :
-///  * le flux natif `google_sign_in`, uniquement lorsque le build est
-///    enregistré dans Google Cloud Console (voir [googleServerClientId]) ;
-///  * le sélecteur de comptes intégré, chemin par défaut (émulateur, démo), qui
-///    ne nécessite aucune configuration.
+///  * le flux natif `google_sign_in`, chemin par défaut : il ouvre la fenêtre
+///    de connexion Google officielle (voir [googleServerClientId]) ;
+///  * le sélecteur de comptes intégré, repli lorsqu'aucun ID client n'est
+///    fourni (émulateur, démo).
 class GoogleAuthHelper {
-  /// ID client Web OAuth Google, passé comme `serverClientId` Android.
+  /// ID client Web OAuth Google, passe comme `serverClientId` Android.
   ///
-  /// Le flux natif ne peut réussir que si le build est enregistré dans Google
+  /// Le flux natif ne peut reussir que si le build est enregistre dans Google
   /// Cloud Console : un client OAuth Android pour `fr.campus.lost_found_ai`
-  /// associé à l'empreinte SHA-1 du certificat de signature. Sans cet
-  /// enregistrement, `GoogleSignIn.signIn()` ouvre quand même le sélecteur de
-  /// comptes natif puis échoue avec DEVELOPER_ERROR (10) : l'utilisateur aurait
-  /// alors deux fenêtres de choix de compte à la suite.
+  /// associe a l'empreinte SHA-1 du certificat de signature. Sans cet
+  /// enregistrement, `GoogleSignIn.signIn()` ouvre quand meme le selecteur de
+  /// comptes natif puis echoue avec DEVELOPER_ERROR (10).
   ///
-  /// On n'ouvre donc le flux natif que lorsque l'ID est fourni :
+  /// L'ID par defaut est le client Web de l'application : on obtient ainsi la
+  /// fenetre de connexion Google officielle. Pour un autre build :
   ///
   /// ```
   /// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>
   /// ```
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '1084749713721-p4rtkavjbfl6efbpj2s643vdtjb0tkhh.apps.googleusercontent.com',
   );
 
   /// Le flux natif n'est tenté que pour un build enregistré (voir
@@ -189,32 +190,10 @@ class GoogleAuthHelper {
                 const SizedBox(height: 20),
                 ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF1D4ED8),
-                    child: Text('F', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  title: const Text('Fares Jomaa', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('fares.jomaa@esprit.tn'),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _loginWithAccount(
-                      context,
-                      ref,
-                      email: 'fares.jomaa@esprit.tn',
-                      name: 'Fares Jomaa',
-                      googleId: 'google-fares-esprit',
-                      onLoadingStart: onLoadingStart,
-                      onLoadingEnd: onLoadingEnd,
-                    );
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const CircleAvatar(
                     backgroundColor: Color(0xFF047857),
                     child: Text('F', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
-                  title: const Text('Fares Jomaa (Gmail)', style: TextStyle(fontWeight: FontWeight.w600)),
+                  title: const Text('Fares Jomaa', style: TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: const Text('jomaafares9@gmail.com'),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                   onTap: () {
@@ -252,7 +231,7 @@ class GoogleAuthHelper {
     );
   }
 
-  /// Boîte de dialogue pour saisir n'importe quelle adresse e-mail Google.
+  /// Boîte de dialogue pour saisir une adresse Google certifiée (@gmail.com).
   static void _showCustomEmailDialog(
     BuildContext context,
     WidgetRef ref, {
@@ -263,53 +242,83 @@ class GoogleAuthHelper {
     showDialog(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Connexion Google', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Entrez l\'adresse e-mail Google que vous souhaitez utiliser :'),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.emailAddress,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'exemple@gmail.com',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
+        String? error;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final email = controller.text.trim();
-                if (email.isNotEmpty && email.contains('@')) {
-                  Navigator.pop(dialogContext);
-                  final name = email.split('@').first.replaceAll('.', ' ');
-                  _loginWithAccount(
-                    context,
-                    ref,
-                    email: email,
-                    name: name[0].toUpperCase() + name.substring(1),
-                    googleId: 'google-user-${email.hashCode.abs()}',
-                    onLoadingStart: onLoadingStart,
-                    onLoadingEnd: onLoadingEnd,
-                  );
-                }
-              },
-              child: const Text('Se connecter'),
-            ),
-          ],
+              title: const Text(
+                'Connexion Google',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Entrez l\'adresse Google (@gmail.com) à utiliser :',
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.emailAddress,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'prenom.nom@gmail.com',
+                      errorText: error,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Seules les adresses @gmail.com sont acceptées.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final email = controller.text.trim().toLowerCase();
+                    if (!email.endsWith('@gmail.com')) {
+                      setDialogState(
+                        () => error = 'Adresse @gmail.com requise.',
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext);
+                    final localPart = email.split('@').first.replaceAll('.', ' ');
+                    final name = localPart.isEmpty
+                        ? 'Utilisateur Google'
+                        : localPart[0].toUpperCase() + localPart.substring(1);
+                    _loginWithAccount(
+                      context,
+                      ref,
+                      email: email,
+                      name: name,
+                      googleId: 'google-user-${email.hashCode.abs()}',
+                      onLoadingStart: onLoadingStart,
+                      onLoadingEnd: onLoadingEnd,
+                    );
+                  },
+                  child: const Text('Se connecter'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

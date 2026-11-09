@@ -100,7 +100,7 @@ class ItemController extends Controller
         );
     }
 
-    public function store(Request $request)
+    public function store(Request $request, MatchingService $matching)
     {
         $data = $this->validatedItem($request);
         $imagePath = $this->storeImage($request);
@@ -112,6 +112,11 @@ class ItemController extends Controller
             'image_path' => $imagePath,
         ]);
 
+        // Chaque annonce declaree genere immediatement ses cartes : le moteur
+        // tourne des la declaration, pas seulement a l'ouverture du deck, pour
+        // que les correspondances existent deja pour les chercheurs.
+        $matching->findMatches($item);
+
         return response()->json($this->payload($item, $request), 201);
     }
 
@@ -120,7 +125,7 @@ class ItemController extends Controller
         return response()->json($this->payload($item, $request));
     }
 
-    public function update(Request $request, Item $item)
+    public function update(Request $request, Item $item, MatchingService $matching)
     {
         $this->authorizeOwner($request, $item, 'Vous ne pouvez modifier que vos propres annonces.');
 
@@ -146,6 +151,12 @@ class ItemController extends Controller
         }
 
         $item->update($data);
+
+        // Une annonce active remet ses correspondances a jour (description,
+        // lieu, photo...). Une annonce fermee ne propose plus de cartes.
+        if ($item->status === 'ACTIVE') {
+            $matching->findMatches($item);
+        }
 
         return response()->json($this->payload($item->refresh(), $request));
     }
