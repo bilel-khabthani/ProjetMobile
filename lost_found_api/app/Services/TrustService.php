@@ -28,6 +28,7 @@ class TrustService
         'ABSENCE_RDV' => -5,
         'RECLAMATION_FONDEE' => -10,
         'RECLAMATION_ABUSIVE' => -5,
+        'MESSAGE_INAPPROPRIE' => -5,
         'BON_REPORT' => 2,
     ];
 
@@ -48,13 +49,47 @@ class TrustService
     }
 
     /**
-     * Chat autorise seulement si le proprietaire a verifie le match et si
-     * son score de confiance est suffisant (CDC 6.4.3).
+     * Chat autorise seulement si l'utilisateur est partie au match, que le
+     * proprietaire a verifie la correspondance et que son score est suffisant.
+     * Le controle de participation est indispensable : sans lui, tout compte
+     * verifie pourrait lire n'importe quelle conversation (IDOR).
      */
     public function canOpenChat(User $user, ItemMatch $match): bool
     {
-        return $match->status !== ItemMatch::STATUS_PENDING
-            && $user->trust_score >= self::MIN_SCORE_TO_CHAT;
+        return $this->chatLockReason($user, $match) === null;
+    }
+
+    /**
+     * Explique pourquoi le chat est verrouille. Retourne null quand il est
+     * accessible, sinon un message affichable dans l'application.
+     */
+    public function chatLockReason(User $user, ItemMatch $match): ?string
+    {
+        $isParticipant = $match->lostItem?->user_id === $user->id
+            || $match->foundItem?->user_id === $user->id;
+
+        if (! $isParticipant) {
+            return 'Vous ne participez pas à cette correspondance.';
+        }
+
+        if (! $user->phone_verified) {
+            return 'Vérifiez votre numéro de téléphone pour discuter.';
+        }
+
+        if (! in_array($match->status, [
+            ItemMatch::STATUS_VERIFIED,
+            ItemMatch::STATUS_CONTACTED,
+            ItemMatch::STATUS_RECOVERED,
+        ], true)) {
+            return 'La correspondance doit d\'abord être vérifiée par le propriétaire.';
+        }
+
+        if ($user->trust_score < self::MIN_SCORE_TO_CHAT) {
+            return 'Votre score de confiance doit atteindre '
+                .self::MIN_SCORE_TO_CHAT.' points pour discuter.';
+        }
+
+        return null;
     }
 
     /**
@@ -107,7 +142,8 @@ class TrustService
 
                 try {
                     Mail::to($finder->email)->send(new CouponVoucherMail($coupon));
-                } catch (\Throwable $e) {}
+                } catch (\Throwable $e) {
+                }
             }
 
             $match->update(['status' => ItemMatch::STATUS_RECOVERED]);

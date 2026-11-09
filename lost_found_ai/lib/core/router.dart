@@ -9,6 +9,7 @@ import '../features/auth/sign_in_screen.dart';
 import '../features/auth/sign_up_screen.dart';
 import '../features/auth/verify_phone_screen.dart';
 import '../features/auth/welcome_screen.dart';
+import '../features/chat/chat_screen.dart';
 import '../features/claim/claim_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/match/match_detail_screen.dart';
@@ -47,6 +48,7 @@ abstract final class AppRoutes {
 
   // ── Matching & Chat ───────────────────────────────────────────────────────
   static const String match = '/match/:id';
+  static const String chat = '/chat/:id';
   static const String claim = '/claim';
   static const String claimWithId = '/claim/:id';
 
@@ -69,6 +71,7 @@ abstract final class AppRoutes {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   static String matchDetail(String id) => '/match/$id';
+  static String chatDetail(String id) => '/chat/$id';
   static String claimDetail([String? id]) =>
       id == null ? '/claim' : '/claim/$id';
   static String objectDetail(String id) => '/objects/$id';
@@ -182,6 +185,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? 'match-sac';
           return MatchDetailScreen(matchId: id);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.chat,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ChatScreen(matchId: id);
         },
       ),
       GoRoute(

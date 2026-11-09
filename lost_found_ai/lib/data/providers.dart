@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_config.dart';
 import 'api_client.dart';
 import 'api_repository.dart';
+import 'chat_socket.dart';
 import 'demo_swipe_deck.dart';
 import 'mock_repository.dart';
+import 'models/chat_message.dart';
 import 'models/item_match.dart';
 import 'models/reward.dart';
 import 'models/swipe_candidate.dart';
@@ -433,5 +437,318 @@ final itemProvider = FutureProvider.autoDispose.family<Item, String>((
 ) async {
   return ref.watch(repositoryProvider).fetchItem(id);
 });
+
+class ChatState {
+  const ChatState({
+    this.messages = const [],
+    this.loading = true,
+    this.sending = false,
+    this.connected = false,
+    this.loadingOlder = false,
+    this.hasMore = false,
+    this.error,
+  });
+
+  final List<ChatMessage> messages;
+  final bool loading;
+  final bool sending;
+  final bool connected;
+  final bool loadingOlder;
+  final bool hasMore;
+  final String? error;
+
+  ChatState copyWith({
+    List<ChatMessage>? messages,
+    bool? loading,
+    bool? sending,
+    bool? connected,
+    bool? loadingOlder,
+    bool? hasMore,
+    String? error,
+    bool clearError = false,
+  }) {
+    return ChatState(
+      messages: messages ?? this.messages,
+      loading: loading ?? this.loading,
+      sending: sending ?? this.sending,
+      connected: connected ?? this.connected,
+      loadingOlder: loadingOlder ?? this.loadingOlder,
+      hasMore: hasMore ?? this.hasMore,
+      error: clearError ? null : (error ?? this.error),
+    );
+  }
+}
+
+/// Etat de la messagerie d'une correspondance : chargement, envoi et
+/// abonnement temps reel via Reverb.
+class ChatNotifier extends StateNotifier<ChatState> {
+  ChatNotifier(this._repository, this.matchId) : super(const ChatState()) {
+    _socket = ChatSocket(
+      matchId: matchId,
+      token: _repository.token,
+      currentUserId: _repository.currentUserId,
+      onMessage: _onSocketMessage,
+      onMessagesRead: _onMessagesRead,
+      onStateChanged: (connected) {
+        if (mounted) {
+          state = state.copyWith(connected: connected);
+        }
+      },
+    );
+    unawaited(load());
+  }
+
+  static const int _pageSize = 50;
+  static const Duration _pollInterval = Duration(seconds: 10);
+
+  final ApiRepository _repository;
+  final String matchId;
+  late final ChatSocket _socket;
+
+  Timer? _pollTimer;
+  bool _polling = false;
+  int _pollTicks = 0;
+
+  Future<void> load() async {
+    state = state.copyWith(loading: true, clearError: true);
+
+    try {
+      final messages = await _repository.fetchMessages(
+        matchId,
+        limit: _pageSize,
+      );
+      if (!mounted) return;
+
+      state = state.copyWith(
+        messages: messages,
+        loading: false,
+        hasMore: messages.length >= _pageSize,
+      );
+
+      _markReadSilently();
+      unawaited(_socket.connect());
+      _ensurePolling();
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      state = state.copyWith(loading: false, error: error.message);
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(
+        loading: false,
+        error: 'Messagerie indisponible. Verifiez votre connexion.',
+      );
+    }
+  }
+
+  /// Charge la page precedente. Retourne une erreur affichable si besoin.
+  Future<String?> loadOlder() async {
+    if (state.loadingOlder || !state.hasMore || state.messages.isEmpty) {
+      return null;
+    }
+
+    state = state.copyWith(loadingOlder: true, clearError: true);
+
+    try {
+      final older = await _repository.fetchMessages(
+        matchId,
+        before: state.messages.first.createdAt,
+        limit: _pageSize,
+      );
+      if (!mounted) return null;
+
+      state = state.copyWith(
+        messages: _mergeMessages(older, state.messages),
+        loadingOlder: false,
+        hasMore: older.length >= _pageSize,
+      );
+      return null;
+    } on ApiException catch (error) {
+      if (mounted) {
+        state = state.copyWith(loadingOlder: false, error: error.message);
+      }
+      return error.message;
+    } catch (_) {
+      const message = "Impossible de charger l'historique.";
+      if (mounted) {
+        state = state.copyWith(loadingOlder: false, error: message);
+      }
+      return message;
+    }
+  }
+
+  /// Retourne un message d'erreur a afficher, ou null en cas de succes.
+  Future<String?> send(String text) async {
+    final body = text.trim();
+    if (body.isEmpty) return null;
+
+    state = state.copyWith(sending: true, clearError: true);
+
+    try {
+      final message = await _repository.sendMessage(
+        matchId: matchId,
+        body: body,
+      );
+      if (!mounted) return null;
+
+      state = state.copyWith(
+        messages: _mergeMessages(state.messages, [message]),
+        sending: false,
+      );
+      return null;
+    } on ApiException catch (error) {
+      if (mounted) {
+        state = state.copyWith(sending: false, error: error.message);
+      }
+      return error.message;
+    } catch (_) {
+      const message = "Impossible d'envoyer le message.";
+      if (mounted) {
+        state = state.copyWith(sending: false, error: message);
+      }
+      return message;
+    }
+  }
+
+  Future<String?> report(String messageId, {String? reason}) async {
+    try {
+      await _repository.reportMessage(
+        matchId: matchId,
+        messageId: messageId,
+        reason: reason,
+      );
+      return null;
+    } on ApiException catch (error) {
+      return error.message;
+    } catch (_) {
+      return 'Signalement impossible pour le moment.';
+    }
+  }
+
+  void _onSocketMessage(ChatMessage message) {
+    if (!mounted) return;
+
+    if (state.messages.any((item) => item.id == message.id)) return;
+
+    state = state.copyWith(messages: _mergeMessages(state.messages, [message]));
+
+    if (!message.isMine) {
+      _markReadSilently();
+    }
+  }
+
+  void _onMessagesRead(Set<String> messageIds, DateTime readAt) {
+    if (!mounted) return;
+
+    final messages = state.messages
+        .map(
+          (message) => message.isMine && messageIds.contains(message.id)
+              ? message.copyWith(readAt: readAt)
+              : message,
+        )
+        .toList(growable: false);
+
+    state = state.copyWith(messages: messages);
+  }
+
+  /// Filet de securite quand Reverb n'est pas disponible : on interroge l'API
+  /// toutes les 10 s pour recuperer les nouveaux messages et les accuses de
+  /// lecture. Toutes les 40 s, on recharge la derniere page pour synchroniser
+  /// aussi les statuts de lecture.
+  void _ensurePolling() {
+    _pollTimer ??= Timer.periodic(_pollInterval, (_) => _poll());
+  }
+
+  Future<void> _poll() async {
+    if (_polling || !mounted) return;
+    _polling = true;
+
+    try {
+      _pollTicks++;
+      if (_pollTicks % 4 == 0) {
+        await _refreshLatest();
+      } else {
+        await _fetchNew();
+      }
+    } catch (_) {
+      // Le prochain tick retentera ; l'ecran garde les messages deja affiches.
+    } finally {
+      _polling = false;
+    }
+  }
+
+  Future<void> _fetchNew() async {
+    if (state.messages.isEmpty) {
+      await _refreshLatest();
+      return;
+    }
+
+    final last = state.messages.last.createdAt.subtract(
+      const Duration(seconds: 1),
+    );
+    final fresh = await _repository.fetchMessages(
+      matchId,
+      after: last,
+      limit: _pageSize,
+    );
+    if (!mounted || fresh.isEmpty) return;
+
+    state = state.copyWith(messages: _mergeMessages(state.messages, fresh));
+
+    if (fresh.any((message) => !message.isMine)) {
+      _markReadSilently();
+    }
+  }
+
+  Future<void> _refreshLatest() async {
+    final latest = await _repository.fetchMessages(matchId, limit: _pageSize);
+    if (!mounted || latest.isEmpty) return;
+
+    final latestIds = latest.map((message) => message.id).toSet();
+    final older = state.messages
+        .where((message) => !latestIds.contains(message.id))
+        .toList(growable: false);
+
+    state = state.copyWith(messages: _mergeMessages(older, latest));
+
+    if (latest.any((message) => !message.isMine && message.readAt == null)) {
+      _markReadSilently();
+    }
+  }
+
+  List<ChatMessage> _mergeMessages(
+    List<ChatMessage> base,
+    List<ChatMessage> incoming,
+  ) {
+    final byId = <String, ChatMessage>{
+      for (final message in base) message.id: message,
+      for (final message in incoming) message.id: message,
+    };
+    final merged = byId.values.toList(growable: false)
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return merged;
+  }
+
+  void _markReadSilently() {
+    unawaited(() async {
+      try {
+        await _repository.markMessagesRead(matchId);
+      } catch (_) {
+        // Sans importance : le prochain chargement remettra l'etat a jour.
+      }
+    }());
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    unawaited(_socket.dispose());
+    super.dispose();
+  }
+}
+
+final chatProvider = StateNotifierProvider.autoDispose
+    .family<ChatNotifier, ChatState, String>(
+      (ref, matchId) => ChatNotifier(ref.watch(repositoryProvider), matchId),
+    );
 
 

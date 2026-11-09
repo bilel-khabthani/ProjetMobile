@@ -37,6 +37,16 @@ class ItemMatch {
     required this.verificationQuestion,
     required this.minutesAgo,
     this.verification = MatchVerification.pending,
+    this.status = 'PENDING',
+    this.viewerRole = 'owner',
+    this.myItemType = ItemType.lost,
+    this.otherItemType = ItemType.found,
+    this.canChat = true,
+    this.chatLockedReason,
+    this.lastMessage,
+    this.lastMessageAt,
+    this.lastMessageIsMine = false,
+    this.unreadCount = 0,
   });
 
   final String id;
@@ -59,6 +69,40 @@ class ItemMatch {
   final String verificationQuestion;
   final int minutesAgo;
   final MatchVerification verification;
+
+  /// Statut serveur : PENDING, VERIFIED, CONTACTED, RECOVERED, REJECTED.
+  final String status;
+
+  /// Role de l'utilisateur connecte dans cette correspondance : owner | finder.
+  final String viewerRole;
+
+  /// Type de l'annonce de l'utilisateur connecte (perdue ou trouvee).
+  final ItemType myItemType;
+
+  /// Type de l'annonce de l'autre partie.
+  final ItemType otherItemType;
+
+  /// Le serveur autorise-t-il l'ouverture du chat pour cet utilisateur ?
+  final bool canChat;
+
+  /// Raison affichable quand [canChat] est faux.
+  final String? chatLockedReason;
+
+  /// Apercu de la derniere conversation.
+  final String? lastMessage;
+  final DateTime? lastMessageAt;
+  final bool lastMessageIsMine;
+  final int unreadCount;
+
+  bool get hasConversation => lastMessage != null;
+
+  bool get isVerified =>
+      status == 'VERIFIED' || status == 'CONTACTED' || status == 'RECOVERED';
+
+  bool get iAmFinder => viewerRole == 'finder';
+
+  /// Nom de la personne avec qui l'utilisateur connecte discute.
+  String get counterpartName => finderName;
 }
 
 class AppUser {

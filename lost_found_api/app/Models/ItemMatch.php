@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'lost_item_id', 'found_item_id', 'image_score', 'location_score',
@@ -66,7 +67,17 @@ class ItemMatch extends Model
 
     public function messages(): HasMany
     {
-        return $this->hasMany(Message::class);
+        return $this->hasMany(Message::class, 'match_id');
+    }
+
+    /** Dernier message visible, pour l'apercu de la liste des conversations. */
+    public function latestMessage(): HasOne
+    {
+        return $this->hasOne(Message::class, 'match_id')
+            ->ofMany(
+                ['created_at' => 'max', 'id' => 'max'],
+                fn ($query) => $query->where('status', '!=', Message::STATUS_BLOCKED),
+            );
     }
 
     /** Module Tinder Cards : historique des glissements sur cette correspondance. */

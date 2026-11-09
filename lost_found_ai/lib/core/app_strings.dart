@@ -108,8 +108,11 @@ abstract final class AppStrings {
       'Quatre critères sont analysés puis pondérés : ressemblance visuelle, distance géographique, écart horaire et proximité des descriptions.';
   static const String matchFoundBy = 'Trouvé par';
   static String matchFoundAt(String place) => 'Trouvé $place';
+  static String matchLostAt(String place) => 'Perdu $place';
   static const String matchYourItem = 'Votre annonce';
+  static const String matchOwnerLabel = 'Propriétaire de l\'objet';
   static const String matchOtherItem = 'Annonce trouvée';
+  static const String matchOtherLostItem = 'Annonce perdue';
   static String distanceMeters(int m) => '$m m de distance';
   static const String answerQuestion = 'Répondre à la question';
   static const String verificationTitle = 'Vérification';
@@ -127,6 +130,14 @@ abstract final class AppStrings {
   static const String continue_ = 'Continuer';
   static const String demoHint =
       'Démo : saisissez « bleue » pour valider la réponse.';
+
+  static const String chatLocked = 'Messagerie verrouillée';
+  static const String chatSafety =
+      'Vos échanges sont analysés pour votre sécurité. Ne partagez jamais vos mots de passe.';
+  static const String chatQuickHello = 'Bonjour, merci de m’avoir contacté !';
+  static const String chatQuickMeet = 'Où et quand pouvons-nous nous retrouver ?';
+  static const String chatQuickProof = 'Puis-je vous montrer une preuve ?';
+  static const String chatAttachSoon = 'L’envoi de photos arrive bientôt.';
 
   static const String notifNewMatch = 'Nouvelle correspondance';
   static const String justNow = 'à l’instant';
