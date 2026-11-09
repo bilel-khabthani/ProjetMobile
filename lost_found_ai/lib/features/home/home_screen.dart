@@ -129,7 +129,7 @@ class _Header extends StatelessWidget {
                 Text(
                   '${_greeting()}${name.isEmpty ? '' : ' $name'}',
                   style: AppText.h1,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
@@ -401,11 +401,15 @@ class _RewardsBanner extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        'Bons & Roue de la Chance',
-                        style: AppText.bodyStrong.copyWith(
-                          fontSize: 15,
-                          color: const Color(0xFF78350F),
+                      Flexible(
+                        child: Text(
+                          'Bons & Roue de la Chance',
+                          style: AppText.bodyStrong.copyWith(
+                            fontSize: 15,
+                            color: const Color(0xFF78350F),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -498,11 +502,15 @@ class _ObjectsBanner extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        'Catalogue des Objets',
-                        style: AppText.bodyStrong.copyWith(
-                          fontSize: 15,
-                          color: const Color(0xFF065F46),
+                      Flexible(
+                        child: Text(
+                          'Catalogue des Objets',
+                          style: AppText.bodyStrong.copyWith(
+                            fontSize: 15,
+                            color: const Color(0xFF065F46),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 6),

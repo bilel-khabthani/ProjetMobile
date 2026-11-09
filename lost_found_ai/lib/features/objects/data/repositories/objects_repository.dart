@@ -14,6 +14,24 @@ class ObjectsRepository {
 
   final ApiClient _client;
 
+  List<dynamic> _extractList(dynamic response) {
+    if (response is List) {
+      return response;
+    }
+    if (response is Map) {
+      if (response['data'] is List) {
+        return response['data'] as List;
+      }
+      if (response['items'] is List) {
+        return response['items'] as List;
+      }
+      if (response['objects'] is List) {
+        return response['objects'] as List;
+      }
+    }
+    return const [];
+  }
+
   Future<List<LostFoundObject>> fetchObjects({
     ItemType? type,
     ItemCategory? category,
@@ -31,8 +49,9 @@ class ObjectsRepository {
     final uri = Uri(path: '/objects', queryParameters: params);
 
     try {
-      final json = await _client.get(uri.toString()) as List<dynamic>;
-      return json.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      final res = await _client.get(uri.toString());
+      final list = _extractList(res);
+      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
     } catch (e) {
       rethrow;
     }
@@ -40,8 +59,12 @@ class ObjectsRepository {
 
   Future<LostFoundObject> fetchObject(String id) async {
     try {
-      final json = await _client.get('/items/$id') as Map<String, dynamic>;
-      return LostFoundObject.fromJson(json);
+      final json = await _client.get('/items/$id');
+      if (json is Map<String, dynamic>) {
+        final data = json['data'] is Map<String, dynamic> ? json['data'] as Map<String, dynamic> : json;
+        return LostFoundObject.fromJson(data);
+      }
+      throw ApiException(500, 'Format de réponse invalide');
     } catch (e) {
       rethrow;
     }
@@ -49,8 +72,9 @@ class ObjectsRepository {
 
   Future<List<LostFoundObject>> fetchMyObjects() async {
     try {
-      final json = await _client.get('/items/mine') as List<dynamic>;
-      return json.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      final res = await _client.get('/items/mine');
+      final list = _extractList(res);
+      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
     } catch (e) {
       rethrow;
     }
@@ -230,8 +254,9 @@ class ObjectsRepository {
       final queryString = params.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}').join('&');
       final path = '/items/nearby?$queryString';
 
-      final json = await _client.get(path) as List<dynamic>;
-      return json.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      final json = await _client.get(path);
+      final list = _extractList(json);
+      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
     } catch (e) {
       rethrow;
     }
@@ -239,8 +264,9 @@ class ObjectsRepository {
 
   Future<List<LostFoundObject>> fetchNearbyFound() async {
     try {
-      final json = await _client.get('/items/nearby-found') as List<dynamic>;
-      return json.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      final json = await _client.get('/items/nearby-found');
+      final list = _extractList(json);
+      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
     } catch (e) {
       rethrow;
     }
@@ -256,8 +282,9 @@ class ObjectsRepository {
       }
       final uri = Uri(path: '/objects', queryParameters: params);
 
-      final json = await _client.get(uri.toString()) as List<dynamic>;
-      return json.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
+      final json = await _client.get(uri.toString());
+      final list = _extractList(json);
+      return list.map((item) => LostFoundObject.fromJson(item as Map<String, dynamic>)).toList();
     } catch (e) {
       rethrow;
     }

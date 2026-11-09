@@ -287,7 +287,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                   TileLayer(
                     urlTemplate:
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.campus.lostfound',
+                    userAgentPackageName: 'fr.campus.lost_found_ai',
                     maxZoom: 19,
                   ),
                   if (_userPosition != null && _radiusKm != null)

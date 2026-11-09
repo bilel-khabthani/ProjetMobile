@@ -78,7 +78,7 @@ class LocationService {
     double longitude,
   ) async {
     try {
-      final placemarks = await geocoding
+      final placemarks = await geocoding.Geocoding()
           .placemarkFromCoordinates(latitude, longitude)
           .timeout(const Duration(seconds: 5));
 
@@ -121,7 +121,7 @@ class LocationService {
     String address,
   ) async {
     try {
-      final locations = await geocoding
+      final locations = await geocoding.Geocoding()
           .locationFromAddress(address)
           .timeout(const Duration(seconds: 5));
 

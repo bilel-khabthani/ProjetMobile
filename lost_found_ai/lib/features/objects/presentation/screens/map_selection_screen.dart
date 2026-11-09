@@ -111,7 +111,7 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                     TileLayer(
                       urlTemplate:
                           'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.campus.lostfound',
+                      userAgentPackageName: 'fr.campus.lost_found_ai',
                     ),
                     if (_picked != null)
                       MarkerLayer(
