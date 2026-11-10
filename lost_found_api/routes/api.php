@@ -101,6 +101,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/claims/{claim}/respond', [ClaimController::class, 'respond']);
         Route::post('/claims/{claim}/escalate', [ClaimController::class, 'escalate']);
         Route::post('/claims/{claim}/resolve', [ClaimController::class, 'resolve']);
+        Route::post('/trust/events/{event}/appeal', [TrustController::class, 'appeal']);
 
         // Module 4 : Gestion des Récompenses, Coupons, PDF, E-mail & Roue de la Chance
         Route::prefix('rewards')->group(function () {

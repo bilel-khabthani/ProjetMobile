@@ -64,6 +64,10 @@ class _DetailBody extends StatelessWidget {
               _ComparisonCard(match: match),
               const SizedBox(height: AppSpacing.md),
               _FinderCard(match: match),
+              if (match.isCoordination) ...[
+                const SizedBox(height: AppSpacing.md),
+                _CoordinationCard(match: match),
+              ],
               const SizedBox(height: AppSpacing.md),
               _HowItWorksCard(),
               const SizedBox(height: AppSpacing.xl),
@@ -515,6 +519,58 @@ class _FinderCard extends StatelessWidget {
   }
 }
 
+class _CoordinationCard extends StatelessWidget {
+  const _CoordinationCard({required this.match});
+
+  final ItemMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = match.coordinationMessagesRemaining ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.accentSoft,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.handshake_rounded,
+            size: 22,
+            color: AppColors.accent,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mode coordination',
+                  style: AppText.label.copyWith(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Votre score permet 5 messages maximum pour organiser la '
+                  'restitution. Il en reste $remaining. Le chat complet '
+                  's’ouvre à 40 points de confiance.',
+                  style: AppText.caption.copyWith(height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HowItWorksCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -571,9 +627,15 @@ class _VerifyBar extends ConsumerWidget {
     final Widget action;
     if (match.isVerified && match.canChat) {
       action = AppButton(
-        label: 'Contacter ${match.counterpartName.split(' ').first}',
-        icon: Icons.chat_bubble_rounded,
-        variant: AppButtonVariant.success,
+        label: match.isCoordination
+            ? 'Coordonner la restitution'
+            : 'Contacter ${match.counterpartName.split(' ').first}',
+        icon: match.isCoordination
+            ? Icons.handshake_rounded
+            : Icons.chat_bubble_rounded,
+        variant: match.isCoordination
+            ? AppButtonVariant.primary
+            : AppButtonVariant.success,
         onPressed: () {
           ref.invalidate(matchProvider(match.id));
           context.push(AppRoutes.chatDetail(match.id));

@@ -130,6 +130,84 @@ class ChatSecurityTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_low_trust_participant_can_coordinate_five_messages(): void
+    {
+        $owner = $this->verifiedUser(trustScore: 35);
+        $match = $this->match($owner, $this->verifiedUser(), ItemMatch::STATUS_VERIFIED);
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/matches/{$match->id}")
+            ->assertOk()
+            ->assertJsonPath('can_chat', true)
+            ->assertJsonPath('chat_mode', 'COORDINATION')
+            ->assertJsonPath('coordination_messages_remaining', 5);
+
+        for ($i = 1; $i <= 5; $i++) {
+            $this->actingAs($owner, 'sanctum')
+                ->postJson("/api/matches/{$match->id}/messages", [
+                    'body' => 'Message de coordination '.$i,
+                ])
+                ->assertCreated();
+        }
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/matches/{$match->id}/messages", [
+                'body' => 'Message six',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'chat_quota_exhausted')
+            ->assertJsonPath('coordination_messages_remaining', 0);
+
+        $this->assertDatabaseCount('messages', 5);
+    }
+
+    public function test_coordination_requires_at_least_thirty_points(): void
+    {
+        $owner = $this->verifiedUser(trustScore: 29);
+        $match = $this->match($owner, $this->verifiedUser(), ItemMatch::STATUS_VERIFIED);
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/matches/{$match->id}/messages")
+            ->assertForbidden();
+    }
+
+    public function test_pending_match_stays_locked_for_coordination(): void
+    {
+        $owner = $this->verifiedUser(trustScore: 35);
+        $match = $this->match($owner, $this->verifiedUser(), ItemMatch::STATUS_PENDING);
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/matches/{$match->id}/messages")
+            ->assertForbidden();
+    }
+
+    public function test_full_chat_has_no_coordination_quota(): void
+    {
+        $owner = $this->verifiedUser(trustScore: 40);
+        $match = $this->match($owner, $this->verifiedUser(), ItemMatch::STATUS_VERIFIED);
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/matches/{$match->id}")
+            ->assertOk()
+            ->assertJsonPath('can_chat', true)
+            ->assertJsonPath('chat_mode', 'FULL')
+            ->assertJsonPath('coordination_messages_remaining', null);
+    }
+
+    public function test_coordination_switches_to_full_chat_after_score_increases(): void
+    {
+        $owner = $this->verifiedUser(trustScore: 35);
+        $match = $this->match($owner, $this->verifiedUser(), ItemMatch::STATUS_VERIFIED);
+
+        $owner->update(['trust_score' => 43]);
+
+        $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/matches/{$match->id}")
+            ->assertOk()
+            ->assertJsonPath('chat_mode', 'FULL')
+            ->assertJsonPath('coordination_messages_remaining', null);
+    }
+
     private function verifiedUser(int $trustScore = 50): User
     {
         return User::factory()->create([

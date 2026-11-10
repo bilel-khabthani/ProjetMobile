@@ -84,7 +84,15 @@ class MatchController extends Controller
 
         $unreadCount = $match->unread_count ?? 0;
 
-        $chatLockReason = $viewer ? $this->trust->chatLockReason($viewer, $match) : null;
+        $chatMode = $viewer
+            ? $this->trust->chatMode($viewer, $match)
+            : TrustService::CHAT_MODE_LOCKED;
+        $chatLockReason = $viewer && $chatMode === TrustService::CHAT_MODE_LOCKED
+            ? $this->trust->chatLockReason($viewer, $match)
+            : null;
+        $coordinationRemaining = $viewer
+            ? $this->trust->coordinationMessagesRemaining($viewer, $match)
+            : null;
 
         return [
             'id' => $match->id,
@@ -98,7 +106,9 @@ class MatchController extends Controller
             'owner_confirmed_at' => $match->owner_confirmed_at?->toIso8601String(),
             'finder_confirmed_at' => $match->finder_confirmed_at?->toIso8601String(),
             'created_at' => $match->created_at?->toIso8601String(),
-            'can_chat' => $chatLockReason === null,
+            'can_chat' => $chatMode !== TrustService::CHAT_MODE_LOCKED,
+            'chat_mode' => $chatMode,
+            'coordination_messages_remaining' => $coordinationRemaining,
             'chat_locked_reason' => $chatLockReason,
             'last_message' => $lastMessage?->body,
             'last_message_at' => $lastMessage?->created_at?->toIso8601String(),
@@ -325,6 +335,21 @@ class MatchController extends Controller
     ) {
         Gate::authorize('chat', $match);
 
+        $user = $request->user();
+
+        if ($this->trust->chatMode($user, $match) === TrustService::CHAT_MODE_COORDINATION) {
+            $remaining = $this->trust->coordinationMessagesRemaining($user, $match);
+
+            if ($remaining !== null && $remaining <= 0) {
+                return response()->json([
+                    'message' => 'Vos 5 messages de coordination sont épuisés. '
+                        .'Terminez la restitution ou contestez une sanction pour retrouver le chat.',
+                    'code' => 'chat_quota_exhausted',
+                    'coordination_messages_remaining' => 0,
+                ], 422);
+            }
+        }
+
         $data = $request->validate(['body' => ['required', 'string', 'max:1000']]);
         $body = trim($data['body']);
 
@@ -332,7 +357,6 @@ class MatchController extends Controller
             return response()->json(['message' => 'Le message est vide.'], 422);
         }
 
-        $user = $request->user();
         $result = $moderation->moderate($body);
 
         if ($result->isBlocked()) {

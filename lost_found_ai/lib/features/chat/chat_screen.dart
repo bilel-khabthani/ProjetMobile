@@ -49,6 +49,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         .send(text);
 
     if (!mounted) return;
+    ref.invalidate(matchProvider(widget.matchId));
     if (error != null) {
       // Ne perds pas le texte de l'utilisateur quand la moderation ou le
       // reseau refuse l'envoi.
@@ -202,6 +203,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             _ChatHeader(match: match, connected: chat.connected),
             const _SafetyBanner(),
+            if (match?.isCoordination == true)
+              _CoordinationBanner(match: match!),
             Expanded(
               child: _ChatBody(
                 matchId: widget.matchId,
@@ -211,14 +214,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onLoadOlder: _loadOlder,
               ),
             ),
-            _Composer(
-              controller: _controller,
-              sending: chat.sending,
-              showQuickReplies: chat.messages.isEmpty,
-              onQuickReply: _quickReply,
-              onSend: _send,
-              onAttach: () => _showSnack(AppStrings.chatAttachSoon),
-            ),
+            if (match?.coordinationQuotaExhausted == true)
+              _CoordinationQuotaBar(
+                onOpenTrust: () => context.push(AppRoutes.trust),
+              )
+            else
+              _Composer(
+                controller: _controller,
+                sending: chat.sending,
+                showQuickReplies: chat.messages.isEmpty,
+                coordinationRemaining: match?.coordinationMessagesRemaining,
+                onQuickReply: _quickReply,
+                onSend: _send,
+                onAttach: () => _showSnack(AppStrings.chatAttachSoon),
+              ),
           ],
         ),
       ),
@@ -377,6 +386,87 @@ class _SafetyBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CoordinationBanner extends StatelessWidget {
+  const _CoordinationBanner({required this.match});
+
+  final ItemMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = match.coordinationMessagesRemaining ?? 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      color: AppColors.accentSoft,
+      child: Row(
+        children: [
+          const Icon(
+            Icons.handshake_rounded,
+            size: 17,
+            color: AppColors.accent,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              'Mode coordination : $remaining message${remaining > 1 ? 's' : ''} '
+              'restant${remaining > 1 ? 's' : ''} pour organiser la restitution.',
+              style: AppText.tiny.copyWith(
+                color: AppColors.textPrimary,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CoordinationQuotaBar extends StatelessWidget {
+  const _CoordinationQuotaBar({required this.onOpenTrust});
+
+  final VoidCallback onOpenTrust;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Vos 5 messages de coordination sont épuisés.',
+              style: AppText.bodyStrong,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Terminez la restitution ou contestez une sanction pour '
+              'retrouver le chat complet.',
+              style: AppText.caption,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: onOpenTrust,
+              icon: const Icon(Icons.verified_user_rounded, size: 18),
+              label: const Text('Voir ma fiabilité'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -622,17 +712,21 @@ class _Composer extends StatelessWidget {
     required this.onQuickReply,
     required this.onSend,
     required this.onAttach,
+    this.coordinationRemaining,
   });
 
   final TextEditingController controller;
   final bool sending;
   final bool showQuickReplies;
+  final int? coordinationRemaining;
   final ValueChanged<String> onQuickReply;
   final Future<void> Function() onSend;
   final VoidCallback onAttach;
 
   @override
   Widget build(BuildContext context) {
+    final remaining = coordinationRemaining;
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
@@ -644,6 +738,21 @@ class _Composer extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (remaining != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$remaining message${remaining > 1 ? 's' : ''} '
+                    'de coordination restant${remaining > 1 ? 's' : ''}.',
+                    style: AppText.tiny.copyWith(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
             if (showQuickReplies)
               SizedBox(
                 height: 46,

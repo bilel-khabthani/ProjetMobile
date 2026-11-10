@@ -19,17 +19,38 @@ class MatchScores {
 
 enum MatchVerification { pending, verified }
 
+/// Niveau d'acces a la messagerie accorde par le serveur.
+enum ChatMode {
+  full,
+  coordination,
+  locked;
+
+  static ChatMode fromCode(String? code) => switch (code?.toUpperCase()) {
+    'FULL' => ChatMode.full,
+    'COORDINATION' => ChatMode.coordination,
+    'LOCKED' => ChatMode.locked,
+    _ => ChatMode.full,
+  };
+
+  String get code => switch (this) {
+    ChatMode.full => 'FULL',
+    ChatMode.coordination => 'COORDINATION',
+    ChatMode.locked => 'LOCKED',
+  };
+}
+
 /// Decision rendue par le moteur d'accord textuel apres une reponse libre.
 enum VerificationDecision {
   yes,
   unsure,
   no;
 
-  static VerificationDecision fromCode(String? code) => switch (code?.toUpperCase()) {
-    'YES' || 'OUI' => VerificationDecision.yes,
-    'UNSURE' => VerificationDecision.unsure,
-    _ => VerificationDecision.no,
-  };
+  static VerificationDecision fromCode(String? code) =>
+      switch (code?.toUpperCase()) {
+        'YES' || 'OUI' => VerificationDecision.yes,
+        'UNSURE' => VerificationDecision.unsure,
+        _ => VerificationDecision.no,
+      };
 
   String get label => switch (this) {
     VerificationDecision.yes => 'Réponse acceptée',
@@ -111,6 +132,8 @@ class ItemMatch {
     this.myItemType = ItemType.lost,
     this.otherItemType = ItemType.found,
     this.canChat = true,
+    this.chatMode = ChatMode.full,
+    this.coordinationMessagesRemaining,
     this.chatLockedReason,
     this.lastMessage,
     this.lastMessageAt,
@@ -168,6 +191,12 @@ class ItemMatch {
   /// Le serveur autorise-t-il l'ouverture du chat pour cet utilisateur ?
   final bool canChat;
 
+  /// FULL, COORDINATION (5 messages) ou LOCKED.
+  final ChatMode chatMode;
+
+  /// Messages restants en mode coordination ; null en chat complet.
+  final int? coordinationMessagesRemaining;
+
   /// Raison affichable quand [canChat] est faux.
   final String? chatLockedReason;
 
@@ -183,6 +212,11 @@ class ItemMatch {
       status == 'VERIFIED' || status == 'CONTACTED' || status == 'RECOVERED';
 
   bool get iAmFinder => viewerRole == 'finder';
+
+  bool get isCoordination => chatMode == ChatMode.coordination;
+
+  bool get coordinationQuotaExhausted =>
+      isCoordination && (coordinationMessagesRemaining ?? 0) <= 0;
 
   /// Nom de la personne avec qui l'utilisateur connecte discute.
   String get counterpartName => finderName;

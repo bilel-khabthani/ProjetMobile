@@ -4,11 +4,15 @@ namespace App\Services;
 
 use App\Mail\CouponVoucherMail;
 use App\Models\ItemMatch;
+use App\Models\Message;
+use App\Models\ModerationEvent;
+use App\Models\TrustEvent;
 use App\Models\User;
 use App\Models\UserCoupon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 /**
  * Module 4 - Score de confiance et prevention de la fraude (CDC 6.4).
@@ -35,6 +39,16 @@ class TrustService
 
     public const MIN_SCORE_TO_CHAT = 40;
 
+    public const MIN_SCORE_TO_COORDINATE = 30;
+
+    public const COORDINATION_MESSAGE_LIMIT = 5;
+
+    public const CHAT_MODE_FULL = 'FULL';
+
+    public const CHAT_MODE_COORDINATION = 'COORDINATION';
+
+    public const CHAT_MODE_LOCKED = 'LOCKED';
+
     /**
      * Garde-fou anti auto-restitution (CDC 6.4.3, exigence STRICT).
      * Retourne un message d'erreur, ou null si la correspondance est autorisee.
@@ -50,21 +64,82 @@ class TrustService
     }
 
     /**
-     * Chat autorise seulement si l'utilisateur est partie au match, que le
-     * proprietaire a verifie la correspondance et que son score est suffisant.
-     * Le controle de participation est indispensable : sans lui, tout compte
-     * verifie pourrait lire n'importe quelle conversation (IDOR).
+     * Chat autorise si l'utilisateur est partie au match, que le proprietaire
+     * a verifie la correspondance et que son score permet au moins une
+     * coordination limitee.
      */
     public function canOpenChat(User $user, ItemMatch $match): bool
     {
-        return $this->chatLockReason($user, $match) === null;
+        return $this->chatMode($user, $match) !== self::CHAT_MODE_LOCKED;
     }
 
     /**
-     * Explique pourquoi le chat est verrouille. Retourne null quand il est
-     * accessible, sinon un message affichable dans l'application.
+     * Mode de chat effectif : complet, coordination limitee ou verrouille.
+     * La coordination permet de finaliser une restitution sans ouvrir le chat
+     * complet a un compte encore sous le seuil de confiance.
+     */
+    public function chatMode(User $user, ItemMatch $match): string
+    {
+        if ($this->chatBaseLockReason($user, $match) !== null) {
+            return self::CHAT_MODE_LOCKED;
+        }
+
+        if ($user->trust_score < self::MIN_SCORE_TO_COORDINATE) {
+            return self::CHAT_MODE_LOCKED;
+        }
+
+        return $user->trust_score >= self::MIN_SCORE_TO_CHAT
+            ? self::CHAT_MODE_FULL
+            : self::CHAT_MODE_COORDINATION;
+    }
+
+    /**
+     * Explique pourquoi le chat est verrouille. Retourne null quand une
+     * coordination ou le chat complet est accessible.
      */
     public function chatLockReason(User $user, ItemMatch $match): ?string
+    {
+        $baseReason = $this->chatBaseLockReason($user, $match);
+
+        if ($baseReason !== null) {
+            return $baseReason;
+        }
+
+        if ($user->trust_score < self::MIN_SCORE_TO_COORDINATE) {
+            return 'Votre score de confiance doit atteindre '
+                .self::MIN_SCORE_TO_COORDINATE.' points pour une coordination '
+                .'limitée, et '.self::MIN_SCORE_TO_CHAT.' points pour discuter librement.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Nombre de messages de coordination restants pour ce match.
+     * Retourne null quand le chat complet est actif.
+     */
+    public function coordinationMessagesRemaining(User $user, ItemMatch $match): ?int
+    {
+        if ($this->chatMode($user, $match) !== self::CHAT_MODE_COORDINATION) {
+            return null;
+        }
+
+        $sent = $match->messages()
+            ->where('sender_id', $user->id)
+            ->where('status', '!=', Message::STATUS_BLOCKED)
+            ->count();
+
+        $blocked = ModerationEvent::query()
+            ->where('user_id', $user->id)
+            ->where('match_id', $match->id)
+            ->where('source', ModerationEvent::SOURCE_CHAT)
+            ->where('decision', ModerationEvent::DECISION_BLOCK)
+            ->count();
+
+        return max(0, self::COORDINATION_MESSAGE_LIMIT - $sent - $blocked);
+    }
+
+    private function chatBaseLockReason(User $user, ItemMatch $match): ?string
     {
         $isParticipant = $match->lostItem?->user_id === $user->id
             || $match->foundItem?->user_id === $user->id;
@@ -83,11 +158,6 @@ class TrustService
             ItemMatch::STATUS_RECOVERED,
         ], true)) {
             return 'La correspondance doit d\'abord être vérifiée par le propriétaire.';
-        }
-
-        if ($user->trust_score < self::MIN_SCORE_TO_CHAT) {
-            return 'Votre score de confiance doit atteindre '
-                .self::MIN_SCORE_TO_CHAT.' points pour discuter.';
         }
 
         return null;
@@ -164,5 +234,47 @@ class TrustService
             $type,
             'Evenement valide par un administrateur.',
         );
+    }
+
+    /**
+     * Annule une sanction apres acceptation d'un appel. La correction est
+     * volontairement hors probation : elle restitue exactement les points
+     * retires, sinon un compte jeune ne recupererait que la moitie.
+     */
+    public function reverseSanction(
+        TrustEvent $event,
+        string $reason,
+        string $validatedBy = 'ADMIN',
+    ): TrustEvent {
+        if ($event->points >= 0) {
+            throw new InvalidArgumentException('Seule une sanction negative peut etre annulee.');
+        }
+
+        $alreadyReversed = TrustEvent::query()
+            ->where('reversal_of_id', $event->id)
+            ->exists();
+
+        if ($alreadyReversed) {
+            throw new InvalidArgumentException('Cette sanction a deja ete annulee.');
+        }
+
+        $user = $event->user;
+
+        if (! $user) {
+            throw new InvalidArgumentException('Utilisateur introuvable pour cet evenement.');
+        }
+
+        $user->trust_score = max(0, min(100, $user->trust_score - $event->points));
+        $user->save();
+
+        return TrustEvent::create([
+            'user_id' => $user->id,
+            'type' => 'SANCTION_ANNULEE',
+            'points' => -$event->points,
+            'related_match_id' => $event->related_match_id,
+            'reversal_of_id' => $event->id,
+            'validated_by' => $validatedBy,
+            'reason' => $reason,
+        ]);
     }
 }

@@ -143,51 +143,51 @@ class AuthController extends Controller
 
     /**
      * Authentification Google (Continue with Google).
-     * Accepte un jeton ID Google (verifie avec Google tokeninfo) ou les donnees
-     * de profil en local/fallback. Lie le compte existant ou en cree un nouveau.
+     * Le client envoie uniquement l'ID token fourni par le sélecteur natif
+     * Google. Le serveur le vérifie auprès de Google puis crée ou lie le compte.
      */
     public function googleLogin(Request $request)
     {
         $data = $request->validate([
-            'id_token' => ['nullable', 'string'],
-            'email' => ['required_without:id_token', 'nullable', 'email', 'max:255'],
-            'name' => ['nullable', 'string', 'max:255'],
-            'google_id' => ['nullable', 'string', 'max:255'],
-            'avatar' => ['nullable', 'string', 'max:1024'],
+            'id_token' => ['required', 'string'],
         ]);
 
-        $email = $data['email'] ?? null;
-        $name = $data['name'] ?? null;
-        $googleId = $data['google_id'] ?? null;
-        $avatar = $data['avatar'] ?? null;
+        try {
+            $response = Http::timeout(5)->get('https://oauth2.googleapis.com/tokeninfo', [
+                'id_token' => $data['id_token'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Validation Google tokeninfo impossible : '.$e->getMessage());
 
-        // Si un id_token Google est passe, validation via l'API Google
-        if (! empty($data['id_token'])) {
-            try {
-                $response = Http::timeout(5)->get('https://oauth2.googleapis.com/tokeninfo', [
-                    'id_token' => $data['id_token'],
-                ]);
-
-                if ($response->successful()) {
-                    $payload = $response->json();
-                    $email = $payload['email'] ?? $email;
-                    $name = $payload['name'] ?? $name;
-                    $googleId = $payload['sub'] ?? $googleId;
-                    $avatar = $payload['picture'] ?? $avatar;
-                } elseif (empty($email)) {
-                    return response()->json(['message' => 'Jeton Google invalide ou expiré.'], 401);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Validation Google tokeninfo impossible : '.$e->getMessage());
-                if (empty($email)) {
-                    return response()->json(['message' => 'Impossible de valider le jeton Google.'], 401);
-                }
-            }
+            return response()->json(['message' => 'Impossible de valider le jeton Google.'], 401);
         }
 
-        if (empty($email)) {
-            return response()->json(['message' => 'Adresse e-mail Google manquante.'], 422);
+        if (! $response->successful()) {
+            return response()->json(['message' => 'Jeton Google invalide ou expiré.'], 401);
         }
+
+        $payload = $response->json();
+        $expectedAudience = config('services.google.client_id');
+        $expectedAudience = is_string($expectedAudience) ? trim($expectedAudience) : null;
+        $audience = is_array($payload) ? ($payload['aud'] ?? null) : null;
+
+        $validPayload = is_array($payload)
+            && ! empty($payload['email'])
+            && ! empty($payload['sub'])
+            && filter_var($payload['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN)
+            && in_array($payload['iss'] ?? null, ['accounts.google.com', 'https://accounts.google.com'], true)
+            && is_string($expectedAudience)
+            && $expectedAudience !== ''
+            && $audience === $expectedAudience;
+
+        if (! $validPayload) {
+            return response()->json(['message' => 'Jeton Google invalide ou expiré.'], 401);
+        }
+
+        $email = $payload['email'];
+        $name = $payload['name'] ?? null;
+        $googleId = $payload['sub'];
+        $avatar = $payload['picture'] ?? null;
 
         // 1. Recherche par google_id
         $user = null;

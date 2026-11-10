@@ -25,11 +25,11 @@ class AppConfig {
   }
 
   /// ID client Web OAuth Google (utilise par GoogleSignIn sur Android pour
-  /// obtenir un idToken officiel et securise). Cette valeur provient de la
-  /// branche `auth` et correspond au client Web du projet Google Cloud.
+  /// obtenir un idToken officiel et securise). Il doit appartenir au meme
+  /// projet Google Cloud que le client OAuth Android de l'application.
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
-    defaultValue: '722615003834-5bcdi1th4fvsjpk2fgn7ol95mqn655cj.apps.googleusercontent.com',
+    defaultValue: '103241478877-9injf5juroq9an661l1fl5315g22edk8.apps.googleusercontent.com',
   );
 
   /// Client OAuth Web. GoogleSignIn exige un `clientId` sur le Web ; sur

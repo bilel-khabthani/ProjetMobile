@@ -9,7 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'reporter_id', 'respondent_id', 'related_match_id', 'related_item_id',
-    'type', 'description', 'response_text', 'status', 'responded_at', 'resolved_at',
+    'related_trust_event_id', 'type', 'description', 'response_text', 'status',
+    'responded_at', 'resolved_at',
 ])]
 class Claim extends Model
 {
@@ -33,6 +34,8 @@ class Claim extends Model
 
     public const STATUS_CLOSED = 'CLOTUREE';
 
+    public const TYPE_APPEL_SANCTION = 'APPEL_SANCTION';
+
     protected function casts(): array
     {
         return [
@@ -49,6 +52,11 @@ class Claim extends Model
     public function respondent(): BelongsTo
     {
         return $this->belongsTo(User::class, 'respondent_id');
+    }
+
+    public function relatedTrustEvent(): BelongsTo
+    {
+        return $this->belongsTo(TrustEvent::class, 'related_trust_event_id');
     }
 
     /** Une reclamation fondee debouche sur un evenement de score (CDC 6.4.4). */

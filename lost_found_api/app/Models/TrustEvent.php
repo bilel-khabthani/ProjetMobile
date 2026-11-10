@@ -7,7 +7,10 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'type', 'points', 'related_match_id', 'validated_by', 'reason'])]
+#[Fillable([
+    'user_id', 'type', 'points', 'related_match_id', 'reversal_of_id',
+    'validated_by', 'reason',
+])]
 class TrustEvent extends Model
 {
     use HasUuids;
@@ -30,9 +33,20 @@ class TrustEvent extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** Sanction d'origine lorsqu'il s'agit d'une correction d'appel. */
+    public function reversalOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reversal_of_id');
+    }
+
     /** Evenement systeme (regle automatique) ou arbitrage humain (CDC 7.1). */
     public function isSystemGenerated(): bool
     {
         return $this->validated_by === 'SYSTEME';
+    }
+
+    public function isReversal(): bool
+    {
+        return $this->reversal_of_id !== null;
     }
 }

@@ -7,12 +7,22 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class AuthTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'services.google.client_id' => 'test-web-client.apps.googleusercontent.com',
+        ]);
+    }
 
     public function test_user_can_register(): void
     {
@@ -68,13 +78,106 @@ class AuthTest extends TestCase
             ->assertJsonPath('message', 'Identifiants invalides.');
     }
 
+    public function test_google_login_requires_id_token(): void
+    {
+        $this->postJson('/api/auth/google', [
+            'email' => 'charlie.google@gmail.com',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('id_token');
+    }
+
+    public function test_google_login_rejects_invalid_token(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'error' => 'invalid_token',
+            ], 400),
+        ]);
+
+        $this->postJson('/api/auth/google', [
+            'id_token' => 'invalid-token',
+        ])->assertUnauthorized();
+    }
+
+    public function test_google_login_rejects_token_for_another_client(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'iss' => 'https://accounts.google.com',
+                'aud' => 'another-client.apps.googleusercontent.com',
+                'email' => 'charlie.google@gmail.com',
+                'email_verified' => 'true',
+                'sub' => 'google_sub_123456789',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/google', [
+            'id_token' => 'valid-token-for-another-app',
+        ])->assertUnauthorized();
+    }
+
+    public function test_google_login_rejects_when_client_id_is_not_configured(): void
+    {
+        config(['services.google.client_id' => null]);
+
+        Http::fake([
+            'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'iss' => 'https://accounts.google.com',
+                'aud' => 'test-web-client.apps.googleusercontent.com',
+                'email' => 'charlie.google@gmail.com',
+                'email_verified' => 'true',
+                'sub' => 'google_sub_123456789',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/google', [
+            'id_token' => 'valid-token',
+        ])->assertUnauthorized();
+    }
+
+    public function test_google_login_accepts_google_workspace_email(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'iss' => 'https://accounts.google.com',
+                'aud' => config('services.google.client_id'),
+                'email' => 'bilel.workspace@esprit.tn',
+                'email_verified' => 'true',
+                'sub' => 'google_sub_workspace',
+                'name' => 'Bilel Workspace',
+            ]),
+        ]);
+
+        $response = $this->postJson('/api/auth/google', [
+            'id_token' => 'valid-workspace-token',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('user.email', 'bilel.workspace@esprit.tn')
+            ->assertJsonPath('user.google_id', 'google_sub_workspace');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'bilel.workspace@esprit.tn',
+            'google_id' => 'google_sub_workspace',
+        ]);
+    }
+
     public function test_google_login_creates_new_user(): void
     {
+        Http::fake([
+            'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'iss' => 'https://accounts.google.com',
+                'aud' => config('services.google.client_id'),
+                'email' => 'charlie.google@gmail.com',
+                'email_verified' => 'true',
+                'sub' => 'google_sub_123456789',
+                'name' => 'Charlie Google',
+                'picture' => 'https://example.com/avatar.jpg',
+            ]),
+        ]);
+
         $response = $this->postJson('/api/auth/google', [
-            'email' => 'charlie.google@gmail.com',
-            'name' => 'Charlie Google',
-            'google_id' => 'google_sub_123456789',
-            'avatar' => 'https://example.com/avatar.jpg',
+            'id_token' => 'valid-token',
         ]);
 
         $response->assertOk()
@@ -94,6 +197,18 @@ class AuthTest extends TestCase
 
     public function test_google_login_links_existing_user(): void
     {
+        Http::fake([
+            'https://oauth2.googleapis.com/tokeninfo*' => Http::response([
+                'iss' => 'https://accounts.google.com',
+                'aud' => config('services.google.client_id'),
+                'email' => 'david@example.com',
+                'email_verified' => 'true',
+                'sub' => 'google_sub_999999',
+                'name' => 'David Updated',
+                'picture' => 'https://example.com/david.png',
+            ]),
+        ]);
+
         $existing = User::factory()->create([
             'email' => 'david@example.com',
             'google_id' => null,
@@ -102,10 +217,7 @@ class AuthTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/auth/google', [
-            'email' => 'david@example.com',
-            'name' => 'David Updated',
-            'google_id' => 'google_sub_999999',
-            'avatar' => 'https://example.com/david.png',
+            'id_token' => 'valid-token',
         ]);
 
         $response->assertOk()

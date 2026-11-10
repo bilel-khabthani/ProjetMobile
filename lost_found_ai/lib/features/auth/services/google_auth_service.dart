@@ -13,63 +13,109 @@ import '../../../data/providers.dart';
 
 /// Service gérant la connexion avec Google.
 ///
-/// Uniquement le flux natif `google_sign_in` : la fenêtre de connexion Google
-/// officielle. C'est elle qui affiche les comptes déjà utilisés sur l'appareil
-/// et propose « Utiliser un autre compte » — aucun compte de démonstration
-/// n'est fabriqué côté application, l'adresse provient toujours d'un vrai
-/// compte Google.
+/// Utilise le flux natif de `google_sign_in` 7 (Credential Manager sur
+/// Android) : le sélecteur de comptes officiel de Google s'ouvre par-dessus
+/// l'application et aucun écran de connexion web intermédiaire n'est affiché.
 class GoogleAuthHelper {
-  /// Le flux natif ne peut reussir que si le build est enregistre dans Google
-  /// Cloud Console : un client OAuth Android pour `fr.campus.lost_found_ai`
-  /// associe a l'empreinte SHA-1 du certificat de signature. Sans cet
-  /// enregistrement, `GoogleSignIn.signIn()` ouvre quand meme le selecteur de
-  /// comptes natif puis echoue avec DEVELOPER_ERROR (10).
-  ///
-  /// Les identifiants viennent de [AppConfig] et peuvent etre surcharges au
-  /// lancement :
-  ///
-  /// ```
-  /// flutter run --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>
-  /// ```
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb ? AppConfig.googleWebClientId : null,
-    serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
-    scopes: const <String>[
-      'email',
-      'profile',
-    ],
-  );
+  static final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
-  /// Ouvre l'unique étape de choix de compte puis connecte l'utilisateur.
+  static Future<void>? _initialization;
+
+  static const String _androidOAuthConfigurationMessage =
+      'Google refuse la connexion : le client OAuth Android est mal configuré. '
+      'Ajoutez le package fr.campus.lost_found_ai et l’empreinte SHA-1 du '
+      'certificat de signature dans Google Cloud Console, puis réessayez.';
+
+  /// Initialise le SDK une seule fois avec le client Web (`serverClientId`).
+  ///
+  /// Sur Android, un client OAuth Android doit aussi exister dans Google Cloud
+  /// Console pour le package `fr.campus.lost_found_ai` et l'empreinte SHA-1 de
+  /// la signature utilisée. Sans lui, la sélection du compte échoue.
+  static Future<void> _ensureInitialized() {
+    return _initialization ??= _googleSignIn
+        .initialize(
+          clientId: kIsWeb ? AppConfig.googleWebClientId : null,
+          serverClientId: kIsWeb ? null : AppConfig.googleServerClientId,
+        )
+        .catchError((Object error) {
+          _initialization = null;
+          throw error;
+        });
+  }
+
+  /// Ouvre le sélecteur de compte natif puis connecte l'utilisateur.
   static Future<void> handleGoogleSignIn(
     BuildContext context,
     WidgetRef ref, {
     VoidCallback? onLoadingStart,
     VoidCallback? onLoadingEnd,
   }) async {
+    onLoadingStart?.call();
+
     try {
-      // Déconnecte toute session native pour que la fenêtre Google s'ouvre
-      // systématiquement (elle liste les comptes de l'appareil).
+      await _ensureInitialized();
+      if (!context.mounted) return;
+
+      if (!_googleSignIn.supportsAuthenticate()) {
+        _showError(
+          context,
+          'La connexion Google native n’est pas disponible sur cette plateforme. '
+          'Utilisez l’application Android.',
+        );
+        return;
+      }
+
+      // Repart d'une session vierge pour toujours proposer le choix du compte.
       try {
         await _googleSignIn.signOut();
       } catch (_) {}
 
-      // Ouvre la boîte de dialogue native Google
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
+      final GoogleSignInAccount account;
+      try {
+        account = await _googleSignIn.authenticate();
+      } on GoogleSignInException catch (error) {
+        final description = error.description ?? '';
+        final configurationFailure =
+            description.contains('[16]') ||
+            description.toLowerCase().contains('reauth') ||
+            error.code == GoogleSignInExceptionCode.clientConfigurationError;
 
-      if (account == null) {
-        // L'utilisateur a fermé ou annulé la fenêtre de connexion Google
-        return;
+        if (error.code == GoogleSignInExceptionCode.canceled) {
+          debugPrint(
+            'Google Sign-In interrompu : ${description.isEmpty ? error.code.name : description}',
+          );
+          if (!context.mounted) return;
+
+          if (configurationFailure) {
+            _showError(context, _androidOAuthConfigurationMessage);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Connexion Google annulée.')),
+            );
+          }
+          return;
+        }
+
+        if (configurationFailure) {
+          if (context.mounted) {
+            _showError(context, _androidOAuthConfigurationMessage);
+          }
+          return;
+        }
+
+        rethrow;
       }
 
-      onLoadingStart?.call();
+      if (!context.mounted) return;
 
-      String? idToken;
-      try {
-        final auth = await account.authentication;
-        idToken = auth.idToken;
-      } catch (_) {
-        // L'API accepte les données de profil lorsque le jeton n'est pas disponible.
+      final String? idToken = account.authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        _showError(
+          context,
+          'Google n’a pas fourni de jeton d’identité. Vérifiez le '
+          'serverClientId et le client OAuth Android dans Google Cloud Console.',
+        );
+        return;
       }
 
       await ref.read(sessionProvider.notifier).signInWithGoogle(
@@ -83,38 +129,45 @@ class GoogleAuthHelper {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Connecté en tant que ${account.displayName ?? account.email} via Google.'),
+          content: Text(
+            'Connecté en tant que ${account.displayName ?? account.email} via Google.',
+          ),
           backgroundColor: AppColors.success,
         ),
       );
       context.go(AppRoutes.home);
+    } on GoogleSignInException catch (error) {
+      final details = error.description ?? error.code.name;
+      _showError(
+        context,
+        'Connexion Google impossible ($details). Vérifiez le package '
+        'fr.campus.lost_found_ai, l’empreinte SHA-1 et le serverClientId dans '
+        'Google Cloud Console.',
+      );
     } on PlatformException catch (error) {
-      // Le sélecteur natif vient de s'afficher : on n'ouvre jamais un second
-      // sélecteur de compte par-dessus (c'était le double affichage). L'échec
-      // est signalé simplement, à charge de l'équipe de finaliser
-      // l'enregistrement OAuth (voir [googleServerClientId]).
       final details = error.message ?? error.code;
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur Google Sign-In ($details). Vérifiez Google Play Services.'),
-          backgroundColor: AppColors.danger,
-          duration: const Duration(seconds: 4),
-        ),
+      _showError(
+        context,
+        'Erreur Google Sign-In ($details). Vérifiez Google Play Services.',
       );
     } on Object catch (error) {
-      if (!context.mounted) return;
       final message = error is ApiException
           ? error.message
           : 'Échec de la connexion avec Google : $error';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      _showError(context, message);
     } finally {
       onLoadingEnd?.call();
     }
+  }
+
+  static void _showError(BuildContext context, String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.danger,
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 }

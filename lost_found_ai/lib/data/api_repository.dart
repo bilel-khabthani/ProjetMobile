@@ -374,20 +374,34 @@ class ApiRepository {
       score: (json['trust_score'] as num?)?.toDouble() ?? 50,
       recoveredCount: (json['recovered_count'] as num?)?.toInt() ?? 0,
       canChat: json['can_chat'] as bool? ?? false,
+      canCoordinate: json['can_coordinate'] as bool? ?? false,
+      minScoreToChat: (json['min_score_to_chat'] as num?)?.toInt() ?? 40,
+      minScoreToCoordinate:
+          (json['min_score_to_coordinate'] as num?)?.toInt() ?? 30,
       inProbation: json['in_probation'] as bool? ?? false,
       history: events
           .map(
             (raw) => TrustEvent(
+              id: raw['id'] as String? ?? '',
               label: _eventLabel(raw['type'] as String? ?? ''),
               points: (raw['points'] as num?)?.toInt() ?? 0,
               at:
                   DateTime.tryParse(raw['created_at'] as String? ?? '') ??
                   DateTime.now(),
               automatic: raw['validated_by'] == 'SYSTEME',
+              appealStatus: raw['appeal_status'] as String?,
+              canAppeal: raw['can_appeal'] as bool? ?? false,
             ),
           )
           .toList(),
     );
+  }
+
+  /// Depose un appel pour une sanction negative de l'utilisateur connecte.
+  Future<void> appealTrustEvent(String eventId, {String? reason}) async {
+    await _client.post('/trust/events/$eventId/appeal', {
+      'reason': reason?.trim(),
+    });
   }
 
   Future<void> fileClaim({
@@ -591,6 +605,9 @@ class ApiRepository {
             )
           : null,
       canChat: json['can_chat'] as bool? ?? _statusAllowsChat(json['status']),
+      chatMode: ChatMode.fromCode(json['chat_mode'] as String?),
+      coordinationMessagesRemaining:
+          (json['coordination_messages_remaining'] as num?)?.toInt(),
       chatLockedReason: json['chat_locked_reason'] as String?,
       lastMessage: json['last_message'] as String?,
       lastMessageAt: DateTime.tryParse(
