@@ -7,14 +7,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
-import '../../../../widgets/pressable_scale.dart';
 import '../../../../widgets/skeleton.dart';
 import '../../data/providers/objects_providers.dart';
 import '../../data/services/location_service.dart';
@@ -81,9 +79,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
       final enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) return;
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: AndroidSettings(
-          accuracy: LocationAccuracy.medium,
-        ),
+        locationSettings: AndroidSettings(accuracy: LocationAccuracy.medium),
       );
       if (!mounted) return;
       setState(() {
@@ -118,9 +114,9 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   List<LostFoundObject> _filtered(List<LostFoundObject> all) {
@@ -156,8 +152,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
   void _fitTo(List<LostFoundObject> items) {
     if (!_mapReady) return;
     final points = [
-      for (final object in items)
-        LatLng(object.latitude!, object.longitude!),
+      for (final object in items) LatLng(object.latitude!, object.longitude!),
     ];
     if (points.isEmpty) return;
     if (points.length == 1) {
@@ -176,10 +171,6 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
     final result = await showModalBottomSheet<_MapFilters>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
       builder: (_) => _FiltersSheet(
         type: _typeFilter,
         category: _categoryFilter,
@@ -221,25 +212,20 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
     final objectsAsync = ref.watch(allObjectsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text('Carte des objets'),
+        title: Text('Carte des objets', style: context.typography.titleLarge),
         actions: [
           IconButton(
             tooltip: 'Liste',
             icon: const Icon(Icons.view_list_rounded),
             onPressed: () => context.push(AppRoutes.objectsList),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs - 4),
         ],
       ),
       body: objectsAsync.when(
-        loading: () => const Center(
-          child: SkeletonBox(width: 220, height: 220),
-        ),
+        loading: () =>
+            const Center(child: SkeletonBox(width: 220, height: 220)),
         error: (error, _) => _MapError(
           message: error.toString(),
           onRetry: () => ref.invalidate(allObjectsProvider),
@@ -254,7 +240,8 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
             );
           }
 
-          final center = _userPosition ??
+          final center =
+              _userPosition ??
               (visible.isNotEmpty
                   ? LatLng(visible.first.latitude!, visible.first.longitude!)
                   : _fallbackCenter);
@@ -300,9 +287,10 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                           point: _userPosition!,
                           radius: _radiusKm! * 1000,
                           useRadiusInMeter: true,
-                          color: AppColors.primary.withValues(alpha: 0.07),
-                          borderColor:
-                              AppColors.primary.withValues(alpha: 0.35),
+                          color: context.colors.primary.withValues(alpha: 0.07),
+                          borderColor: context.colors.primary.withValues(
+                            alpha: 0.35,
+                          ),
                           borderStrokeWidth: 1.5,
                         ),
                       ],
@@ -331,8 +319,8 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
               ),
               Positioned(
                 top: 10,
-                left: 12,
-                right: 12,
+                left: AppSpacing.sm,
+                right: AppSpacing.sm,
                 child: _MapTopBar(
                   controller: _searchController,
                   query: _query,
@@ -353,11 +341,11 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
               ),
               Positioned(
                 top: 74,
-                left: 12,
+                left: AppSpacing.sm,
                 child: _CountPill(count: visible.length),
               ),
               Positioned(
-                right: 12,
+                right: AppSpacing.sm,
                 bottom: selected != null ? 178 : 92,
                 child: Column(
                   children: [
@@ -378,9 +366,9 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
               ),
               if (selected != null)
                 Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 16,
+                  left: AppSpacing.sm,
+                  right: AppSpacing.sm,
+                  bottom: AppSpacing.lg,
                   child: _SelectedCard(
                     object: selected,
                     distanceKm: _userPosition == null
@@ -399,8 +387,8 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                 ),
               if (visible.isEmpty)
                 Positioned(
-                  left: 24,
-                  right: 24,
+                  left: AppSpacing.xl,
+                  right: AppSpacing.xl,
                   top: 130,
                   child: _EmptyCard(
                     hasFilters: _activeFilterCount > 0 || _query.isNotEmpty,
@@ -412,8 +400,8 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
         onPressed: () => context.push(AppRoutes.objectAdd),
         child: const Icon(Icons.add_rounded),
       ),
@@ -431,13 +419,15 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
 
   List<List<LostFoundObject>> _group(List<LostFoundObject> items) {
     if (_zoom >= 14) {
-      return [for (final item in items) [item]];
+      return [
+        for (final item in items) [item],
+      ];
     }
     final cell = _zoom >= 12
         ? 0.02
         : _zoom >= 10
-            ? 0.08
-            : 0.35;
+        ? 0.08
+        : 0.35;
     final buckets = <String, List<LostFoundObject>>{};
     for (final item in items) {
       final key =
@@ -449,7 +439,10 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
 
   Marker _objectMarker(LostFoundObject object, LostFoundObject? selected) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
+    final color = isLost ? context.colors.primary : context.colors.tertiary;
+    final onColor = isLost
+        ? context.colors.onPrimary
+        : context.colors.onTertiary;
     final isSelected = selected?.id == object.id;
 
     return Marker(
@@ -477,16 +470,17 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                 color: color,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.white,
+                  color: isSelected
+                      ? context.colors.primary
+                      : context.colors.surface,
                   width: isSelected ? 3 : 2.5,
                 ),
-                boxShadow: AppShadows.card,
               ),
               child: Center(
                 child: AppIcon(
                   categoryIconName(object.category),
                   size: isSelected ? 19 : 16,
-                  color: Colors.white,
+                  color: onColor,
                 ),
               ),
             ),
@@ -509,43 +503,43 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
   Marker _clusterMarker(List<LostFoundObject> group) {
     final latitude =
         group.fold<double>(0, (sum, item) => sum + item.latitude!) /
-            group.length;
+        group.length;
     final longitude =
         group.fold<double>(0, (sum, item) => sum + item.longitude!) /
-            group.length;
+        group.length;
     final point = LatLng(latitude, longitude);
     final lost = group.where((item) => item.type == ItemType.lost).length;
-    final color = lost >= group.length ~/ 2 ? AppColors.lost : AppColors.found;
+    final isMostlyLost = lost >= group.length ~/ 2;
+    final color = isMostlyLost
+        ? context.colors.primary
+        : context.colors.tertiary;
+    final onColor = isMostlyLost
+        ? context.colors.onPrimary
+        : context.colors.onTertiary;
 
     return Marker(
       point: point,
       width: 48,
       height: 48,
       child: GestureDetector(
-        onTap: () => _mapController.move(
-          point,
-          (_zoom + 2).clamp(3, 18).toDouble(),
-        ),
+        onTap: () =>
+            _mapController.move(point, (_zoom + 2).clamp(3, 18).toDouble()),
         child: Center(
           child: Container(
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.colors.surface,
               shape: BoxShape.circle,
-              boxShadow: AppShadows.raised,
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 7),
               constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               alignment: Alignment.center,
               child: Text(
                 '${group.length}',
-                style: AppText.bodyStrong.copyWith(
-                  color: Colors.white,
+                style: context.typography.titleMedium?.copyWith(
+                  color: onColor,
                   fontSize: 13,
                 ),
               ),
@@ -582,30 +576,27 @@ class _MapTopBar extends StatelessWidget {
           child: Container(
             height: 50,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: context.colors.surface,
               borderRadius: BorderRadius.circular(AppRadius.pill),
-              boxShadow: AppShadows.raised,
+              border: Border.all(color: context.colors.outlineVariant),
             ),
             child: Row(
               children: [
                 const SizedBox(width: 14),
-                const Icon(
+                Icon(
                   Icons.search_rounded,
                   size: 21,
-                  color: AppColors.textTertiary,
+                  color: context.colors.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: TextField(
                     controller: controller,
                     onChanged: onQueryChanged,
                     textInputAction: TextInputAction.search,
-                    style: AppText.body,
+                    style: context.typography.bodyMedium,
                     decoration: InputDecoration(
                       hintText: 'Rechercher un objet, un lieu…',
-                      hintStyle: AppText.body.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
                       border: InputBorder.none,
                       isCollapsed: true,
                     ),
@@ -615,7 +606,7 @@ class _MapTopBar extends StatelessWidget {
                   IconButton(
                     tooltip: 'Effacer',
                     icon: const Icon(Icons.close_rounded, size: 19),
-                    color: AppColors.textTertiary,
+                    color: context.colors.onSurfaceVariant,
                     onPressed: onClear,
                   ),
               ],
@@ -623,51 +614,51 @@ class _MapTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        GestureDetector(
-          onTap: onOpenFilters,
-          child: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              boxShadow: AppShadows.primary,
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Center(
-                  child: Icon(
-                    Icons.tune_rounded,
-                    size: 22,
-                    color: Colors.white,
+        SizedBox(
+          width: 50,
+          height: 50,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: IconButton(
+                  onPressed: onOpenFilters,
+                  icon: const Icon(Icons.tune_rounded, size: 22),
+                  style: IconButton.styleFrom(
+                    backgroundColor: context.colors.primary,
+                    foregroundColor: context.colors.onPrimary,
+                    minimumSize: const Size(50, 50),
+                    shape: const StadiumBorder(),
                   ),
                 ),
-                if (activeFilters > 0)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: AppColors.mint,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.primary, width: 1.5),
+              ),
+              if (activeFilters > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: context.colors.tertiaryContainer,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: context.colors.primary,
+                        width: 1.5,
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$activeFilters',
-                        style: AppText.tiny.copyWith(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryDark,
-                        ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      '$activeFilters',
+                      style: context.typography.labelSmall?.copyWith(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: context.colors.onTertiaryContainer,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ],
@@ -685,15 +676,15 @@ class _CountPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        boxShadow: AppShadows.card,
+        border: Border.all(color: context.colors.outlineVariant),
       ),
       child: Text(
         '$count objet${count > 1 ? 's' : ''} sur la carte',
-        style: AppText.tiny.copyWith(
+        style: context.typography.labelMedium?.copyWith(
           fontWeight: FontWeight.w800,
-          color: AppColors.textSecondary,
+          color: context.colors.onSurfaceVariant,
         ),
       ),
     );
@@ -717,25 +708,21 @@ class _MapControlButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: PressableScale(
-        onTap: busy ? null : onTap,
-        child: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            shape: BoxShape.circle,
-            boxShadow: AppShadows.raised,
-          ),
-          child: Center(
-            child: busy
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.2),
-                  )
-                : Icon(icon, size: 22, color: AppColors.primary),
-          ),
+      child: IconButton(
+        onPressed: busy ? null : onTap,
+        icon: busy
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              )
+            : Icon(icon, size: 22),
+        style: IconButton.styleFrom(
+          backgroundColor: context.colors.surface,
+          foregroundColor: context.colors.primary,
+          minimumSize: const Size(48, 48),
+          shape: const CircleBorder(),
+          side: BorderSide(color: context.colors.outlineVariant),
         ),
       ),
     );
@@ -754,7 +741,7 @@ class _UserDot extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.16),
+          color: context.colors.primary.withValues(alpha: 0.16),
           shape: BoxShape.circle,
         ),
         child: Center(
@@ -762,10 +749,9 @@ class _UserDot extends StatelessWidget {
             width: 18,
             height: 18,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: context.colors.primary,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2.5),
-              boxShadow: AppShadows.card,
+              border: Border.all(color: context.colors.surface, width: 2.5),
             ),
           ),
         ),
@@ -782,24 +768,19 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.raised,
-      ),
       child: Column(
         children: [
-          const Icon(
+          Icon(
             Icons.location_off_rounded,
             size: 34,
-            color: AppColors.textTertiary,
+            color: context.colors.onSurfaceVariant,
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Aucun objet sur la carte',
-            style: AppText.bodyStrong,
+            style: context.typography.titleMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
@@ -807,7 +788,7 @@ class _EmptyCard extends StatelessWidget {
             hasFilters
                 ? 'Élargissez le rayon ou retirez des filtres.'
                 : 'Les nouvelles annonces géolocalisées apparaîtront ici.',
-            style: AppText.tiny.copyWith(color: AppColors.textSecondary),
+            style: context.typography.bodySmall,
             textAlign: TextAlign.center,
           ),
           if (hasFilters) ...[
@@ -848,27 +829,24 @@ class _SelectedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
-    final soft = isLost ? AppColors.lostSoft : AppColors.foundSoft;
+    final color = isLost ? context.colors.primary : context.colors.tertiary;
+    final soft = isLost
+        ? context.colors.primaryContainer
+        : context.colors.tertiaryContainer;
     final distance = _distanceLabel();
 
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.raised,
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderRadius: BorderRadius.circular(AppSpacing.sm),
                 child: SizedBox(
-                  width: 64,
-                  height: 64,
+                  width: AppSpacing.huge + 16,
+                  height: AppSpacing.huge + 16,
                   child: object.imageUrl != null
                       ? Image.network(
                           object.imageUrl!,
@@ -888,7 +866,7 @@ class _SelectedCard extends StatelessWidget {
                       object.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppText.bodyStrong,
+                      style: context.typography.titleMedium,
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -904,9 +882,8 @@ class _SelectedCard extends StatelessWidget {
                           ),
                           child: Text(
                             object.type.shortLabel,
-                            style: AppText.tiny.copyWith(
+                            style: context.typography.labelSmall?.copyWith(
                               color: color,
-                              fontSize: 9,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -919,7 +896,7 @@ class _SelectedCard extends StatelessWidget {
                                 : object.placeLabel,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppText.tiny,
+                            style: context.typography.bodySmall,
                           ),
                         ),
                       ],
@@ -928,17 +905,15 @@ class _SelectedCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.near_me_rounded,
                             size: 12,
-                            color: AppColors.textTertiary,
+                            color: context.colors.onSurfaceVariant,
                           ),
                           const SizedBox(width: 3),
                           Text(
                             'À $distance de vous',
-                            style: AppText.tiny.copyWith(
-                              color: AppColors.textTertiary,
-                            ),
+                            style: context.typography.bodySmall,
                           ),
                         ],
                       ),
@@ -949,7 +924,7 @@ class _SelectedCard extends StatelessWidget {
               IconButton(
                 tooltip: 'Fermer',
                 icon: const Icon(Icons.close_rounded),
-                color: AppColors.textTertiary,
+                color: context.colors.onSurfaceVariant,
                 onPressed: onClose,
               ),
             ],
@@ -958,12 +933,9 @@ class _SelectedCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: AppButton(
-                  label: 'Voir l’annonce',
-                  onPressed: onOpen,
-                ),
+                child: AppButton(label: 'Voir l’annonce', onPressed: onOpen),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: AppButton(
                   label: 'Itinéraire',
@@ -1018,7 +990,12 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottom),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.sm,
+          AppSpacing.xl,
+          AppSpacing.lg + bottom,
+        ),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1028,81 +1005,101 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 child: Container(
                   width: 42,
                   height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.lg),
                   decoration: BoxDecoration(
-                    color: AppColors.divider,
+                    color: context.colors.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              Text('Filtrer la carte', style: AppText.h2),
+              Text('Filtrer la carte', style: context.typography.headlineSmall),
               const SizedBox(height: 4),
               Text(
                 'Affinez les annonces affichées autour de vous.',
-                style: AppText.tiny.copyWith(color: AppColors.textSecondary),
+                style: context.typography.bodySmall,
               ),
               const SizedBox(height: 18),
-              Text('Type', style: AppText.label),
-              const SizedBox(height: 8),
+              Text('Type', style: context.typography.titleMedium),
+              const SizedBox(height: AppSpacing.xs),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
                 children: [
-                  _SheetChip(
-                    label: 'Tous',
+                  FilterChip(
+                    label: const Text('Tous'),
                     selected: _type == null,
-                    onTap: () => setState(() => _type = null),
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _type = null),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 14,
+                    ),
                   ),
                   for (final type in ItemType.values)
-                    _SheetChip(
-                      label: type == ItemType.lost ? 'Perdus' : 'Trouvés',
+                    FilterChip(
+                      label: Text(type == ItemType.lost ? 'Perdus' : 'Trouvés'),
                       selected: _type == type,
-                      onTap: () => setState(() => _type = type),
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => _type = type),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 14,
+                      ),
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text('Catégorie', style: AppText.label),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.lg),
+              Text('Catégorie', style: context.typography.titleMedium),
+              const SizedBox(height: AppSpacing.xs),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
                 children: [
-                  _SheetChip(
-                    label: 'Toutes',
+                  FilterChip(
+                    label: const Text('Toutes'),
                     selected: _category == null,
-                    onTap: () => setState(() => _category = null),
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _category = null),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 14,
+                    ),
                   ),
                   for (final category in ItemCategory.values)
-                    _SheetChip(
-                      label: category.label,
+                    FilterChip(
+                      label: Text(category.label),
                       selected: _category == category,
-                      onTap: () => setState(() => _category = category),
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => _category = category),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 14,
+                      ),
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Autour de moi', style: AppText.bodyStrong),
+                        Text(
+                          'Autour de moi',
+                          style: context.typography.titleMedium,
+                        ),
                         Text(
                           _useRadius
                               ? 'Rayon de ${_radiusKm.round()} km'
                               : 'Afficher toutes les distances',
-                          style: AppText.tiny.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          style: context.typography.bodySmall,
                         ),
                       ],
                     ),
                   ),
                   Switch(
                     value: _useRadius,
-                    activeTrackColor: AppColors.primary,
                     onChanged: (value) => setState(() => _useRadius = value),
                   ),
                 ],
@@ -1113,25 +1110,21 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                   min: 1,
                   max: 50,
                   divisions: 49,
-                  activeColor: AppColors.primary,
                   label: '${_radiusKm.round()} km',
                   onChanged: (value) => setState(() => _radiusKm = value),
                 ),
               ],
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               Row(
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: () => Navigator.pop(
-                        context,
-                        (
-                          type: null,
-                          category: null,
-                          useRadius: false,
-                          radiusKm: 10.0,
-                        ),
-                      ),
+                      onPressed: () => Navigator.pop(context, (
+                        type: null,
+                        category: null,
+                        useRadius: false,
+                        radiusKm: 10.0,
+                      )),
                       child: const Text('Réinitialiser'),
                     ),
                   ),
@@ -1139,57 +1132,17 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                   Expanded(
                     child: AppButton(
                       label: 'Appliquer',
-                      onPressed: () => Navigator.pop(
-                        context,
-                        (
-                          type: _type,
-                          category: _category,
-                          useRadius: _useRadius,
-                          radiusKm: _radiusKm,
-                        ),
-                      ),
+                      onPressed: () => Navigator.pop(context, (
+                        type: _type,
+                        category: _category,
+                        useRadius: _useRadius,
+                        radiusKm: _radiusKm,
+                      )),
                     ),
                   ),
                 ],
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetChip extends StatelessWidget {
-  const _SheetChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.background,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.divider,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppText.tiny.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
-            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -1211,24 +1164,17 @@ class _MapError extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.map_outlined,
-              size: 48,
-              color: AppColors.danger,
-            ),
+            Icon(Icons.map_outlined, size: 48, color: context.colors.error),
             const SizedBox(height: AppSpacing.md),
-            Text('Carte indisponible', style: AppText.h2),
+            Text('Carte indisponible', style: context.typography.headlineSmall),
             const SizedBox(height: AppSpacing.sm),
             Text(
               message,
-              style: AppText.body,
+              style: context.typography.bodyMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Réessayer'),
-            ),
+            FilledButton(onPressed: onRetry, child: const Text('Réessayer')),
           ],
         ),
       ),

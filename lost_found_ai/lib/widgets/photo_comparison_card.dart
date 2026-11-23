@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/ai/photo_similarity.dart';
-import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
-import '../core/theme/app_typography.dart';
+import '../core/theme/app_theme.dart';
 import '../data/models/item.dart';
 import 'item_photo.dart';
 
@@ -72,27 +71,27 @@ class _PhotoComparisonCardState extends State<PhotoComparisonCard> {
   @override
   Widget build(BuildContext context) {
     final result = _result;
+    final colors = context.colors;
 
-    return Container(
-      width: double.infinity,
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.compare_arrows_rounded,
                 size: 17,
-                color: AppColors.primary,
+                color: colors.primary,
               ),
               const SizedBox(width: AppSpacing.xs),
-              Expanded(child: Text(widget.title, style: AppText.h3)),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: context.typography.headlineSmall,
+                ),
+              ),
               if (_loading)
                 const SizedBox(
                   width: 14,
@@ -102,9 +101,9 @@ class _PhotoComparisonCardState extends State<PhotoComparisonCard> {
               else if (result != null && result.available)
                 Text(
                   '${result.score}/100',
-                  style: AppText.label.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
+                  style: context.typography.labelMedium?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
             ],
@@ -124,7 +123,7 @@ class _PhotoComparisonCardState extends State<PhotoComparisonCard> {
                 child: Icon(
                   Icons.compare_arrows_rounded,
                   size: 18,
-                  color: AppColors.textTertiary,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
               Expanded(
@@ -142,8 +141,8 @@ class _PhotoComparisonCardState extends State<PhotoComparisonCard> {
               result.available
                   ? result.label
                   : (result.message ?? 'Photos non comparables.'),
-              style: AppText.caption.copyWith(
-                color: AppColors.textSecondary,
+              style: context.typography.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
                 height: 1.35,
               ),
             ),
@@ -184,7 +183,7 @@ class _PhotoTile extends StatelessWidget {
         const SizedBox(height: 5),
         Text(
           label,
-          style: AppText.caption.copyWith(fontSize: 10),
+          style: context.typography.bodySmall?.copyWith(fontSize: 10),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -201,6 +200,7 @@ class _ScoreBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
@@ -209,7 +209,7 @@ class _ScoreBar extends StatelessWidget {
             width: 52,
             child: Text(
               label,
-              style: AppText.caption.copyWith(fontSize: 10),
+              style: context.typography.bodySmall?.copyWith(fontSize: 10),
             ),
           ),
           Expanded(
@@ -218,10 +218,8 @@ class _ScoreBar extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: value / 100,
                 minHeight: 5,
-                backgroundColor: AppColors.surfaceAlt,
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  AppColors.primary,
-                ),
+                backgroundColor: colors.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
               ),
             ),
           ),
@@ -231,7 +229,7 @@ class _ScoreBar extends StatelessWidget {
             child: Text(
               '$value',
               textAlign: TextAlign.right,
-              style: AppText.caption.copyWith(fontSize: 10),
+              style: context.typography.bodySmall?.copyWith(fontSize: 10),
             ),
           ),
         ],

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
-import '../core/theme/app_typography.dart';
+import '../core/theme/app_theme.dart';
 import '../data/models/item.dart';
 
 class StatusPill extends StatelessWidget {
@@ -13,9 +13,15 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final isLost = type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
-    final background = isLost ? AppColors.lostSoft : AppColors.foundSoft;
+    final background = isLost
+        ? colors.primaryContainer
+        : colors.tertiaryContainer;
+    final foreground = isLost
+        ? colors.onPrimaryContainer
+        : colors.onTertiaryContainer;
+    final dot = isLost ? colors.primary : colors.tertiary;
     final label = isLost ? 'Perdu' : 'Trouvé';
 
     return Container(
@@ -33,14 +39,14 @@ class StatusPill extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
           ),
           SizedBox(width: compact ? 5 : 6),
           Text(
             label,
-            style: AppText.caption.copyWith(
-              color: Color.lerp(color, Colors.black, 0.22),
-              fontWeight: FontWeight.w800,
+            style: context.typography.bodySmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w700,
               fontSize: compact ? 11 : 12,
             ),
           ),
@@ -57,16 +63,19 @@ class ScorePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = score >= 80
-        ? AppColors.found
-        : score >= 65
-        ? AppColors.accent
-        : AppColors.textTertiary;
-    final background = score >= 80
-        ? AppColors.foundSoft
-        : score >= 65
-        ? AppColors.accentSoft
-        : AppColors.surfaceAlt;
+    final colors = context.colors;
+    final strong = score >= 80;
+    final medium = score >= 65;
+    final foreground = strong
+        ? colors.onTertiaryContainer
+        : medium
+        ? colors.onSecondaryContainer
+        : colors.onSurfaceVariant;
+    final background = strong
+        ? colors.tertiaryContainer
+        : medium
+        ? colors.secondaryContainer
+        : colors.surfaceContainerHighest;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -76,9 +85,9 @@ class ScorePill extends StatelessWidget {
       ),
       child: Text(
         '${score.round()} % de correspondance',
-        style: AppText.caption.copyWith(
-          color: Color.lerp(color, Colors.black, 0.2),
-          fontWeight: FontWeight.w800,
+        style: context.typography.bodySmall?.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -99,21 +108,22 @@ class Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: color.withValues(alpha: 0.14),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+        color: colors.surfaceContainerHighest,
+        border: Border.all(color: colors.outlineVariant, width: 1.5),
       ),
       child: Text(
         initials,
-        style: AppText.label.copyWith(
-          color: Color.lerp(color, Colors.black, 0.15),
+        style: context.typography.labelMedium?.copyWith(
+          color: color,
           fontSize: size * 0.34,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

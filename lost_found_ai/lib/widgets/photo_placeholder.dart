@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
-import '../core/theme/app_typography.dart';
+import '../core/theme/app_theme.dart';
 import '../data/models/item.dart';
 import 'app_icon.dart';
 
@@ -28,16 +28,19 @@ String categoryIconName(ItemCategory category) => switch (category) {
   ItemCategory.other => 'box-linear',
 };
 
-Color categoryColor(ItemCategory category) => switch (category) {
-  ItemCategory.bag => AppColors.primary,
-  ItemCategory.phone => const Color(0xFF2E7BE0),
-  ItemCategory.keys => const Color(0xFFC98A2E),
-  ItemCategory.documents => const Color(0xFF7A6FE0),
-  ItemCategory.clothing => const Color(0xFFD95C86),
-  ItemCategory.glasses => const Color(0xFF1F9C93),
-  ItemCategory.wallet => const Color(0xFFB86A3C),
-  ItemCategory.other => AppColors.textTertiary,
-};
+Color categoryColor(ItemCategory category) {
+  final scheme = ColorScheme.fromSeed(seedColor: AppColors.seed);
+  return switch (category) {
+    ItemCategory.bag => scheme.primary,
+    ItemCategory.phone => scheme.secondary,
+    ItemCategory.keys => scheme.tertiary,
+    ItemCategory.documents => scheme.primary,
+    ItemCategory.clothing => scheme.tertiary,
+    ItemCategory.glasses => scheme.secondary,
+    ItemCategory.wallet => scheme.primary,
+    ItemCategory.other => scheme.outline,
+  };
+}
 
 class PhotoPlaceholder extends StatelessWidget {
   const PhotoPlaceholder({
@@ -93,6 +96,7 @@ class ItemArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final base = categoryColor(category);
     final shortest = compact ? 72.0 : 150.0;
 
@@ -101,45 +105,33 @@ class ItemArtwork extends StatelessWidget {
       height: height,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(borderRadius),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(base, Colors.white, 0.86)!,
-            Color.lerp(base, Colors.white, 0.66)!,
-            Color.lerp(base, AppColors.background, 0.7)!,
-          ],
-        ),
       ),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(painter: _BlobPainter(base)),
+          CustomPaint(
+            painter: _BlobPainter(
+              first: colors.secondaryContainer,
+              second: colors.tertiaryContainer,
+              third: colors.surfaceContainerHighest,
+            ),
+          ),
           Center(
             child: Container(
               width: shortest * 0.44,
               height: shortest * 0.44,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.72),
+                color: colors.surface,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: base.withValues(alpha: 0.16),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                border: Border.all(color: colors.outlineVariant, width: 1.2),
               ),
               child: Center(
                 child: AppIcon(
                   categoryIconName(category),
                   size: shortest * 0.22,
-                  color: Color.lerp(base, AppColors.textPrimary, 0.18)!,
+                  color: base,
                 ),
               ),
             ),
@@ -149,19 +141,16 @@ class ItemArtwork extends StatelessWidget {
               left: 10,
               bottom: 10,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 5,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.82),
+                  color: colors.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
                   category.label,
-                  style: AppText.tiny.copyWith(
-                    color: Color.lerp(base, AppColors.textPrimary, 0.25),
-                    fontWeight: FontWeight.w800,
+                  style: context.typography.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -173,38 +162,45 @@ class ItemArtwork extends StatelessWidget {
 }
 
 class _BlobPainter extends CustomPainter {
-  const _BlobPainter(this.base);
+  const _BlobPainter({
+    required this.first,
+    required this.second,
+    required this.third,
+  });
 
-  final Color base;
+  final Color first;
+  final Color second;
+  final Color third;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final soft = Paint()..color = base.withValues(alpha: 0.13);
-    final softer = Paint()..color = base.withValues(alpha: 0.07);
-    final white = Paint()..color = Colors.white.withValues(alpha: 0.16);
+    final primary = Paint()..color = first;
+    final secondary = Paint()..color = second;
+    final tertiary = Paint()..color = third;
 
     canvas.drawCircle(
       Offset(size.width * 0.12, size.height * 0.18),
       size.shortestSide * 0.34,
-      softer,
+      tertiary,
     );
     canvas.drawCircle(
       Offset(size.width * 0.92, size.height * 0.84),
       size.shortestSide * 0.3,
-      soft,
+      secondary,
     );
     canvas.drawCircle(
       Offset(size.width * 0.82, size.height * 0.1),
       size.shortestSide * 0.1,
-      white,
+      primary,
     );
     canvas.drawCircle(
       Offset(size.width * 0.24, size.height * 0.9),
       size.shortestSide * 0.06,
-      white,
+      primary,
     );
   }
 
   @override
-  bool shouldRepaint(covariant _BlobPainter old) => old.base != base;
+  bool shouldRepaint(covariant _BlobPainter old) =>
+      old.first != first || old.second != second || old.third != third;
 }

@@ -102,7 +102,9 @@ class LocationService {
       final adminArea = placemark.administrativeArea;
       final label = parts.isNotEmpty
           ? parts.join(', ')
-          : (locality != null ? '$locality, ${adminArea ?? ''}' : '$latitude, $longitude');
+          : (locality != null
+                ? '$locality, ${adminArea ?? ''}'
+                : '$latitude, $longitude');
 
       return LocationData(
         latitude: latitude,
@@ -119,9 +121,7 @@ class LocationService {
   }
 
   /// Get coordinates from address
-  static Future<LocationData?> getCoordinatesFromAddress(
-    String address,
-  ) async {
+  static Future<LocationData?> getCoordinatesFromAddress(String address) async {
     try {
       final locations = await geocoding.Geocoding()
           .locationFromAddress(address)
@@ -152,7 +152,8 @@ class LocationService {
     const r = 6371.0; // Earth's radius in kilometers
     final dLat = _toRad(lat2 - lat1);
     final dLon = _toRad(lon2 - lon1);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(_toRad(lat1)) *
             math.cos(_toRad(lat2)) *
             math.sin(dLon / 2) *

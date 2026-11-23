@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'match_id', 'sender_id', 'body', 'status', 'moderation_categories',
+    'match_id', 'sender_id', 'body', 'image_path', 'status', 'moderation_categories',
     'moderation_scores', 'moderation_provider', 'read_at',
 ])]
 class Message extends Model

@@ -4,15 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
-import '../../data/models/item_match.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/item.dart';
+import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
+import '../../widgets/app_icon.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/skeleton.dart';
-import '../../widgets/status_pill.dart';
 import 'widgets/match_card.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -23,53 +22,40 @@ class HomeScreen extends ConsumerWidget {
     final user = ref.watch(sessionProvider);
     final matches = ref.watch(matchesProvider);
     final myItems = ref.watch(myItemsProvider);
+    final scheme = context.colors;
 
     return Scaffold(
+      backgroundColor: scheme.surface,
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
-          color: AppColors.primary,
+          color: scheme.primary,
           onRefresh: () async {
             ref.invalidate(matchesProvider);
             ref.invalidate(myItemsProvider);
           },
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverToBoxAdapter(child: _Header(user: user)),
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                  child: _ActionRow(),
+                  child: _PrimaryActions(),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                  child: _TinderBanner(),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                  child: _RewardsBanner(),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                  child: _ObjectsBanner(),
+                  child: _QuickLinks(),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                  child: _SectionTitle(
-                    title: AppStrings.sectionMatches,
-                    subtitle: '',
-                  ),
+                  child: _MatchesHeader(),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.sm)),
@@ -110,6 +96,8 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
     final name = user?.name ?? '';
     final initials = user?.initials ?? 'LF';
 
@@ -118,7 +106,7 @@ class _Header extends StatelessWidget {
         AppSpacing.xl,
         AppSpacing.lg,
         AppSpacing.xl,
-        AppSpacing.xl,
+        AppSpacing.lg,
       ),
       child: Row(
         children: [
@@ -128,39 +116,40 @@ class _Header extends StatelessWidget {
               children: [
                 Text(
                   '${_greeting()}${name.isEmpty ? '' : ' $name'}',
-                  style: AppText.h1,
+                  style: textTheme.headlineMedium,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Voici ce qui se passe sur votre campus.',
-                  style: AppText.body,
+                  'Que voulez-vous faire aujourd’hui ?',
+                  style: textTheme.bodyMedium,
                 ),
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.md),
-          PressableScale(
-            child: InkWell(
-              onTap: () => context.push(AppRoutes.profile),
-              borderRadius: BorderRadius.circular(999),
-              child: Avatar(initials: initials, size: 48),
+          const SizedBox(width: AppSpacing.sm),
+          Semantics(
+            button: true,
+            label: 'Ouvrir mes récompenses',
+            child: IconButton(
+              icon: AppIcon('gift-linear', color: scheme.tertiary),
+              onPressed: () => context.push(AppRoutes.rewards),
+              tooltip: 'Récompenses & Coupons',
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
-          IconButton(
-            icon: const Icon(
-              Icons.card_giftcard_rounded,
-              color: AppColors.accent,
+          Semantics(
+            button: true,
+            label: 'Ouvrir mon profil',
+            child: PressableScale(
+              onTap: () => context.go(AppRoutes.profile),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: scheme.primaryContainer,
+                foregroundColor: scheme.onPrimaryContainer,
+                child: Text(initials, style: textTheme.titleMedium),
+              ),
             ),
-            onPressed: () => context.push(AppRoutes.rewards),
-            tooltip: 'Récompenses & Coupons',
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_rounded),
-            onPressed: () => context.push(AppRoutes.profile),
-            tooltip: 'Profil',
           ),
         ],
       ),
@@ -168,31 +157,31 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _ActionRow extends StatelessWidget {
-  const _ActionRow();
+class _PrimaryActions extends StatelessWidget {
+  const _PrimaryActions();
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: _ActionCard(
-            icon: Icons.search_off_rounded,
+          child: _PrimaryActionCard(
+            icon: 'magnifer-linear',
             title: AppStrings.actionLostTitle,
             subtitle: AppStrings.actionLostSubtitle,
-            color: AppColors.lost,
-            background: AppColors.lostSoft,
+            color: context.colors.primary,
+            background: context.colors.primaryContainer,
             onTap: () => context.push('${AppRoutes.publish}?type=lost'),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: _ActionCard(
-            icon: Icons.redeem_rounded,
+          child: _PrimaryActionCard(
+            icon: 'box-linear',
             title: AppStrings.actionFoundTitle,
             subtitle: AppStrings.actionFoundSubtitle,
-            color: AppColors.found,
-            background: AppColors.foundSoft,
+            color: context.colors.tertiary,
+            background: context.colors.tertiaryContainer,
             onTap: () => context.push('${AppRoutes.publish}?type=found'),
           ),
         ),
@@ -201,8 +190,8 @@ class _ActionRow extends StatelessWidget {
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
+class _PrimaryActionCard extends StatelessWidget {
+  const _PrimaryActionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -211,7 +200,7 @@ class _ActionCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final IconData icon;
+  final String icon;
   final String title;
   final String subtitle;
   final Color color;
@@ -220,374 +209,141 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
+    final textTheme = context.typography;
+    return Semantics(
+      button: true,
+      label: title,
+      child: AppCard(
+        onTap: onTap,
         padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: color.withValues(alpha: 0.22), width: 1.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(title, style: AppText.h3.copyWith(fontSize: 16), maxLines: 2),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: AppText.caption.copyWith(height: 1.35),
-              maxLines: 3,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TinderBanner extends StatelessWidget {
-  const _TinderBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: () => context.push(AppRoutes.swipe),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFEEF0FE), Color(0xFFF3E8FF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: AppColors.primary.withValues(alpha: 0.24),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, Color(0xFF8B5CF6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        color: background,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 124),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                boxShadow: AppShadows.primary,
+                child: AppIcon(icon, color: context.colors.onPrimary, size: 24),
               ),
-              child: const Icon(
-                Icons.style_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'Tinder Cards',
-                          style: AppText.bodyStrong.copyWith(
-                            fontSize: 15,
-                            color: AppColors.primaryDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, Color(0xFF8B5CF6)],
-                          ),
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 9,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              'IA',
-                              style: AppText.caption.copyWith(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Glissez les correspondances triées par l’IA : à droite si c’est votre objet.',
-                    style: AppText.caption.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.35,
-                    ),
-                    maxLines: 2,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.primary,
-              size: 22,
-            ),
-          ],
+              const SizedBox(height: AppSpacing.sm),
+              Text(title, style: textTheme.titleMedium, maxLines: 2),
+              const SizedBox(height: 2),
+              Text(subtitle, style: textTheme.bodySmall, maxLines: 3),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _RewardsBanner extends StatelessWidget {
-  const _RewardsBanner();
+class _QuickLinks extends StatelessWidget {
+  const _QuickLinks();
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: () => context.push(AppRoutes.rewards),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: const Icon(
-                Icons.card_giftcard_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'Bons & Roue de la Chance',
-                          style: AppText.bodyStrong.copyWith(
-                            fontSize: 15,
-                            color: const Color(0xFF78350F),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B),
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                        ),
-                        child: Text(
-                          'NOUVEAU',
-                          style: AppText.caption.copyWith(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Gagnez des coupons de livraison Glovo & Yassir !',
-                    style: AppText.caption.copyWith(
-                      color: const Color(0xFF92400E),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFFB45309),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ObjectsBanner extends StatelessWidget {
-  const _ObjectsBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: () => context.push(AppRoutes.objects),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFE4F6ED), Color(0xFFD0F0E2)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: AppColors.found.withValues(alpha: 0.28),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.found,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x332FB57C),
-                    blurRadius: 16,
-                    offset: Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.inventory_2_rounded,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'Catalogue des Objets',
-                          style: AppText.bodyStrong.copyWith(
-                            fontSize: 15,
-                            color: const Color(0xFF065F46),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.found,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                        ),
-                        child: Text(
-                          'EXPLORER',
-                          style: AppText.caption.copyWith(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Parcourez les annonces ou visualisez la carte interactive',
-                    style: AppText.caption.copyWith(
-                      color: const Color(0xFF047857),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.found,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text(title, style: AppText.h2),
-        if (subtitle.isNotEmpty) ...[
-          const SizedBox(height: 2),
-          Text(subtitle, style: AppText.caption),
-        ],
+        Expanded(
+          child: _QuickLink(
+            icon: 'stars-linear',
+            label: 'Examiner',
+            color: context.colors.primary,
+            onTap: () => context.push(AppRoutes.swipe),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _QuickLink(
+            icon: 'box-linear',
+            label: 'Catalogue',
+            color: context.colors.tertiary,
+            onTap: () => context.go(AppRoutes.objects),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _QuickLink(
+            icon: 'gift-linear',
+            label: 'Récompenses',
+            color: context.colors.secondary,
+            onTap: () => context.push(AppRoutes.rewards),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickLink extends StatelessWidget {
+  const _QuickLink({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = context.typography;
+    return Semantics(
+      button: true,
+      label: label,
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.sm,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AppIcon(icon, color: color, size: 20),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                label,
+                style: textTheme.labelMedium?.copyWith(fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchesHeader extends StatelessWidget {
+  const _MatchesHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            AppStrings.sectionMatches,
+            style: context.typography.headlineSmall,
+          ),
+        ),
+        TextButton(
+          onPressed: () => context.go(AppRoutes.matches),
+          child: Text(AppStrings.sectionSeeAll),
+        ),
       ],
     );
   }
@@ -603,10 +359,11 @@ class _MatchesSection extends StatelessWidget {
     if (matches.isEmpty) {
       return const SliverToBoxAdapter(child: _EmptyMatches());
     }
+
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       sliver: SliverList.separated(
-        itemCount: matches.length,
+        itemCount: matches.take(3).length,
         separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
         itemBuilder: (context, index) {
           final match = matches[index];
@@ -632,37 +389,33 @@ class _EmptyMatches extends StatelessWidget {
         AppSpacing.xl,
         0,
       ),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.travel_explore_rounded,
-              size: 40,
-              color: AppColors.textTertiary,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text('Aucune correspondance', style: AppText.h3),
-            const SizedBox(height: 4),
-            Text(
-              'Publiez une annonce : notre moteur cherchera pour vous.',
-              style: AppText.caption,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextButton(
-              onPressed: () => context.push(AppRoutes.publish),
-              child: Text(
-                'Publier une annonce',
-                style: AppText.label.copyWith(color: AppColors.primary),
+      child: Semantics(
+        container: true,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          decoration: BoxDecoration(),
+          child: Column(
+            children: [
+              AppIcon(
+                'chat-round-dots-linear',
+                size: 40,
+                color: context.colors.textTertiary,
               ),
-            ),
-          ],
+              const SizedBox(height: AppSpacing.sm),
+              Text('Aucune correspondance', style: context.typography.h3),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Publiez une annonce : notre moteur cherchera pour vous.',
+                style: context.typography.caption,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextButton(
+                onPressed: () => context.push(AppRoutes.publish),
+                child: Text('Publier une annonce'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -678,13 +431,13 @@ class _MatchesSkeleton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
       child: Column(
         children: List.generate(
-          3,
+          2,
           (index) => Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: context.colors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Row(
@@ -695,17 +448,16 @@ class _MatchesSkeleton extends StatelessWidget {
                     borderRadius: AppRadius.md,
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         SkeletonBox(width: 170, height: 14),
                         SizedBox(height: 8),
                         SkeletonBox(width: 120, height: 11),
                       ],
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
                   const SkeletonBox(width: 52, height: 52, borderRadius: 40),
                 ],
               ),
@@ -724,21 +476,16 @@ class _MatchesError extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-      child: Container(
+      child: AppCard(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
-        ),
         child: Row(
           children: [
-            const Icon(Icons.cloud_off_rounded, color: AppColors.danger),
+            Icon(Icons.cloud_off_rounded, color: context.colors.error),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 'Impossible de charger les correspondances.',
-                style: AppText.body,
+                style: context.typography.bodyMedium,
               ),
             ),
           ],
@@ -757,30 +504,30 @@ class _ActivitySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final entries = <_ActivityItem>[
-      for (final item in myItems.take(3))
+      for (final item in myItems.take(2))
         _ActivityItem(
-          icon: item.type == ItemType.lost
-              ? Icons.search_off_rounded
-              : Icons.redeem_rounded,
-          color: item.type == ItemType.lost ? AppColors.lost : AppColors.found,
+          icon: 'box-linear',
+          color: item.type == ItemType.lost
+              ? context.colors.lost
+              : context.colors.found,
           title: 'Annonce « ${item.title} » publiée',
           subtitle:
               '${item.place.isEmpty ? item.category.label : item.place} · ${_relativeTime(item.occurredAt)}',
         ),
-      for (final match in matches.take(3))
+      for (final match in matches.take(2))
         _ActivityItem(
-          icon: Icons.auto_awesome_rounded,
-          color: AppColors.primary,
-          title: '${AppStrings.notifNewMatch} · ${match.foundItemTitle}',
+          icon: 'stars-linear',
+          color: context.colors.primary,
+          title: 'Nouvelle correspondance · ${match.foundItemTitle}',
           subtitle: '${match.scores.global.round()} % de correspondance',
         ),
     ];
 
     if (entries.isEmpty) {
       entries.add(
-        const _ActivityItem(
-          icon: Icons.history_rounded,
-          color: AppColors.textTertiary,
+        _ActivityItem(
+          icon: 'clock-circle-linear',
+          color: context.colors.textTertiary,
           title: 'Aucune activité récente',
           subtitle: 'Vos annonces et correspondances apparaîtront ici.',
         ),
@@ -792,19 +539,14 @@ class _ActivitySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(title: AppStrings.sectionActivity, subtitle: ''),
+          Text('Activité récente', style: context.typography.h2),
           const SizedBox(height: AppSpacing.md),
-          Container(
+          AppCard(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.xs,
             ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              boxShadow: AppShadows.card,
-            ),
-            child: Column(children: entries.take(5).toList()),
+            child: Column(children: entries.take(4).toList()),
           ),
         ],
       ),
@@ -820,7 +562,7 @@ class _ActivityItem extends StatelessWidget {
     required this.subtitle,
   });
 
-  final IconData icon;
+  final String icon;
   final Color color;
   final String title;
   final String subtitle;
@@ -838,7 +580,7 @@ class _ActivityItem extends StatelessWidget {
               color: color.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: Icon(icon, size: 19, color: color),
+            child: AppIcon(icon, color: color, size: 19),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -847,12 +589,12 @@ class _ActivityItem extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: AppText.bodyStrong.copyWith(fontSize: 14),
+                  style: context.typography.titleMedium?.copyWith(fontSize: 14),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 1),
-                Text(subtitle, style: AppText.caption),
+                Text(subtitle, style: context.typography.bodySmall),
               ],
             ),
           ),
@@ -864,7 +606,7 @@ class _ActivityItem extends StatelessWidget {
 
 String _relativeTime(DateTime dt) {
   final diff = DateTime.now().difference(dt);
-  if (diff.inMinutes < 1) return 'a l\'instant';
+  if (diff.inMinutes < 1) return 'à l’instant';
   if (diff.inMinutes < 60) return 'il y a ${diff.inMinutes} min';
   if (diff.inHours < 24) return 'il y a ${diff.inHours} h';
   if (diff.inDays == 1) return 'hier';

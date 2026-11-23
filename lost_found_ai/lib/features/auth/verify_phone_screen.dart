@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
@@ -66,11 +65,9 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
     });
 
     try {
-      await ref.read(sessionProvider.notifier).updateMe(
-        name: user.name,
-        email: user.email,
-        phone: phone,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .updateMe(name: user.name, email: user.email, phone: phone);
       if (!mounted) return;
       setState(() {
         _needsPhone = false;
@@ -78,7 +75,6 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Code de vérification envoyé par e-mail.'),
-          backgroundColor: AppColors.success,
         ),
       );
     } on Object catch (error) {
@@ -104,10 +100,7 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
       await ref.read(sessionProvider.notifier).verifyPhone(code: code);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Numéro de téléphone vérifié !'),
-          backgroundColor: AppColors.success,
-        ),
+        const SnackBar(content: Text('Numéro de téléphone vérifié !')),
       );
       // Le changement de session redéclenche la garde du routeur :
       // phoneVerified=true libère l'accès à l'application.
@@ -128,12 +121,9 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
       await ref.read(sessionProvider.notifier).resendOtp();
       if (!mounted) return;
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nouveau code envoyé.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Nouveau code envoyé.')));
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = _messageOf(error));
@@ -196,7 +186,9 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       _error!,
-                      style: AppText.caption.copyWith(color: AppColors.danger),
+                      style: context.typography.bodySmall?.copyWith(
+                        color: context.colors.error,
+                      ),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.xl),
@@ -219,7 +211,9 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.done,
                     maxLength: 6,
-                    style: AppText.h2.copyWith(letterSpacing: 10),
+                    style: context.typography.headlineMedium?.copyWith(
+                      letterSpacing: 10,
+                    ),
                     onFieldSubmitted: (_) => _submitCode(),
                     decoration: const InputDecoration(
                       labelText: 'Code de vérification',
@@ -232,7 +226,9 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       _error!,
-                      style: AppText.caption.copyWith(color: AppColors.danger),
+                      style: context.typography.bodySmall?.copyWith(
+                        color: context.colors.error,
+                      ),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.xl),
@@ -251,24 +247,18 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(
-                                'Renvoyer le code',
-                                style: AppText.label.copyWith(
-                                  color: AppColors.primary,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
-                              ),
+                              )
+                            : const Text('Renvoyer le code'),
                       ),
                       const Text(' • '),
                       TextButton(
-                        onPressed: _loading ? null : () => setState(() => _needsPhone = true),
-                        child: Text(
-                          'Modifier le numéro',
-                          style: AppText.label.copyWith(
-                            color: AppColors.primary,
-                          ),
-                        ),
+                        onPressed: _loading
+                            ? null
+                            : () => setState(() => _needsPhone = true),
+                        child: const Text('Modifier le numéro'),
                       ),
                     ],
                   ),
@@ -279,8 +269,8 @@ class _VerifyPhoneScreenState extends ConsumerState<VerifyPhoneScreen> {
                     onPressed: _loading ? null : _logout,
                     child: Text(
                       'Se déconnecter',
-                      style: AppText.label.copyWith(
-                        color: AppColors.textTertiary,
+                      style: context.typography.labelLarge?.copyWith(
+                        color: context.colors.onSurfaceVariant,
                       ),
                     ),
                   ),

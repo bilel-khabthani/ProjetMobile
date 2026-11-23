@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
@@ -71,24 +70,23 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
     setState(() => _loading = true);
     try {
-      await ref.read(sessionProvider.notifier).signUp(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        password: _passwordController.text,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .signUp(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            phone: _phoneController.text.trim(),
+            password: _passwordController.text,
+          );
       if (!mounted) return;
       // La garde du routeur impose /verify-phone tant que le numero n'est
       // pas verifie (CDC 6.1), puis mene a l'accueil.
       context.go(AppRoutes.home);
     } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_messageOf(error)),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_messageOf(error))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -168,8 +166,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     prefixIcon: Icon(Icons.phone_android_rounded),
                   ),
                   validator: (value) {
-                    final digits = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-                    return digits.length >= 8 ? null : AppStrings.errorPhoneInvalid;
+                    final digits = (value ?? '').replaceAll(
+                      RegExp(r'[^0-9]'),
+                      '',
+                    );
+                    return digits.length >= 8
+                        ? null
+                        : AppStrings.errorPhoneInvalid;
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -237,13 +240,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 Center(
                   child: TextButton(
                     onPressed: () => context.replace(AppRoutes.signIn),
-                    child: Text(
-                      AppStrings.alreadyHaveAccount,
-                      style: AppText.label.copyWith(
-                        color: AppColors.primary,
-                        fontSize: 15,
-                      ),
-                    ),
+                    child: Text(AppStrings.alreadyHaveAccount),
                   ),
                 ),
               ],
@@ -274,23 +271,15 @@ class _TermsCheckbox extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: value,
-                onChanged: (next) => onChanged(next ?? false),
-                activeColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
+            Checkbox(
+              value: value,
+              onChanged: (next) => onChanged(next ?? false),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 "J’accepte les conditions d’utilisation et la politique de confidentialité.",
-                style: AppText.caption.copyWith(fontSize: 13),
+                style: context.typography.bodySmall,
               ),
             ),
           ],
@@ -300,7 +289,9 @@ class _TermsCheckbox extends StatelessWidget {
             padding: const EdgeInsets.only(left: 36, top: 4),
             child: Text(
               AppStrings.errorTerms,
-              style: AppText.caption.copyWith(color: AppColors.danger),
+              style: context.typography.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
             ),
           ),
       ],

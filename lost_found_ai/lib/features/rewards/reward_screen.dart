@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/reward.dart';
 import '../../data/providers.dart';
 import 'widgets/coupon_card.dart';
@@ -45,7 +44,7 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
           content: Text(
             'Points insuffisants : vous avez $currentPoints pts, il vous faut ${reward.pointsCost} pts.',
           ),
-          backgroundColor: AppColors.danger,
+          backgroundColor: context.colors.error,
         ),
       );
       return;
@@ -84,8 +83,12 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
       final emailSent = res['email_sent'] != false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(res['message'] as String? ?? 'Coupon obtenu avec succès !'),
-          backgroundColor: emailSent ? AppColors.success : AppColors.warning,
+          content: Text(
+            res['message'] as String? ?? 'Coupon obtenu avec succès !',
+          ),
+          backgroundColor: emailSent
+              ? context.colors.primary
+              : context.colors.tertiary,
           duration: Duration(seconds: emailSent ? 4 : 6),
         ),
       );
@@ -95,7 +98,10 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.danger),
+        SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: context.colors.danger,
+        ),
       );
     }
   }
@@ -109,7 +115,10 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.danger),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: context.colors.danger,
+          ),
         );
       }
       return null;
@@ -127,12 +136,15 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
         title: const Text('Récompenses & Fidélité'),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textTertiary,
-          indicatorColor: AppColors.primary,
+          labelColor: context.colors.primary,
+          unselectedLabelColor: context.colors.onSurfaceVariant,
+          indicatorColor: context.colors.primary,
           tabs: const [
             Tab(icon: Icon(Icons.storefront_rounded), text: 'Boutique'),
-            Tab(icon: Icon(Icons.confirmation_number_rounded), text: 'Mes Bons'),
+            Tab(
+              icon: Icon(Icons.confirmation_number_rounded),
+              text: 'Mes Bons',
+            ),
             Tab(icon: Icon(Icons.casino_rounded), text: 'Roue'),
           ],
         ),
@@ -155,7 +167,8 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
                 _ShopTab(
                   rewardsAsync: rewardsAsync,
                   selectedCategory: _selectedCategory,
-                  onCategoryChanged: (cat) => setState(() => _selectedCategory = cat),
+                  onCategoryChanged: (cat) =>
+                      setState(() => _selectedCategory = cat),
                   onRedeem: _redeemReward,
                 ),
 
@@ -169,10 +182,7 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
                 ),
 
                 // Onglet 3 : Roue de la Chance
-                _WheelTab(
-                  walletAsync: walletAsync,
-                  onSpin: _handleSpin,
-                ),
+                _WheelTab(walletAsync: walletAsync, onSpin: _handleSpin),
               ],
             ),
           ),
@@ -193,13 +203,12 @@ class _WalletHeader extends StatelessWidget {
       margin: const EdgeInsets.all(AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF5B6CF0), Color(0xFF4351D6)],
+        gradient: LinearGradient(
+          colors: [context.colors.primary, context.colors.tertiary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.primary,
       ),
       child: Row(
         children: [
@@ -207,12 +216,12 @@ class _WalletHeader extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: context.colors.onPrimary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.stars_rounded,
-              color: Colors.white,
+              color: context.colors.onPrimary,
               size: 28,
             ),
           ),
@@ -223,11 +232,15 @@ class _WalletHeader extends StatelessWidget {
               children: [
                 Text(
                   '${wallet.points} Points Fidélité',
-                  style: AppText.h2.copyWith(color: Colors.white),
+                  style: context.typography.titleLarge?.copyWith(
+                    color: context.colors.onPrimary,
+                  ),
                 ),
                 Text(
                   'Gagnez des points en restituant des objets perdus !',
-                  style: AppText.caption.copyWith(color: Colors.white70),
+                  style: context.typography.bodySmall?.copyWith(
+                    color: context.colors.onPrimary.withValues(alpha: 0.85),
+                  ),
                 ),
               ],
             ),
@@ -235,15 +248,20 @@ class _WalletHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: wallet.canSpinFreeToday ? const Color(0xFFFFB33C) : Colors.white24,
+              color: wallet.canSpinFreeToday
+                  ? context.colors.tertiaryContainer
+                  : context.colors.onPrimary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
             child: Text(
-              wallet.canSpinFreeToday ? '1 Tour Dispo' : 'Tour Effectué (Demain)',
-              style: AppText.caption.copyWith(
-                color: Colors.white,
+              wallet.canSpinFreeToday
+                  ? '1 Tour Dispo'
+                  : 'Tour Effectué (Demain)',
+              style: context.typography.labelSmall?.copyWith(
+                color: wallet.canSpinFreeToday
+                    ? context.colors.onTertiaryContainer
+                    : context.colors.onPrimary,
                 fontWeight: FontWeight.bold,
-                fontSize: 10,
               ),
             ),
           ),
@@ -273,7 +291,10 @@ class _ShopTab extends StatelessWidget {
         // Filtres catégories
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
           child: Row(
             children: [
               _FilterChip(
@@ -306,19 +327,30 @@ class _ShopTab extends StatelessWidget {
             data: (rewards) {
               final filtered = selectedCategory == 'ALL'
                   ? rewards
-                  : rewards.where((r) => r.partnerType.toUpperCase() == selectedCategory).toList();
+                  : rewards
+                        .where(
+                          (r) =>
+                              r.partnerType.toUpperCase() == selectedCategory,
+                        )
+                        .toList();
 
               if (filtered.isEmpty) {
-                return const Center(child: Text('Aucune récompense dans cette catégorie.'));
+                return const Center(
+                  child: Text('Aucune récompense dans cette catégorie.'),
+                );
               }
 
               return ListView.separated(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 itemCount: filtered.length,
-                separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppSpacing.sm),
                 itemBuilder: (context, index) {
                   final reward = filtered[index];
-                  return _RewardShopCard(reward: reward, onRedeem: () => onRedeem(reward));
+                  return _RewardShopCard(
+                    reward: reward,
+                    onRedeem: () => onRedeem(reward),
+                  );
                 },
               );
             },
@@ -350,9 +382,11 @@ class _FilterChip extends StatelessWidget {
         label: Text(label),
         selected: selected,
         onSelected: (_) => onSelected(),
-        selectedColor: AppColors.primarySoft,
+
         labelStyle: TextStyle(
-          color: selected ? AppColors.primary : AppColors.textSecondary,
+          color: selected
+              ? context.colors.primary
+              : context.colors.onSurfaceVariant,
           fontWeight: selected ? FontWeight.bold : FontWeight.normal,
           fontSize: 12,
         ),
@@ -367,27 +401,14 @@ class _RewardShopCard extends StatelessWidget {
   final Reward reward;
   final VoidCallback onRedeem;
 
-  Color _color() {
-    try {
-      final hex = reward.colorHex.replaceAll('#', '');
-      return Color(int.parse('FF$hex', radix: 16));
-    } catch (_) {
-      return AppColors.primary;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final color = _color();
+    final scheme = context.colors;
+    final textTheme = context.typography;
+    final color = _partnerColor(reward.partnerName, scheme);
 
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-        border: Border.all(color: AppColors.border),
-      ),
       child: Row(
         children: [
           Container(
@@ -406,19 +427,13 @@ class _RewardShopCard extends StatelessWidget {
               children: [
                 Text(
                   reward.partnerName,
-                  style: AppText.caption.copyWith(
+                  style: textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
                 ),
-                Text(
-                  reward.title,
-                  style: AppText.bodyStrong,
-                ),
-                Text(
-                  reward.discountText,
-                  style: AppText.caption.copyWith(color: AppColors.textSecondary),
-                ),
+                Text(reward.title, style: textTheme.titleMedium),
+                Text(reward.discountText, style: textTheme.bodySmall),
               ],
             ),
           ),
@@ -427,7 +442,6 @@ class _RewardShopCard extends StatelessWidget {
             onPressed: onRedeem,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              backgroundColor: AppColors.primary,
             ),
             child: Text('${reward.pointsCost} pts'),
           ),
@@ -435,13 +449,20 @@ class _RewardShopCard extends StatelessWidget {
       ),
     );
   }
+
+  Color _partnerColor(String name, ColorScheme scheme) {
+    final normalized = name.toLowerCase();
+    if (normalized.contains('glovo')) return scheme.tertiary;
+    if (normalized.contains('yassir')) return scheme.secondary;
+    if (normalized.contains('resto') || normalized.contains('campus')) {
+      return scheme.error;
+    }
+    return scheme.primary;
+  }
 }
 
 class _MyCouponsTab extends StatelessWidget {
-  const _MyCouponsTab({
-    required this.couponsAsync,
-    required this.onRefresh,
-  });
+  const _MyCouponsTab({required this.couponsAsync, required this.onRefresh});
 
   final AsyncValue<List<UserCoupon>> couponsAsync;
   final RefreshCallback onRefresh;
@@ -459,17 +480,20 @@ class _MyCouponsTab extends StatelessWidget {
                 Center(
                   child: Column(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.confirmation_number_outlined,
                         size: 54,
-                        color: AppColors.textTertiary,
+                        color: context.colors.onSurfaceVariant,
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      Text('Aucun coupon actif', style: AppText.h3),
+                      Text(
+                        'Aucun coupon actif',
+                        style: context.typography.titleMedium,
+                      ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Restituez un objet ou tournez la Roue de la Chance pour en gagner !',
-                        style: AppText.caption,
+                        style: context.typography.bodySmall,
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -499,48 +523,45 @@ class _MyCouponsTab extends StatelessWidget {
 }
 
 class _WheelTab extends StatelessWidget {
-  const _WheelTab({
-    required this.walletAsync,
-    required this.onSpin,
-  });
-
+  const _WheelTab({required this.walletAsync, required this.onSpin});
   final AsyncValue<RewardWallet> walletAsync;
   final Future<SpinResult?> Function() onSpin;
-
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
     final wallet = walletAsync.valueOrNull;
     final canSpinToday = wallet?.canSpinFreeToday ?? true;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: canSpinToday ? const Color(0xFFFEF3C7) : AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
-                color: canSpinToday ? const Color(0xFFF59E0B) : AppColors.border,
-              ),
+          AppCard(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
+            color: canSpinToday
+                ? scheme.tertiaryContainer.withValues(alpha: 0.45)
+                : scheme.surfaceContainer,
             child: Row(
               children: [
                 Icon(
-                  canSpinToday ? Icons.celebration_rounded : Icons.check_circle_rounded,
-                  color: canSpinToday ? const Color(0xFFD97706) : AppColors.success,
+                  canSpinToday
+                      ? Icons.celebration_rounded
+                      : Icons.check_circle_rounded,
+                  color: canSpinToday ? scheme.tertiary : scheme.primary,
                   size: 20,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     canSpinToday
-                        ? '🎯 1 tour gratuit disponible aujourd\'hui !'
-                        : '✅ Tour du jour déjà effectué ! Revenez demain.',
-                    style: AppText.caption.copyWith(
+                        ? '1 tour gratuit disponible aujourd\'hui !'
+                        : 'Tour du jour déjà effectué ! Revenez demain.',
+                    style: textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: canSpinToday ? const Color(0xFF78350F) : AppColors.textPrimary,
+                      color: scheme.onSurface,
                     ),
                   ),
                 ),
@@ -548,17 +569,13 @@ class _WheelTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-
-          // La Roue de la Chance
-          LuckyWheelWidget(
-            onSpinRequested: onSpin,
-            canSpin: canSpinToday,
-          ),
-
+          LuckyWheelWidget(onSpinRequested: onSpin, canSpin: canSpinToday),
           const SizedBox(height: AppSpacing.xl),
           Text(
-            'Règle : 1 seul tour par jour.\nPlus les points augmentent, plus la chance est rare ! (De +5 à +100 Pts Jackpot)\nÉchangez vos points dans la Boutique contre vos bons partenaires.',
-            style: AppText.caption,
+            'Règle : 1 seul tour par jour.\n'
+            'Plus les points augmentent, plus la chance est rare ! (De +5 à +100 Pts Jackpot)\n'
+            'Échangez vos points dans la Boutique contre vos bons partenaires.',
+            style: textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
         ],
@@ -566,4 +583,3 @@ class _WheelTab extends StatelessWidget {
     );
   }
 }
-

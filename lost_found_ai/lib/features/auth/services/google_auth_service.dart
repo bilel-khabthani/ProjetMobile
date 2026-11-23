@@ -118,13 +118,15 @@ class GoogleAuthHelper {
         return;
       }
 
-      await ref.read(sessionProvider.notifier).signInWithGoogle(
-        idToken: idToken,
-        email: account.email,
-        name: account.displayName ?? account.email.split('@').first,
-        googleId: account.id,
-        avatar: account.photoUrl,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .signInWithGoogle(
+            idToken: idToken,
+            email: account.email,
+            name: account.displayName ?? account.email.split('@').first,
+            googleId: account.id,
+            avatar: account.photoUrl,
+          );
 
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

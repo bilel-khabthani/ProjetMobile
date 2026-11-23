@@ -20,6 +20,7 @@ class MessageResource extends JsonResource
             'id' => $this->id,
             'match_id' => $this->match_id,
             'body' => $this->body,
+            'image_url' => $this->image_path ? '/storage/'.$this->image_path : null,
             'status' => $this->status,
             'created_at' => $this->created_at?->toIso8601String(),
             'read_at' => $this->read_at?->toIso8601String(),

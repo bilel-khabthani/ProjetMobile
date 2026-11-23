@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/swipe_candidate.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
@@ -143,6 +142,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final deck = state;
     final total = deck?.initialTotal ?? 0;
     final remaining = deck?.remaining ?? 0;
@@ -176,7 +176,10 @@ class _Header extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text('Tinder Cards', style: AppText.h2),
+                        Text(
+                          'Tinder Cards',
+                          style: context.typography.headlineSmall,
+                        ),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -184,26 +187,24 @@ class _Header extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColors.primary, Color(0xFF8B5CF6)],
-                            ),
+                            color: colors.primary,
                             borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.auto_awesome_rounded,
                                 size: 10,
-                                color: Colors.white,
+                                color: colors.onPrimary,
                               ),
                               const SizedBox(width: 3),
                               Text(
                                 'IA',
-                                style: AppText.caption.copyWith(
-                                  color: Colors.white,
+                                style: context.typography.bodySmall?.copyWith(
+                                  color: colors.onPrimary,
                                   fontSize: 9,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -211,7 +212,10 @@ class _Header extends StatelessWidget {
                         ),
                       ],
                     ),
-                    Text('L’IA trie, vous décidez.', style: AppText.caption),
+                    Text(
+                      'L’IA trie, vous décidez.',
+                      style: context.typography.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -236,12 +240,12 @@ class _Header extends StatelessWidget {
                     children: [
                       Text(
                         '$remaining carte${remaining > 1 ? 's' : ''} à trier',
-                        style: AppText.label,
+                        style: context.typography.labelMedium,
                       ),
                       const Spacer(),
                       Text(
                         '${deck.liked} validée(s) · ${deck.passed} passée(s)',
-                        style: AppText.caption,
+                        style: context.typography.bodySmall,
                       ),
                     ],
                   ),
@@ -251,10 +255,8 @@ class _Header extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: done.clamp(0.0, 1.0),
                       minHeight: 6,
-                      backgroundColor: AppColors.primarySoft,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.primary,
-                      ),
+                      backgroundColor: colors.primaryContainer,
+                      valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
                     ),
                   ),
                 ],
@@ -273,6 +275,7 @@ class _DemoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       margin: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -285,20 +288,26 @@ class _DemoBanner extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: AppColors.accentSoft,
+        color: colors.secondaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Row(
         children: [
-          const Icon(Icons.science_rounded, size: 16, color: Color(0xFF9A5B00)),
+          Icon(
+            Icons.science_rounded,
+            size: 16,
+            color: colors.onSecondaryContainer,
+          ),
           const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
               message == null
                   ? 'Mode démo : API indisponible, deck de démonstration.'
                   : 'Mode démo : ${message!}. Deck de démonstration chargé.',
-              style: AppText.caption.copyWith(color: const Color(0xFF9A5B00)),
+              style: context.typography.bodySmall?.copyWith(
+                color: colors.onSecondaryContainer,
+              ),
               maxLines: 2,
             ),
           ),
@@ -315,12 +324,7 @@ class _DeckLoading extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.xl),
-          boxShadow: AppShadows.card,
-        ),
+      child: AppCard(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +368,7 @@ class _DeckError extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CenteredState(
       icon: Icons.cloud_off_rounded,
-      color: AppColors.danger,
+      color: context.colors.error,
       title: 'Deck indisponible',
       subtitle: message,
       child: AppButton(
@@ -386,7 +390,7 @@ class _DeckFinished extends StatelessWidget {
   Widget build(BuildContext context) {
     return _CenteredState(
       icon: Icons.task_alt_rounded,
-      color: AppColors.found,
+      color: context.colors.tertiary,
       title: 'Deck terminé !',
       subtitle: state.liked == 0
           ? 'Aucune carte validée pour le moment. Rechargez le deck ou publiez une annonce pour recevoir de nouvelles correspondances.'
@@ -409,10 +413,7 @@ class _DeckFinished extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           TextButton(
             onPressed: () => context.go(AppRoutes.home),
-            child: Text(
-              'Retour à l’accueil',
-              style: AppText.label.copyWith(color: AppColors.primary),
-            ),
+            child: const Text('Retour à l’accueil'),
           ),
         ],
       ),
@@ -447,15 +448,23 @@ class _CenteredState extends StatelessWidget {
               width: 84,
               height: 84,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
+                color: context.colors.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 40, color: color),
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(title, style: AppText.h2, textAlign: TextAlign.center),
+            Text(
+              title,
+              style: context.typography.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppSpacing.xs),
-            Text(subtitle, style: AppText.body, textAlign: TextAlign.center),
+            Text(
+              subtitle,
+              style: context.typography.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppSpacing.xl),
             SizedBox(width: 260, child: child),
           ],

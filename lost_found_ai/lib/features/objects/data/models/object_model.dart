@@ -61,7 +61,8 @@ class LostFoundObject {
       occurredAt:
           DateTime.tryParse(json['occurred_at']?.toString() ?? '') ??
           DateTime.now(),
-      imagePath: (json['image_url'] as String?) ?? (json['image_path'] as String?),
+      imagePath:
+          (json['image_url'] as String?) ?? (json['image_path'] as String?),
       contactPhone: json['contact_phone'] as String?,
       secretDetail: json['secret_detail'] as String?,
       userName: user?['name'] as String?,
@@ -154,10 +155,12 @@ class LostFoundObject {
     if (imagePath!.startsWith('http://') || imagePath!.startsWith('https://')) {
       return imagePath;
     }
-    final cleanPath =
-        imagePath!.startsWith('/') ? imagePath!.substring(1) : imagePath!;
-    final storagePath =
-        cleanPath.startsWith('storage/') ? cleanPath : 'storage/$cleanPath';
+    final cleanPath = imagePath!.startsWith('/')
+        ? imagePath!.substring(1)
+        : imagePath!;
+    final storagePath = cleanPath.startsWith('storage/')
+        ? cleanPath
+        : 'storage/$cleanPath';
     return '${AppConfig.serverBaseUrl}/$storagePath';
   }
 

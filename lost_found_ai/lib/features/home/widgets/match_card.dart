@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/app_strings.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/item.dart';
 import '../../../data/models/item_match.dart';
 import '../../../widgets/photo_placeholder.dart';
-import '../../../widgets/pressable_scale.dart';
-import '../../../widgets/score_gauge.dart';
 import '../../../widgets/status_pill.dart';
 
 class MatchCard extends StatelessWidget {
@@ -19,77 +16,63 @@ class MatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
+    final scheme = context.colors;
+    final textTheme = context.typography;
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: AppShadows.card,
-        ),
-        child: Row(
-          children: [
-            PhotoPlaceholder(
-              category: match.foundItemCategory,
-              size: 68,
-              borderRadius: AppRadius.md,
-              showLabel: false,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    match.foundItemTitle,
-                    style: AppText.h3,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${AppStrings.matchFoundAt(match.foundItemPlace)} · ${_ago(match.minutesAgo)}',
-                    style: AppText.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: [
-                      StatusPill(type: ItemType.found, compact: true),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          match.finderName,
-                          style: AppText.caption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Column(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Row(
+        children: [
+          PhotoPlaceholder(
+            category: match.foundItemCategory,
+            size: 68,
+            borderRadius: AppRadius.md,
+            showLabel: false,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ScoreGauge(
-                  value: match.scores.global,
-                  size: 52,
-                  strokeWidth: 6,
-                  color: _scoreColor(match.scores.global),
-                  secondaryColor: _scoreColor(match.scores.global)
-                      .withValues(alpha: 0.55),
+                Text(
+                  match.foundItemTitle,
+                  style: textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
-                Text('score', style: AppText.caption.copyWith(fontSize: 10)),
+                const SizedBox(height: 3),
+                Text(
+                  '${AppStrings.matchFoundAt(match.foundItemPlace)} · ${_ago(match.minutesAgo)}',
+                  style: textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    StatusPill(type: ItemType.found, compact: true),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        match.finderName,
+                        style: textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          _MatchScore(
+            score: match.scores.global,
+            scheme: scheme,
+            textTheme: textTheme,
+          ),
+        ],
       ),
     );
   }
@@ -99,10 +82,47 @@ class MatchCard extends StatelessWidget {
     if (minutes < 60) return AppStrings.minutesAgo(minutes);
     return AppStrings.hoursAgo(minutes ~/ 60);
   }
+}
 
-  static Color _scoreColor(double score) {
-    if (score >= 80) return AppColors.found;
-    if (score >= 65) return AppColors.accent;
-    return AppColors.textTertiary;
+class _MatchScore extends StatelessWidget {
+  const _MatchScore({
+    required this.score,
+    required this.scheme,
+    required this.textTheme,
+  });
+
+  final double score;
+  final ColorScheme scheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = score >= 80 ? scheme.primary : scheme.tertiary;
+    final value = (score / 100).clamp(0.0, 1.0);
+    return Column(
+      children: [
+        SizedBox(
+          width: 52,
+          height: 52,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CircularProgressIndicator(
+                value: value,
+                strokeWidth: 6,
+                color: color,
+                backgroundColor: scheme.surfaceContainerHighest,
+              ),
+              Text(
+                '${score.round()}',
+                style: textTheme.labelLarge?.copyWith(color: scheme.onSurface),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text('score', style: textTheme.bodySmall?.copyWith(fontSize: 10)),
+      ],
+    );
   }
 }

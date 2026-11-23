@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
-import '../core/theme/app_typography.dart';
+import '../core/theme/app_theme.dart';
 
 class ScoreGauge extends StatelessWidget {
   const ScoreGauge({
@@ -83,6 +83,7 @@ class _GaugeBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final percent = (progress * 100).round();
     return SizedBox(
       width: size,
@@ -94,8 +95,8 @@ class _GaugeBody extends StatelessWidget {
             size: Size.square(size),
             painter: _GaugePainter(
               progress: progress,
-              color: color,
-              secondaryColor: secondaryColor ?? color,
+              foreground: secondaryColor ?? color,
+              trackColor: colors.surfaceContainerHighest,
               strokeWidth: strokeWidth,
             ),
           ),
@@ -104,9 +105,10 @@ class _GaugeBody extends StatelessWidget {
             children: [
               Text(
                 '$percent',
-                style: AppText.score.copyWith(
+                style: context.typography.headlineLarge?.copyWith(
                   fontSize: size * 0.28,
-                  color: labelColor ?? AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  color: labelColor ?? colors.onSurface,
                 ),
               ),
               if (label != null)
@@ -114,8 +116,8 @@ class _GaugeBody extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
                     label!,
-                    style: AppText.caption.copyWith(
-                      color: labelColor ?? AppColors.textTertiary,
+                    style: context.typography.bodySmall?.copyWith(
+                      color: labelColor ?? colors.onSurfaceVariant,
                       fontSize: size * 0.085,
                     ),
                   ),
@@ -131,14 +133,14 @@ class _GaugeBody extends StatelessWidget {
 class _GaugePainter extends CustomPainter {
   const _GaugePainter({
     required this.progress,
-    required this.color,
-    required this.secondaryColor,
+    required this.foreground,
+    required this.trackColor,
     required this.strokeWidth,
   });
 
   final double progress;
-  final Color color;
-  final Color secondaryColor;
+  final Color foreground;
+  final Color trackColor;
   final double strokeWidth;
 
   @override
@@ -150,23 +152,16 @@ class _GaugePainter extends CustomPainter {
     final track = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..color = color.withValues(alpha: 0.13);
+      ..color = trackColor;
     canvas.drawCircle(center, radius, track);
 
     if (progress <= 0) return;
-
-    final shader = SweepGradient(
-      startAngle: -math.pi / 2,
-      endAngle: 3 * math.pi / 2,
-      colors: [secondaryColor, color],
-      transform: const GradientRotation(-math.pi / 2),
-    ).createShader(rect);
 
     final arc = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
-      ..shader = shader;
+      ..color = foreground;
 
     canvas.drawArc(
       rect,
@@ -180,8 +175,8 @@ class _GaugePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _GaugePainter old) {
     return old.progress != progress ||
-        old.color != color ||
-        old.secondaryColor != secondaryColor ||
+        old.foreground != foreground ||
+        old.trackColor != trackColor ||
         old.strokeWidth != strokeWidth;
   }
 }

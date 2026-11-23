@@ -4,109 +4,283 @@ import 'app_colors.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
 
-ThemeData buildAppTheme() {
-  const colorScheme = ColorScheme.light(
-    primary: AppColors.primary,
-    onPrimary: Colors.white,
-    primaryContainer: AppColors.primarySoft,
-    onPrimaryContainer: AppColors.primaryDark,
-    secondary: AppColors.accent,
-    onSecondary: AppColors.textPrimary,
-    secondaryContainer: AppColors.accentSoft,
-    onSecondaryContainer: AppColors.textPrimary,
-    tertiary: AppColors.found,
-    onTertiary: Colors.white,
-    tertiaryContainer: AppColors.foundSoft,
-    onTertiaryContainer: Color(0xFF1D6B4A),
-    error: AppColors.danger,
-    onError: Colors.white,
-    surface: AppColors.surface,
-    onSurface: AppColors.textPrimary,
-    onSurfaceVariant: AppColors.textSecondary,
-    outline: AppColors.border,
-    outlineVariant: AppColors.divider,
+ThemeData buildAppTheme() => _buildTheme(Brightness.light);
+
+ThemeData buildAppDarkTheme() => _buildTheme(Brightness.dark);
+
+ThemeData _buildTheme(Brightness brightness) {
+  final scheme = ColorScheme.fromSeed(
+    seedColor: AppColors.seed,
+    brightness: brightness,
+  );
+  final textTheme = _buildTextTheme(scheme);
+  final shape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(AppRadius.lg),
+  );
+  final buttonShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(AppRadius.md),
   );
 
   return ThemeData(
     useMaterial3: true,
-    colorScheme: colorScheme,
+    colorScheme: scheme,
     fontFamily: AppText.family,
-    scaffoldBackgroundColor: AppColors.background,
+    scaffoldBackgroundColor: scheme.surface,
+    canvasColor: scheme.surface,
     splashFactory: InkSparkle.splashFactory,
-    textSelectionTheme: const TextSelectionThemeData(
-      cursorColor: AppColors.primary,
-      selectionColor: AppColors.primarySoft,
-      selectionHandleColor: AppColors.primary,
-    ),
-    textTheme: const TextTheme(
-      displayLarge: AppText.display,
-      headlineMedium: AppText.h1,
-      headlineSmall: AppText.h2,
-      titleLarge: AppText.h3,
-      bodyLarge: AppText.body,
-      bodyMedium: AppText.body,
-      labelLarge: AppText.label,
-      bodySmall: AppText.caption,
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.background,
+    textTheme: textTheme,
+    appBarTheme: AppBarTheme(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
       surfaceTintColor: Colors.transparent,
-      foregroundColor: AppColors.textPrimary,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: AppText.h2,
+      titleTextStyle: AppText.h2.copyWith(color: scheme.onSurface),
+      iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
     ),
-    dividerTheme: const DividerThemeData(
-      color: AppColors.divider,
+    cardTheme: CardThemeData(
+      color: scheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: shape.copyWith(side: BorderSide(color: scheme.outlineVariant)),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(64, 56),
+        shape: buttonShape,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        textStyle: AppText.button,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(64, 56),
+        shape: buttonShape,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        textStyle: AppText.button,
+        side: BorderSide(color: scheme.outline),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        minimumSize: const Size(64, 48),
+        shape: buttonShape,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        textStyle: AppText.button,
+      ),
+    ),
+    iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+    listTileTheme: ListTileThemeData(
+      iconColor: scheme.onSurfaceVariant,
+      titleTextStyle: AppText.h3.copyWith(color: scheme.onSurface),
+      subtitleTextStyle: AppText.body.copyWith(color: scheme.onSurfaceVariant),
+      shape: shape,
+    ),
+    dividerTheme: DividerThemeData(
+      color: scheme.outlineVariant,
       thickness: 1,
       space: 1,
     ),
-    snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.textPrimary,
-      contentTextStyle: AppText.bodyStrong.copyWith(color: Colors.white),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+    chipTheme: ChipThemeData(
+      backgroundColor: scheme.surfaceContainerLow,
+      selectedColor: scheme.secondaryContainer,
+      disabledColor: scheme.surfaceContainerHighest,
+      labelStyle: AppText.label.copyWith(color: scheme.onSurfaceVariant),
+      secondaryLabelStyle: AppText.label.copyWith(
+        color: scheme.onSecondaryContainer,
+      ),
+      side: BorderSide(color: scheme.outlineVariant),
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        backgroundColor: scheme.surfaceContainerLow,
+        selectedBackgroundColor: scheme.secondaryContainer,
+        foregroundColor: scheme.onSurfaceVariant,
+        selectedForegroundColor: scheme.onSecondaryContainer,
+        side: BorderSide(color: scheme.outlineVariant),
+        textStyle: AppText.label,
       ),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-      ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: scheme.primary,
+      linearTrackColor: scheme.primaryContainer,
+      circularTrackColor: scheme.primaryContainer,
+      refreshBackgroundColor: scheme.surfaceContainer,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surfaceAlt,
+      fillColor: scheme.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.md,
       ),
-      hintStyle: AppText.body.copyWith(color: AppColors.textTertiary),
-      labelStyle: AppText.label,
-      floatingLabelStyle: AppText.label.copyWith(color: AppColors.primary),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.border, width: 1.5),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.danger, width: 2),
+      hintStyle: AppText.body.copyWith(color: scheme.onSurfaceVariant),
+      labelStyle: AppText.label.copyWith(color: scheme.onSurfaceVariant),
+      floatingLabelStyle: AppText.label.copyWith(color: scheme.primary),
+      border: _inputBorder(scheme.outlineVariant),
+      enabledBorder: _inputBorder(scheme.outlineVariant),
+      focusedBorder: _inputBorder(scheme.primary, width: 2),
+      errorBorder: _inputBorder(scheme.error),
+      focusedErrorBorder: _inputBorder(scheme.error, width: 2),
+      errorStyle: AppText.caption.copyWith(color: scheme.error),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: scheme.surfaceContainer,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      indicatorColor: scheme.secondaryContainer,
+      indicatorShape: const StadiumBorder(),
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+      labelTextStyle: WidgetStateProperty.resolveWith<TextStyle?>((states) {
+        return states.contains(WidgetState.selected)
+            ? AppText.label.copyWith(color: scheme.onSecondaryContainer)
+            : AppText.label.copyWith(color: scheme.onSurfaceVariant);
+      }),
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: scheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
     ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: scheme.inverseSurface,
+      contentTextStyle: AppText.body.copyWith(color: scheme.onInverseSurface),
+      behavior: SnackBarBehavior.floating,
+      shape: shape,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: scheme.surfaceContainerHigh,
+      surfaceTintColor: Colors.transparent,
+      elevation: 1,
+      shape: shape,
+      titleTextStyle: AppText.h2.copyWith(color: scheme.onSurface),
+      contentTextStyle: AppText.body.copyWith(color: scheme.onSurfaceVariant),
+    ),
   );
+}
+
+OutlineInputBorder _inputBorder(Color color, {double width = 1}) {
+  return OutlineInputBorder(
+    borderRadius: BorderRadius.circular(AppRadius.md),
+    borderSide: BorderSide(color: color, width: width),
+  );
+}
+
+TextTheme _buildTextTheme(ColorScheme scheme) {
+  return TextTheme(
+    displayLarge: AppText.display.copyWith(color: scheme.onSurface),
+    displayMedium: AppText.h1.copyWith(color: scheme.onSurface),
+    displaySmall: AppText.h2.copyWith(color: scheme.onSurface),
+    headlineLarge: AppText.h1.copyWith(color: scheme.onSurface),
+    headlineMedium: AppText.h2.copyWith(color: scheme.onSurface),
+    headlineSmall: AppText.h3.copyWith(color: scheme.onSurface),
+    titleLarge: AppText.h3.copyWith(color: scheme.onSurface),
+    titleMedium: AppText.bodyStrong.copyWith(color: scheme.onSurface),
+    titleSmall: AppText.label.copyWith(color: scheme.onSurface),
+    bodyLarge: AppText.body.copyWith(color: scheme.onSurface),
+    bodyMedium: AppText.body.copyWith(color: scheme.onSurfaceVariant),
+    bodySmall: AppText.caption.copyWith(color: scheme.onSurfaceVariant),
+    labelLarge: AppText.button.copyWith(color: scheme.onPrimary),
+    labelMedium: AppText.label.copyWith(color: scheme.onSurfaceVariant),
+    labelSmall: AppText.tiny.copyWith(color: scheme.onSurfaceVariant),
+  );
+}
+
+extension AppThemeContext on BuildContext {
+  ColorScheme get colors => Theme.of(this).colorScheme;
+  TextTheme get typography => Theme.of(this).textTheme;
+}
+
+extension ColorSchemeSemantics on ColorScheme {
+  Color get danger => error;
+  Color get lost => primary;
+  Color get found => tertiary;
+  Color get textTertiary => onSurfaceVariant;
+  Color get scoreHigh => AppColors.scoreHigh;
+  Color get scoreMedium => AppColors.scoreMedium;
+  Color get scoreLow => AppColors.scoreLow;
+}
+
+extension TextThemeSemantics on TextTheme {
+  TextStyle? get h2 => headlineSmall;
+  TextStyle? get h3 => titleMedium;
+  TextStyle? get caption => bodySmall;
+  TextStyle? get bodyStrong => titleMedium;
+}
+
+class AppCard extends StatefulWidget {
+  const AppCard({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.margin = EdgeInsets.zero,
+    this.color,
+    this.borderRadius = AppRadius.lg,
+    this.showBorder = true,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry margin;
+  final Color? color;
+  final double borderRadius;
+  final bool showBorder;
+
+  @override
+  State<AppCard> createState() => _AppCardState();
+}
+
+class _AppCardState extends State<AppCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (widget.onTap == null || _pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final radius = BorderRadius.circular(widget.borderRadius);
+    final card = Card(
+      color: widget.color ?? scheme.surfaceContainerLow,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      margin: widget.margin,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: widget.showBorder
+            ? BorderSide(color: scheme.outlineVariant)
+            : BorderSide.none,
+      ),
+      child: Padding(padding: widget.padding, child: widget.child),
+    );
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOut,
+      transform: Matrix4.identity()..scale(_pressed ? 0.98 : 1.0),
+      child: widget.onTap == null
+          ? card
+          : InkWell(
+              onTap: widget.onTap,
+              onTapDown: (_) => _setPressed(true),
+              onTapUp: (_) => _setPressed(false),
+              onTapCancel: () => _setPressed(false),
+              borderRadius: radius,
+              child: card,
+            ),
+    );
+  }
 }

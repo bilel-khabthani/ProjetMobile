@@ -256,10 +256,21 @@ class ApiRepository {
   Future<ChatMessage> sendMessage({
     required String matchId,
     required String body,
+    List<int>? imageBytes,
+    String? imageName,
   }) async {
-    final json =
-        await _client.post('/matches/$matchId/messages', {'body': body})
-            as Map<String, dynamic>;
+    final hasImage = imageBytes != null && imageBytes.isNotEmpty;
+    final json = hasImage
+        ? await _client.postMultipart(
+                '/matches/$matchId/messages',
+                {'body': body},
+                fileField: 'image',
+                fileBytes: imageBytes,
+                fileName: imageName ?? 'photo.jpg',
+              )
+              as Map<String, dynamic>
+        : await _client.post('/matches/$matchId/messages', {'body': body})
+              as Map<String, dynamic>;
     return ChatMessage.fromJson(json, currentUserId: currentUserId);
   }
 

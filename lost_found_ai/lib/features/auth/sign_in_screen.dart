@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
@@ -48,8 +47,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
-  String _messageOf(Object error) =>
-      error is ApiException ? error.message : 'Connexion impossible. Reessayez.';
+  String _messageOf(Object error) => error is ApiException
+      ? error.message
+      : 'Connexion impossible. Reessayez.';
 
   /// Remplit les champs avec le compte de demonstration (numero deja verifie)
   /// puis se connecte directement : aucun numero reel n'est demande.
@@ -60,27 +60,27 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     await _submit();
   }
 
-  Future<void> _submit() async {    final valid = _formKey.currentState?.validate() ?? false;
+  Future<void> _submit() async {
+    final valid = _formKey.currentState?.validate() ?? false;
     if (!valid) return;
 
     setState(() => _loading = true);
     try {
-      await ref.read(sessionProvider.notifier).signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .signIn(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
       if (!mounted) return;
       // La garde du routeur impose /verify-phone si le numero n'est pas
       // verifie (CDC 6.1), sinon ouvre l'application.
       context.go(AppRoutes.home);
     } on Object catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_messageOf(error)),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_messageOf(error))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -163,10 +163,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => context.push(AppRoutes.forgotPassword),
-                    child: Text(
-                      'Mot de passe oublié ?',
-                      style: AppText.label.copyWith(color: AppColors.primary),
-                    ),
+                    child: const Text('Mot de passe oublié ?'),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -181,10 +178,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     onPressed: () => context.replace(AppRoutes.signUp),
                     child: Text(
                       '${AppStrings.noAccountYet} ${AppStrings.createAccount}',
-                      style: AppText.label.copyWith(
-                        color: AppColors.primary,
-                        fontSize: 15,
-                      ),
                     ),
                   ),
                 ),
@@ -206,43 +199,49 @@ class _DemoAccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bolt_rounded, size: 18, color: AppColors.primary),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                AppStrings.demoAccountTitle,
-                style: AppText.label.copyWith(color: AppColors.primary),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.bolt_rounded,
+                  size: 18,
+                  color: context.colors.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  AppStrings.demoAccountTitle,
+                  style: context.typography.titleMedium?.copyWith(
+                    color: context.colors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${AppStrings.demoAccountEmail} · ${AppStrings.demoAccountPassword}',
+              style: context.typography.bodyMedium?.copyWith(
+                color: context.colors.onSurface,
+                fontWeight: FontWeight.w600,
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            '${AppStrings.demoAccountEmail} · ${AppStrings.demoAccountPassword}',
-            style: AppText.bodyStrong,
-          ),
-          const SizedBox(height: 2),
-          Text(AppStrings.demoAccountBody, style: AppText.caption),
-          const SizedBox(height: AppSpacing.sm),
-          AppButton(
-            label: AppStrings.useDemoAccount,
-            variant: AppButtonVariant.secondary,
-            icon: Icons.bolt_rounded,
-            height: 46,
-            onPressed: onUse,
-          ),
-        ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              AppStrings.demoAccountBody,
+              style: context.typography.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton.icon(
+              onPressed: onUse,
+              icon: const Icon(Icons.bolt_rounded, size: 18),
+              label: Text(AppStrings.useDemoAccount),
+            ),
+          ],
+        ),
       ),
     );
   }

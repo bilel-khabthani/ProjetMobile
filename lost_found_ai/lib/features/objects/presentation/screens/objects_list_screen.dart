@@ -5,13 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
-import '../../../../widgets/pressable_scale.dart';
 import '../../../../widgets/skeleton.dart';
 import '../../data/providers/objects_providers.dart';
 
@@ -87,12 +85,8 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
     final objectsAsync = ref.watch(objectsProvider(_filter));
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text('Objets'),
+        title: Text('Objets', style: context.typography.titleLarge),
         actions: [
           IconButton(
             tooltip: 'Carte',
@@ -104,7 +98,7 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
             icon: const Icon(Icons.person_outline_rounded),
             onPressed: () => context.push(AppRoutes.objectMyList),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs - 4),
         ],
       ),
       body: Column(
@@ -160,7 +154,7 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
                   );
                 }
                 return RefreshIndicator(
-                  color: AppColors.primary,
+                  color: context.colors.primary,
                   onRefresh: () async {
                     ref.invalidate(objectsProvider(_filter));
                     await ref.read(objectsProvider(_filter).future);
@@ -191,8 +185,8 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
         onPressed: () => context.push(AppRoutes.objectAdd),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Publier'),
@@ -215,27 +209,7 @@ class _SearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: 'Rechercher un objet, un lieu…',
-        hintStyle: AppText.body.copyWith(color: AppColors.textTertiary),
-        prefixIcon: const Icon(Icons.search_rounded,
-            color: AppColors.textTertiary, size: 21),
-        filled: true,
-        fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
+        prefixIcon: Icon(Icons.search_rounded, size: 21),
       ),
     );
   }
@@ -249,49 +223,25 @@ class _TypeFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = <({String label, ItemType? type})>[
-      (label: 'Tous', type: null),
-      (label: 'Perdus', type: ItemType.lost),
-      (label: 'Trouvés', type: ItemType.found),
-    ];
-
-    return Row(
-      children: [
-        for (final option in options) ...[
-          Expanded(
-            child: PressableScale(
-              onTap: () => onChanged(option.type),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected == option.type
-                      ? AppColors.primary
-                      : AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: selected == option.type
-                        ? AppColors.primary
-                        : AppColors.border,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    option.label,
-                    style: AppText.tiny.copyWith(
-                      color: selected == option.type
-                          ? Colors.white
-                          : AppColors.textSecondary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<ItemType?>(
+        segments: const [
+          ButtonSegment<ItemType?>(value: null, label: Text('Tous')),
+          ButtonSegment<ItemType?>(value: ItemType.lost, label: Text('Perdus')),
+          ButtonSegment<ItemType?>(
+            value: ItemType.found,
+            label: Text('Trouvés'),
           ),
-          if (option != options.last) const SizedBox(width: AppSpacing.xs),
         ],
-      ],
+        selected: {selected},
+        showSelectedIcon: false,
+        multiSelectionEnabled: false,
+        style: SegmentedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+        ),
+        onSelectionChanged: (selection) => onChanged(selection.first),
+      ),
     );
   }
 }
@@ -305,7 +255,7 @@ class _CategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 36,
+      height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
@@ -345,33 +295,19 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : AppColors.textSecondary;
-    return PressableScale(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primarySoft : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIcon(iconName, size: 14, color: color),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: AppText.tiny.copyWith(
-                color: color,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+    return FilterChip(
+      label: Text(label),
+      avatar: AppIcon(
+        iconName,
+        size: 16,
+        color: context.colors.onSurfaceVariant,
+      ),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onTap(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 14,
       ),
     );
   }
@@ -386,97 +322,100 @@ class _ObjectTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
-    final soft = isLost ? AppColors.lostSoft : AppColors.foundSoft;
+    final color = isLost ? context.colors.primary : context.colors.tertiary;
+    final soft = isLost
+        ? context.colors.primaryContainer
+        : context.colors.tertiaryContainer;
 
-    return PressableScale(
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppShadows.card,
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: SizedBox(
-                width: 68,
-                height: 68,
-                child: object.imageUrl != null
-                    ? Image.network(
-                        object.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            ItemArtwork(category: object.category),
-                      )
-                    : ItemArtwork(category: object.category),
-              ),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.sm),
+            child: SizedBox(
+              width: AppSpacing.huge + 20,
+              height: AppSpacing.huge + 20,
+              child: object.imageUrl != null
+                  ? Image.network(
+                      object.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          ItemArtwork(category: object.category),
+                    )
+                  : ItemArtwork(category: object.category),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: soft,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                        ),
-                        child: Text(
-                          object.type.shortLabel,
-                          style: AppText.tiny.copyWith(
-                            color: color,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10,
-                          ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: soft,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        object.type.shortLabel,
+                        style: context.typography.labelSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(object.formattedDate, style: AppText.tiny),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    object.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.bodyStrong,
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      const Icon(Icons.place_outlined,
-                          size: 13, color: AppColors.textTertiary),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          object.placeLabel.isEmpty
-                              ? object.category.label
-                              : object.placeLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.tiny,
-                        ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        object.formattedDate,
+                        style: context.typography.labelSmall,
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  object.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.typography.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.place_outlined,
+                      size: 13,
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        object.placeLabel.isEmpty
+                            ? object.category.label
+                            : object.placeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.typography.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textTertiary),
-          ],
-        ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.colors.onSurfaceVariant,
+          ),
+        ],
       ),
     );
   }
@@ -496,24 +435,30 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off_rounded,
-                size: 52, color: AppColors.textTertiary),
+            Icon(
+              Icons.search_off_rounded,
+              size: 52,
+              color: context.colors.onSurfaceVariant,
+            ),
             const SizedBox(height: AppSpacing.md),
             Text(
               hasFilters ? 'Aucun résultat' : 'Aucun objet publié',
-              style: AppText.h2,
+              style: context.typography.headlineSmall,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               hasFilters
                   ? 'Essaie d\'autres filtres ou une autre recherche.'
                   : 'Sois le premier à publier une annonce.',
-              style: AppText.body,
+              style: context.typography.bodyMedium,
               textAlign: TextAlign.center,
             ),
             if (hasFilters) ...[
               const SizedBox(height: AppSpacing.lg),
-              TextButton(onPressed: onClear, child: const Text('Réinitialiser')),
+              TextButton(
+                onPressed: onClear,
+                child: const Text('Réinitialiser'),
+              ),
             ],
           ],
         ),
@@ -536,12 +481,22 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 48, color: AppColors.danger),
+            Icon(
+              Icons.cloud_off_rounded,
+              size: 48,
+              color: context.colors.error,
+            ),
             const SizedBox(height: AppSpacing.md),
-            Text('Impossible de charger les objets', style: AppText.h2),
+            Text(
+              'Impossible de charger les objets',
+              style: context.typography.headlineSmall,
+            ),
             const SizedBox(height: AppSpacing.sm),
-            Text(error, style: AppText.body, textAlign: TextAlign.center),
+            Text(
+              error,
+              style: context.typography.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppSpacing.lg),
             TextButton(onPressed: onRetry, child: const Text('Réessayer')),
           ],

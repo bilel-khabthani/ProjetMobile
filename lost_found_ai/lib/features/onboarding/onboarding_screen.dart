@@ -3,9 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/scene_art.dart';
 
@@ -24,17 +23,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _Slide(
       variant: SceneVariant.search,
       title: 'Vous avez perdu quelque chose ?',
-      body: 'Déclarez-le en deux minutes. Nous cherchons pour vous, tout le campus.',
+      body:
+          'Déclarez-le en deux minutes. Nous cherchons pour vous, tout le campus.',
     ),
     _Slide(
       variant: SceneVariant.link,
       title: 'Le bon objet, au bon moment',
-      body: 'Notre moteur compare les images, les lieux, les horaires et les descriptions pour trouver la correspondance.',
+      body:
+          'Notre moteur compare les images, les lieux, les horaires et les descriptions pour trouver la correspondance.',
     ),
     _Slide(
       variant: SceneVariant.shield,
       title: 'Une mise en relation sécurisée',
-      body: 'Une question secrète confirme l’identité du propriétaire avant tout échange.',
+      body:
+          'Une question secrète confirme l’identité du propriétaire avant tout échange.',
     ),
   ];
 
@@ -67,13 +69,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () => context.go(AppRoutes.welcome),
-                child: Text(
-                  AppStrings.onboardingSkip,
-                  style: AppText.label.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 15,
-                  ),
-                ),
+                child: Text(AppStrings.onboardingSkip),
               ),
             ),
             Expanded(
@@ -101,13 +97,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         const SizedBox(height: AppSpacing.xxl),
                         Text(
                           slide.title,
-                          style: AppText.h1,
+                          style: context.typography.headlineMedium,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           slide.body,
-                          style: AppText.body.copyWith(fontSize: 16),
+                          style: context.typography.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
                       ],

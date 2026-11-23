@@ -7,6 +7,8 @@ use App\Models\ItemMatch;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ChatSecurityTest extends TestCase
@@ -42,6 +44,28 @@ class ChatSecurityTest extends TestCase
             ->assertJsonPath('updated', 1);
 
         $this->assertNotNull($message->fresh()->read_at);
+    }
+
+    public function test_participants_can_send_a_photo_in_the_chat(): void
+    {
+        Storage::fake('public');
+
+        $owner = $this->verifiedUser();
+        $match = $this->match($owner, $this->verifiedUser(), ItemMatch::STATUS_VERIFIED);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->post("/api/matches/{$match->id}/messages", [
+                'body' => 'Voici la photo de l’objet.',
+                'image' => UploadedFile::fake()->image('objet.png'),
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('body', 'Voici la photo de l’objet.')
+            ->assertJsonPath('image_url', fn ($url) => str_starts_with((string) $url, '/storage/messages/'));
+
+        $message = Message::sole();
+        $this->assertNotNull($message->image_path);
+        Storage::disk('public')->assertExists($message->image_path);
     }
 
     public function test_chat_is_locked_until_the_match_is_verified(): void

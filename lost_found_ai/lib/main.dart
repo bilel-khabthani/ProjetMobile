@@ -13,8 +13,9 @@ Future<void> main() async {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFFFFF9F4),
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 
@@ -23,7 +24,12 @@ Future<void> main() async {
   final container = ProviderContainer();
   await container.read(sessionProvider.notifier).restore();
 
-  runApp(UncontrolledProviderScope(container: container, child: const LostAndFoundApp()));
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const LostAndFoundApp(),
+    ),
+  );
 }
 
 class LostAndFoundApp extends ConsumerWidget {
@@ -35,6 +41,8 @@ class LostAndFoundApp extends ConsumerWidget {
       title: 'Lost&Found AI',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      darkTheme: buildAppDarkTheme(),
+      themeMode: ThemeMode.system,
       routerConfig: ref.watch(routerProvider),
     );
   }

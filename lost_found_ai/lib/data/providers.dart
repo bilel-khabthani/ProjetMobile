@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,7 +27,9 @@ final apiRepositoryProvider = Provider<ApiRepository>(
   (ref) => ApiRepository(client: ref.watch(apiClientProvider)),
 );
 
-final mockRepositoryProvider = Provider<MockRepository>((ref) => MockRepository());
+final mockRepositoryProvider = Provider<MockRepository>(
+  (ref) => MockRepository(),
+);
 
 /// Bascule entre API reelle et demonstration hors ligne.
 final repositoryProvider = Provider<ApiRepository>(
@@ -193,11 +196,8 @@ final matchProvider = FutureProvider.family<ItemMatch, String>((ref, id) async {
 /// Chat securise : messages echanges sur une correspondance verifiee.
 /// Le backend refuse l'acces tant que les deux participants ne sont pas
 /// autorises (match verifie + score de confiance suffisant).
-final chatMessagesProvider =
-    FutureProvider.autoDispose.family<List<ChatMessage>, String>((
-      ref,
-      matchId,
-    ) async {
+final chatMessagesProvider = FutureProvider.autoDispose
+    .family<List<ChatMessage>, String>((ref, matchId) async {
       if (AppConfig.useMockData) return const [];
       return ref.watch(repositoryProvider).fetchMessages(matchId);
     });
@@ -250,8 +250,10 @@ class VerificationNotifier extends StateNotifier<VerificationResult?> {
     _busy = true;
     final VerificationOutcome outcome;
     if (AppConfig.useMockData) {
-      outcome = await MockRepository()
-          .verifyAnswer(matchId: matchId, answer: answer);
+      outcome = await MockRepository().verifyAnswer(
+        matchId: matchId,
+        answer: answer,
+      );
     } else {
       outcome = await _repository.verifyAnswer(
         matchId: matchId,
@@ -312,6 +314,7 @@ class ClaimNotifier extends StateNotifier<bool> {
 
   void reset() => state = false;
 }
+
 final myItemsProvider = FutureProvider<List<Item>>((ref) async {
   ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
@@ -320,7 +323,9 @@ final myItemsProvider = FutureProvider<List<Item>>((ref) async {
   return ref.watch(repositoryProvider).fetchMyItems();
 });
 
-final nearbyFoundProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final nearbyFoundProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   ref.watch(sessionUserIdProvider);
   if (AppConfig.useMockData) {
     return const [];
@@ -462,16 +467,15 @@ class SwipeDeckNotifier extends AsyncNotifier<SwipeDeckState> {
     );
 
     return insight.copyWith(
-      agreementScore:
-          insight.agreementScore > 0 ? insight.agreementScore : local.score,
-      sharedDetails:
-          insight.sharedDetails.isNotEmpty
-              ? insight.sharedDetails
-              : local.shared,
-      contradictions:
-          insight.contradictions.isNotEmpty
-              ? insight.contradictions
-              : local.contradictions,
+      agreementScore: insight.agreementScore > 0
+          ? insight.agreementScore
+          : local.score,
+      sharedDetails: insight.sharedDetails.isNotEmpty
+          ? insight.sharedDetails
+          : local.shared,
+      contradictions: insight.contradictions.isNotEmpty
+          ? insight.contradictions
+          : local.contradictions,
     );
   }
 }
@@ -658,9 +662,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   /// Retourne un message d'erreur a afficher, ou null en cas de succes.
-  Future<String?> send(String text) async {
+  Future<String?> send(
+    String text, {
+    Uint8List? imageBytes,
+    String? imageName,
+  }) async {
     final body = text.trim();
-    if (body.isEmpty) return null;
+    final hasImage = imageBytes != null && imageBytes.isNotEmpty;
+    if (body.isEmpty && !hasImage) return null;
 
     state = state.copyWith(sending: true, clearError: true);
 
@@ -668,6 +677,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       final message = await _repository.sendMessage(
         matchId: matchId,
         body: body,
+        imageBytes: imageBytes,
+        imageName: imageName,
       );
       if (!mounted) return null;
 
@@ -831,5 +842,3 @@ final chatProvider = StateNotifierProvider.autoDispose
     .family<ChatNotifier, ChatState, String>(
       (ref, matchId) => ChatNotifier(ref.watch(repositoryProvider), matchId),
     );
-
-

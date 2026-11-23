@@ -1,3 +1,5 @@
+import 'item.dart';
+
 /// Message du chat securise, tel que renvoye par l'API Laravel.
 class ChatMessage {
   const ChatMessage({
@@ -11,6 +13,7 @@ class ChatMessage {
     required this.senderName,
     required this.senderInitials,
     this.readAt,
+    this.imageUrl,
   });
 
   factory ChatMessage.fromJson(
@@ -35,6 +38,7 @@ class ChatMessage {
       senderId: senderId,
       senderName: sender['name'] as String? ?? 'Utilisateur',
       senderInitials: sender['initials'] as String? ?? 'LF',
+      imageUrl: resolveItemImageUrl(json['image_url'] as String?),
     );
   }
 
@@ -48,8 +52,9 @@ class ChatMessage {
   final int? senderId;
   final String senderName;
   final String senderInitials;
+  final String? imageUrl;
 
-  ChatMessage copyWith({DateTime? readAt}) {
+  ChatMessage copyWith({DateTime? readAt, String? imageUrl}) {
     return ChatMessage(
       id: id,
       matchId: matchId,
@@ -61,6 +66,7 @@ class ChatMessage {
       senderId: senderId,
       senderName: senderName,
       senderInitials: senderInitials,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

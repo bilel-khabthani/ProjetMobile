@@ -1,29 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/reward.dart';
 
 class CouponCard extends StatelessWidget {
-  const CouponCard({
-    super.key,
-    required this.coupon,
-    required this.onTap,
-  });
+  const CouponCard({super.key, required this.coupon, required this.onTap});
 
   final UserCoupon coupon;
   final VoidCallback onTap;
 
-  Color _partnerColor() {
+  Color _partnerColor(ColorScheme scheme) {
     final name = coupon.partnerName.toLowerCase();
-    if (name.contains('glovo')) return const Color(0xFFFFC244);
-    if (name.contains('yassir')) return const Color(0xFF00A859);
-    if (name.contains('resto') || name.contains('campus')) return const Color(0xFFE11D48);
-    if (name.contains('café') || name.contains('cafe')) return const Color(0xFF8B5CF6);
-    if (name.contains('jumia')) return const Color(0xFFF97316);
-    return AppColors.primary;
+    if (name.contains('glovo')) return scheme.tertiary;
+    if (name.contains('yassir')) return scheme.secondary;
+    if (name.contains('resto') || name.contains('campus')) {
+      return scheme.error;
+    }
+    if (name.contains('café') || name.contains('cafe')) {
+      return scheme.primary;
+    }
+    if (name.contains('jumia')) return scheme.primary;
+    return scheme.primary;
   }
 
   IconData _partnerIcon() {
@@ -36,7 +35,9 @@ class CouponCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final partnerColor = _partnerColor();
+    final scheme = context.colors;
+    final textTheme = context.typography;
+    final partnerColor = _partnerColor(scheme);
     final isUsed = coupon.status == CouponStatus.used;
     final isExpired = coupon.isExpired;
 
@@ -46,11 +47,13 @@ class CouponCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: scheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: AppShadows.card,
+
           border: Border.all(
-            color: isUsed || isExpired ? AppColors.border : partnerColor.withValues(alpha: 0.35),
+            color: isUsed || isExpired
+                ? scheme.outlineVariant
+                : partnerColor.withValues(alpha: 0.35),
             width: 1.5,
           ),
         ),
@@ -66,21 +69,25 @@ class CouponCard extends StatelessWidget {
                   vertical: AppSpacing.xs,
                 ),
                 color: isUsed || isExpired
-                    ? AppColors.surfaceAlt
+                    ? scheme.surfaceContainerHighest
                     : partnerColor.withValues(alpha: 0.15),
                 child: Row(
                   children: [
                     Icon(
                       _partnerIcon(),
                       size: 18,
-                      color: isUsed || isExpired ? AppColors.textTertiary : partnerColor,
+                      color: isUsed || isExpired
+                          ? scheme.onSurfaceVariant
+                          : partnerColor,
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
                       coupon.partnerName,
-                      style: AppText.caption.copyWith(
+                      style: textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: isUsed || isExpired ? AppColors.textTertiary : partnerColor,
+                        color: isUsed || isExpired
+                            ? scheme.onSurfaceVariant
+                            : partnerColor,
                       ),
                     ),
                     const Spacer(),
@@ -100,33 +107,35 @@ class CouponCard extends StatelessWidget {
                         children: [
                           Text(
                             coupon.discountText,
-                            style: AppText.h3.copyWith(
+                            style: textTheme.titleLarge?.copyWith(
                               fontSize: 18,
                               color: isUsed || isExpired
-                                  ? AppColors.textSecondary
-                                  : AppColors.textPrimary,
+                                  ? scheme.onSurfaceVariant
+                                  : scheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             coupon.title,
-                            style: AppText.caption,
+                            style: textTheme.bodySmall,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.schedule_rounded,
                                 size: 14,
-                                color: AppColors.textTertiary,
+                                color: scheme.onSurfaceVariant,
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 'Expire le ${coupon.expiresAt.day.toString().padLeft(2, '0')}/${coupon.expiresAt.month.toString().padLeft(2, '0')}/${coupon.expiresAt.year}',
-                                style: AppText.caption.copyWith(
-                                  color: isExpired ? AppColors.danger : AppColors.textTertiary,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: isExpired
+                                      ? scheme.error
+                                      : scheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -143,29 +152,33 @@ class CouponCard extends StatelessWidget {
                         vertical: AppSpacing.xs,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
+                        color: scheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(AppRadius.md),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: scheme.outlineVariant),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             coupon.code,
-                            style: AppText.bodyStrong.copyWith(
+                            style: textTheme.titleSmall?.copyWith(
                               fontSize: 12,
                               letterSpacing: 1.2,
-                              color: AppColors.primary,
+                              color: scheme.primary,
                             ),
                           ),
                           const SizedBox(height: 2),
                           InkWell(
                             onTap: () {
-                              Clipboard.setData(ClipboardData(text: coupon.code));
+                              Clipboard.setData(
+                                ClipboardData(text: coupon.code),
+                              );
                               HapticFeedback.lightImpact();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Code promo copié dans le presse-papiers !'),
+                                  content: Text(
+                                    'Code promo copié dans le presse-papiers !',
+                                  ),
                                   duration: Duration(seconds: 2),
                                 ),
                               );
@@ -173,15 +186,17 @@ class CouponCard extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.copy_rounded,
                                   size: 12,
-                                  color: AppColors.textSecondary,
+                                  color: scheme.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Copier',
-                                  style: AppText.caption.copyWith(fontSize: 11),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -208,17 +223,19 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
     if (isExpired && status != CouponStatus.used) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.15),
+          color: scheme.errorContainer,
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
           'Expiré',
-          style: AppText.caption.copyWith(
-            color: AppColors.danger,
+          style: textTheme.labelSmall?.copyWith(
+            color: scheme.onErrorContainer,
             fontWeight: FontWeight.bold,
             fontSize: 10,
           ),
@@ -230,13 +247,13 @@ class _StatusBadge extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: AppColors.textTertiary.withValues(alpha: 0.15),
+          color: scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
         child: Text(
           'Utilisé',
-          style: AppText.caption.copyWith(
-            color: AppColors.textTertiary,
+          style: textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.bold,
             fontSize: 10,
           ),
@@ -247,13 +264,13 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.15),
+        color: scheme.primaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Text(
         'Actif',
-        style: AppText.caption.copyWith(
-          color: AppColors.success,
+        style: textTheme.labelSmall?.copyWith(
+          color: scheme.onPrimaryContainer,
           fontWeight: FontWeight.bold,
           fontSize: 10,
         ),
@@ -261,4 +278,3 @@ class _StatusBadge extends StatelessWidget {
     );
   }
 }
-

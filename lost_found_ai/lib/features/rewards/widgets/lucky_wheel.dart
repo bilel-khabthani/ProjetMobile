@@ -2,9 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/reward.dart';
 
 class LuckyWheelWidget extends StatefulWidget {
@@ -32,62 +31,46 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
   bool _spinningLocally = false;
 
   // Configuration des 8 tranches : 100% Points avec probabilités décroissantes
-  static final List<_SliceData> _slices = [
-    const _SliceData(
+  static const List<_SliceData> _slices = [
+    _SliceData(
       label: '+5 Pts',
       sublabel: '35% chance',
-      color: Color(0xFF10B981),
       icon: Icons.add_circle_outline_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: '+10 Pts',
       sublabel: '25% chance',
-      color: Color(0xFF3B82F6),
       icon: Icons.bolt_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: '+15 Pts',
       sublabel: '15% chance',
-      color: Color(0xFF8B5CF6),
       icon: Icons.stars_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: '+20 Pts',
       sublabel: '10% chance',
-      color: Color(0xFF6366F1),
       icon: Icons.card_giftcard_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: '+30 Pts',
       sublabel: '7% chance',
-      color: Color(0xFFF59E0B),
       icon: Icons.military_tech_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: '+50 Pts',
       sublabel: '4% chance',
-      color: Color(0xFFF97316),
       icon: Icons.diamond_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: '+75 Pts',
       sublabel: '3% chance',
-      color: Color(0xFFEC4899),
       icon: Icons.workspace_premium_rounded,
-      textColor: Colors.white,
     ),
-    const _SliceData(
+    _SliceData(
       label: 'JACKPOT',
       sublabel: '100 Pts (1%)',
-      color: Color(0xFFEAB308),
       icon: Icons.emoji_events_rounded,
-      textColor: Color(0xFF78350F),
     ),
   ];
 
@@ -109,9 +92,11 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
   Future<void> _startSpin() async {
     if (!widget.canSpin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vous avez déjà tourné la roue aujourd\'hui ! Revenez demain pour votre prochain tour.'),
-          backgroundColor: AppColors.textSecondary,
+        SnackBar(
+          content: const Text(
+            'Vous avez déjà tourné la roue aujourd\'hui ! Revenez demain pour votre prochain tour.',
+          ),
+          backgroundColor: context.colors.onSurfaceVariant,
         ),
       );
       return;
@@ -138,17 +123,18 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
 
       // Ajoute 6 à 8 tours complets pour un effet spectaculaire
       const extraTurns = 6 * 2 * math.pi;
-      final targetAngle = _currentAngle + extraTurns + (finalAngleNormalized - (_currentAngle % (2 * math.pi)));
+      final targetAngle =
+          _currentAngle +
+          extraTurns +
+          (finalAngleNormalized - (_currentAngle % (2 * math.pi)));
 
-      _rotationAnimation = Tween<double>(
-        begin: _currentAngle,
-        end: targetAngle,
-      ).animate(
-        CurvedAnimation(
-          parent: _animController,
-          curve: Curves.easeOutCubic,
-        ),
-      );
+      _rotationAnimation = Tween<double>(begin: _currentAngle, end: targetAngle)
+          .animate(
+            CurvedAnimation(
+              parent: _animController,
+              curve: Curves.easeOutCubic,
+            ),
+          );
 
       _animController.reset();
       await _animController.forward();
@@ -164,7 +150,7 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
-            backgroundColor: AppColors.danger,
+            backgroundColor: context.colors.error,
           ),
         );
       }
@@ -176,6 +162,8 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
   }
 
   void _showWinDialog(SpinResult result) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
     showDialog<void>(
       context: context,
       builder: (ctx) {
@@ -195,34 +183,40 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
                   width: 76,
                   height: 76,
                   decoration: BoxDecoration(
-                    color: isJackpot ? const Color(0xFFFEF3C7) : AppColors.primarySoft,
+                    color: isJackpot
+                        ? scheme.tertiaryContainer
+                        : scheme.primaryContainer,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isJackpot ? Icons.emoji_events_rounded : Icons.stars_rounded,
+                    isJackpot
+                        ? Icons.emoji_events_rounded
+                        : Icons.stars_rounded,
                     size: 42,
-                    color: isJackpot ? const Color(0xFFD97706) : AppColors.primary,
+                    color: isJackpot
+                        ? scheme.onTertiaryContainer
+                        : scheme.primary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  isJackpot ? '🌟 JACKPOT DU JOUR !' : '🎉 Félicitations !',
-                  style: AppText.h2,
+                  isJackpot ? 'JACKPOT DU JOUR !' : 'Félicitations !',
+                  style: textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   '+$pts Points',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
-                    color: AppColors.primary,
+                    color: scheme.primary,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Vos points ont été crédités sur votre compte !\nVous pouvez les utiliser dans la Boutique pour commander vos bons Glovo, Yassir ou Resto.',
-                  style: AppText.caption,
+                  style: textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -243,6 +237,7 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
     const wheelSize = 280.0;
 
     return Center(
@@ -250,10 +245,10 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
         mainAxisSize: MainAxisSize.min,
         children: [
           // Flèche indicatrice au sommet de la roue
-          const Icon(
+          Icon(
             Icons.arrow_drop_down_rounded,
             size: 44,
-            color: AppColors.danger,
+            color: context.colors.error,
           ),
           Transform.translate(
             offset: const Offset(0, -10),
@@ -272,7 +267,10 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
                         angle: angle,
                         child: CustomPaint(
                           size: const Size(wheelSize, wheelSize),
-                          painter: _WheelPainter(slices: _slices),
+                          painter: _WheelPainter(
+                            slices: _slices,
+                            scheme: scheme,
+                          ),
                         ),
                       );
                     },
@@ -285,58 +283,59 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: context.colors.surfaceContainerLow,
                         shape: BoxShape.circle,
-                        boxShadow: AppShadows.raised,
-                        border: Border.all(
-                          color: AppColors.primary,
-                          width: 3.5,
-                        ),
+
+                        border: Border.all(color: scheme.primary, width: 3.5),
                       ),
                       child: Center(
                         child: !widget.canSpin
                             ? Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.lock_clock_rounded,
-                                    color: AppColors.textTertiary,
+                                    color: context.colors.onSurfaceVariant,
                                     size: 22,
                                   ),
                                   Text(
                                     'DEMAIN',
-                                    style: AppText.caption.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textTertiary,
-                                      fontSize: 9,
-                                    ),
+                                    style: context.typography.labelSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color:
+                                              context.colors.onSurfaceVariant,
+                                          fontSize: 9,
+                                        ),
                                   ),
                                 ],
                               )
                             : _spinningLocally
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.play_arrow_rounded,
-                                        color: AppColors.primary,
-                                        size: 26,
-                                      ),
-                                      Text(
-                                        'SPIN',
-                                        style: AppText.caption.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.primary,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: scheme.primary,
+                                    size: 26,
                                   ),
+                                  Text(
+                                    'SPIN',
+                                    style: context.typography.caption?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: scheme.primary,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   ),
@@ -346,14 +345,18 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
           ),
           const SizedBox(height: AppSpacing.sm),
           FilledButton.icon(
-            onPressed: (!widget.canSpin || _spinningLocally) ? null : _startSpin,
-            icon: Icon(widget.canSpin ? Icons.casino_rounded : Icons.lock_clock_rounded),
+            onPressed: (!widget.canSpin || _spinningLocally)
+                ? null
+                : _startSpin,
+            icon: Icon(
+              widget.canSpin ? Icons.casino_rounded : Icons.lock_clock_rounded,
+            ),
             label: Text(
               _spinningLocally
                   ? 'Tirage en cours...'
                   : widget.canSpin
-                      ? 'Tourner la roue (1 fois par jour) !'
-                      : 'Déjà tourné aujourd\'hui — Revenez demain !',
+                  ? 'Tourner la roue (1 fois par jour) !'
+                  : 'Déjà tourné aujourd\'hui — Revenez demain !',
             ),
           ),
         ],
@@ -366,22 +369,61 @@ class _SliceData {
   const _SliceData({
     required this.label,
     required this.sublabel,
-    required this.color,
     required this.icon,
-    required this.textColor,
   });
 
   final String label;
   final String sublabel;
-  final Color color;
   final IconData icon;
-  final Color textColor;
+}
+
+Color _sliceColor(ColorScheme scheme, int index) {
+  switch (index % 8) {
+    case 0:
+      return scheme.primary;
+    case 1:
+      return scheme.secondary;
+    case 2:
+      return scheme.tertiary;
+    case 3:
+      return scheme.primaryContainer;
+    case 4:
+      return scheme.secondaryContainer;
+    case 5:
+      return scheme.tertiaryContainer;
+    case 6:
+      return scheme.error;
+    default:
+      return scheme.primary;
+  }
+}
+
+Color _onSliceColor(ColorScheme scheme, int index) {
+  switch (index % 8) {
+    case 0:
+      return scheme.onPrimary;
+    case 1:
+      return scheme.onSecondary;
+    case 2:
+      return scheme.onTertiary;
+    case 3:
+      return scheme.onPrimaryContainer;
+    case 4:
+      return scheme.onSecondaryContainer;
+    case 5:
+      return scheme.onTertiaryContainer;
+    case 6:
+      return scheme.onError;
+    default:
+      return scheme.onPrimary;
+  }
 }
 
 class _WheelPainter extends CustomPainter {
-  const _WheelPainter({required this.slices});
+  const _WheelPainter({required this.slices, required this.scheme});
 
   final List<_SliceData> slices;
+  final ColorScheme scheme;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -391,7 +433,7 @@ class _WheelPainter extends CustomPainter {
 
     // Ombre extérieure de la roue
     final shadowPaint = Paint()
-      ..color = Colors.black12
+      ..color = scheme.shadow.withValues(alpha: 0.12)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
     canvas.drawCircle(center, radius, shadowPaint);
 
@@ -401,7 +443,7 @@ class _WheelPainter extends CustomPainter {
       final startAngle = i * sweepAngle;
 
       final paint = Paint()
-        ..color = slice.color
+        ..color = _sliceColor(scheme, i)
         ..style = PaintingStyle.fill;
 
       canvas.drawArc(
@@ -414,7 +456,7 @@ class _WheelPainter extends CustomPainter {
 
       // Bordure de séparation blanche
       final borderPaint = Paint()
-        ..color = Colors.white.withValues(alpha: 0.6)
+        ..color = scheme.surface.withValues(alpha: 0.6)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0;
 
@@ -435,7 +477,7 @@ class _WheelPainter extends CustomPainter {
       final textSpan = TextSpan(
         text: '${slice.label}\n${slice.sublabel}',
         style: TextStyle(
-          color: slice.textColor,
+          color: _onSliceColor(scheme, i),
           fontWeight: FontWeight.w800,
           fontSize: 10,
           height: 1.1,
@@ -447,17 +489,14 @@ class _WheelPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout(maxWidth: radius * 0.45);
 
-      textPainter.paint(
-        canvas,
-        Offset(radius * 0.45, -textPainter.height / 2),
-      );
+      textPainter.paint(canvas, Offset(radius * 0.45, -textPainter.height / 2));
 
       canvas.restore();
     }
 
     // Cerclage extérieur doré / chromé
     final rimPaint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = scheme.outline
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6.0;
     canvas.drawCircle(center, radius, rimPaint);
@@ -466,4 +505,3 @@ class _WheelPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WheelPainter oldDelegate) => false;
 }
-

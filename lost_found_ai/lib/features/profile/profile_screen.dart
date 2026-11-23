@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 
 import '../../data/providers.dart';
 import '../../widgets/photo_placeholder.dart';
@@ -54,13 +54,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await ref.read(sessionProvider.notifier).updateMe(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _changingPass ? _passController.text : null,
-        passwordConfirmation: _changingPass ? _passConfirmController.text : null,
-        phone: _phoneController.text.trim(),
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .updateMe(
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _changingPass ? _passController.text : null,
+            passwordConfirmation: _changingPass
+                ? _passConfirmController.text
+                : null,
+            phone: _phoneController.text.trim(),
+          );
       if (_changingPass) {
         setState(() {
           _changingPass = false;
@@ -85,7 +89,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppColors.danger),
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: context.colors.error,
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -124,6 +131,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
       body: SafeArea(
+        bottom: false,
         child: Form(
           key: _formKey,
           child: ListView(
@@ -140,14 +148,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Prénom et nom'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Requis' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Requis' : null,
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Adresse e-mail'),
-                validator: (v) => (v == null || !v.contains('@')) ? 'E-mail invalide' : null,
+                validator: (v) =>
+                    (v == null || !v.contains('@')) ? 'E-mail invalide' : null,
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
@@ -155,7 +165,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: 'Téléphone',
-                  helperText: 'Un changement demande une nouvelle verification.',
+                  helperText:
+                      'Un changement demande une nouvelle verification.',
                 ),
                 validator: (v) {
                   final digits = (v ?? '').replaceAll(RegExp(r'[^0-9]'), '');
@@ -167,17 +178,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.workspace_premium_outlined),
                 title: const Text('Mon score de confiance'),
-                subtitle: Text(
-                  '${(user?.reputation ?? 0).round()} points',
-                ),
+                subtitle: Text('${(user?.reputation ?? 0).round()} points'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => context.push(AppRoutes.trust),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.card_giftcard_rounded, color: AppColors.accent),
+                leading: Icon(
+                  Icons.card_giftcard_rounded,
+                  color: context.colors.tertiary,
+                ),
                 title: const Text('Mes Récompenses & Bons Partenaires'),
-                subtitle: const Text('Coupons Glovo, Yassir & Roue de la Chance'),
+                subtitle: const Text(
+                  'Coupons Glovo, Yassir & Roue de la Chance',
+                ),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => context.push(AppRoutes.rewards),
               ),
@@ -192,22 +206,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 TextFormField(
                   controller: _passController,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Nouveau mot de passe'),
-                  validator: (v) => (v == null || v.length < 8) ? '8 caractères minimum' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Nouveau mot de passe',
+                  ),
+                  validator: (v) => (v == null || v.length < 8)
+                      ? '8 caractères minimum'
+                      : null,
                 ),
                 const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _passConfirmController,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Confirmer le mot de passe'),
-                  validator: (v) => v != _passController.text ? 'Non identique' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmer le mot de passe',
+                  ),
+                  validator: (v) =>
+                      v != _passController.text ? 'Non identique' : null,
                 ),
               ],
               const SizedBox(height: AppSpacing.xxxl),
               FilledButton(
                 onPressed: _loading ? null : _save,
                 child: _loading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Enregistrer'),
               ),
             ],

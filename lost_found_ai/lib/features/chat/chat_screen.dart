@@ -1,12 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
@@ -32,6 +34,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
 
+  Uint8List? _attachmentBytes;
+  String? _attachmentName;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -41,25 +46,86 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text;
-    if (text.trim().isEmpty) return;
+    final bytes = _attachmentBytes;
+    final name = _attachmentName;
+    if (text.trim().isEmpty && bytes == null) return;
 
     _controller.clear();
+    _attachmentBytes = null;
+    _attachmentName = null;
     final error = await ref
         .read(chatProvider(widget.matchId).notifier)
-        .send(text);
+        .send(text, imageBytes: bytes, imageName: name);
 
     if (!mounted) return;
     ref.invalidate(matchProvider(widget.matchId));
     if (error != null) {
-      // Ne perds pas le texte de l'utilisateur quand la moderation ou le
-      // reseau refuse l'envoi.
-      if (_controller.text.isEmpty) {
-        _controller.text = text;
-        _controller.selection = TextSelection.collapsed(offset: text.length);
-      }
+      // Ne perds pas le texte ni la photo quand l'envoi est refuse.
+      setState(() {
+        _attachmentBytes = bytes;
+        _attachmentName = name;
+        if (_controller.text.isEmpty) {
+          _controller.text = text;
+          _controller.selection = TextSelection.collapsed(offset: text.length);
+        }
+      });
       _showSnack(error);
     } else {
       _scrollToBottom();
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+        side: BorderSide(color: context.colors.outlineVariant),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.photo_camera_rounded,
+                  color: sheetContext.colors.primary,
+                ),
+                title: const Text('Prendre une photo'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.photo_library_rounded,
+                  color: sheetContext.colors.primary,
+                ),
+                title: const Text('Choisir dans la galerie'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 82,
+      );
+      if (picked == null || !mounted) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _attachmentBytes = bytes;
+        _attachmentName = picked.name;
+      });
+    } catch (_) {
+      _showSnack('Impossible de récupérer la photo.');
     }
   }
 
@@ -176,7 +242,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     if (match != null && !match.canChat) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: context.colors.surface,
         body: SafeArea(
           child: Column(
             children: [
@@ -196,7 +262,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -224,9 +290,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 sending: chat.sending,
                 showQuickReplies: chat.messages.isEmpty,
                 coordinationRemaining: match?.coordinationMessagesRemaining,
+                attachmentBytes: _attachmentBytes,
+                attachmentName: _attachmentName,
                 onQuickReply: _quickReply,
                 onSend: _send,
-                onAttach: () => _showSnack(AppStrings.chatAttachSoon),
+                onAttach: _pickImage,
+                onRemoveAttachment: () => setState(() {
+                  _attachmentBytes = null;
+                  _attachmentName = null;
+                }),
               ),
           ],
         ),
@@ -243,11 +315,12 @@ class _ChatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(bottom: BorderSide(color: colors.outlineVariant)),
       ),
       child: Row(
         children: [
@@ -267,7 +340,7 @@ class _ChatHeader extends StatelessWidget {
               Avatar(
                 initials: match?.finderInitials ?? 'LF',
                 size: 44,
-                color: AppColors.primary,
+                color: colors.primary,
               ),
               Positioned(
                 right: 0,
@@ -276,9 +349,9 @@ class _ChatHeader extends StatelessWidget {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: connected ? AppColors.found : AppColors.textTertiary,
+                    color: connected ? colors.tertiary : colors.outline,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surface, width: 2),
+                    border: Border.all(color: colors.surface, width: 2),
                   ),
                 ),
               ),
@@ -295,16 +368,16 @@ class _ChatHeader extends StatelessWidget {
                     Flexible(
                       child: Text(
                         match?.finderName ?? 'Conversation',
-                        style: AppText.bodyStrong,
+                        style: context.typography.titleMedium,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (match?.isVerified == true) ...[
                       const SizedBox(width: 6),
-                      const AppIcon(
+                      AppIcon(
                         'verified-check-bold',
                         size: 15,
-                        color: AppColors.mintDark,
+                        color: colors.primary,
                       ),
                     ],
                   ],
@@ -312,8 +385,10 @@ class _ChatHeader extends StatelessWidget {
                 const SizedBox(height: 1),
                 Text(
                   connected ? 'En ligne · sécurisé' : 'Messagerie sécurisée',
-                  style: AppText.tiny.copyWith(
-                    color: connected ? AppColors.found : AppColors.textTertiary,
+                  style: context.typography.labelSmall?.copyWith(
+                    color: connected
+                        ? colors.tertiary
+                        : colors.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -342,16 +417,17 @@ class _HeaderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return PressableScale(
       onTap: onTap,
       child: Container(
-        width: 40,
-        height: 40,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
-          color: AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(13),
+          color: colors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
-        child: AppIcon(icon, size: 18, color: AppColors.textPrimary),
+        child: AppIcon(icon, size: 20, color: colors.onSurface),
       ),
     );
   }
@@ -362,23 +438,24 @@ class _SafetyBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 9, 20, 9),
-      color: AppColors.foundSoft,
+      color: colors.secondaryContainer,
       child: Row(
         children: [
-          const AppIcon(
+          AppIcon(
             'shield-check-linear',
             size: 15,
-            color: AppColors.mintDark,
+            color: colors.onSecondaryContainer,
           ),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
               AppStrings.chatSafety,
-              style: AppText.tiny.copyWith(
-                color: AppColors.mintDark,
+              style: context.typography.labelSmall?.copyWith(
+                color: colors.onSecondaryContainer,
                 height: 1.3,
               ),
               maxLines: 2,
@@ -398,26 +475,27 @@ class _CoordinationBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final remaining = match.coordinationMessagesRemaining ?? 0;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-      color: AppColors.accentSoft,
+      color: colors.tertiaryContainer,
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.handshake_rounded,
             size: 17,
-            color: AppColors.accent,
+            color: colors.onTertiaryContainer,
           ),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
               'Mode coordination : $remaining message${remaining > 1 ? 's' : ''} '
               'restant${remaining > 1 ? 's' : ''} pour organiser la restitution.',
-              style: AppText.tiny.copyWith(
-                color: AppColors.textPrimary,
+              style: context.typography.labelSmall?.copyWith(
+                color: colors.onTertiaryContainer,
                 height: 1.3,
                 fontWeight: FontWeight.w600,
               ),
@@ -436,11 +514,12 @@ class _CoordinationQuotaBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.divider)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.outlineVariant)),
       ),
       child: SafeArea(
         top: false,
@@ -449,14 +528,14 @@ class _CoordinationQuotaBar extends StatelessWidget {
           children: [
             Text(
               'Vos 5 messages de coordination sont épuisés.',
-              style: AppText.bodyStrong,
+              style: context.typography.titleMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 3),
             Text(
               'Terminez la restitution ou contestez une sanction pour '
               'retrouver le chat complet.',
-              style: AppText.caption,
+              style: context.typography.bodySmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
@@ -490,9 +569,7 @@ class _ChatBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (chat.loading && chat.messages.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (chat.error != null && chat.messages.isEmpty) {
@@ -552,6 +629,7 @@ class _LoadOlder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Center(
@@ -563,18 +641,8 @@ class _LoadOlder extends StatelessWidget {
                   height: 14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const AppIcon(
-                  'clock-circle-linear',
-                  size: 15,
-                  color: AppColors.primary,
-                ),
-          label: Text(
-            'Charger les messages précédents',
-            style: AppText.tiny.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+              : AppIcon('clock-circle-linear', size: 15, color: colors.primary),
+          label: const Text('Charger les messages précédents'),
         ),
       ),
     );
@@ -588,23 +656,24 @@ class _DateDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          const Expanded(child: Divider(color: AppColors.divider)),
+          const Expanded(child: Divider()),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
               _dayLabel(day),
-              style: AppText.tiny.copyWith(
-                color: AppColors.textTertiary,
-                fontWeight: FontWeight.w800,
+              style: context.typography.labelSmall?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
               ),
             ),
           ),
-          const Expanded(child: Divider(color: AppColors.divider)),
+          const Expanded(child: Divider()),
         ],
       ),
     );
@@ -619,7 +688,9 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final mine = message.isMine;
+    final foreground = mine ? colors.onPrimary : colors.onSurface;
 
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -632,22 +703,14 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 9),
           padding: const EdgeInsets.fromLTRB(13, 9, 13, 7),
           decoration: BoxDecoration(
-            color: mine ? null : AppColors.surface,
-            gradient: mine
-                ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF5B4DF5), AppColors.primary],
-                  )
-                : null,
+            color: mine ? colors.primary : colors.surfaceContainerLow,
             borderRadius: BorderRadius.only(
               topLeft: const Radius.circular(20),
               topRight: const Radius.circular(20),
               bottomLeft: Radius.circular(mine ? 20 : 6),
               bottomRight: Radius.circular(mine ? 6 : 20),
             ),
-            border: mine ? null : Border.all(color: AppColors.divider),
-            boxShadow: mine ? AppShadows.primary : AppShadows.card,
+            border: mine ? null : Border.all(color: colors.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -656,20 +719,53 @@ class _MessageBubble extends StatelessWidget {
               if (!mine) ...[
                 Text(
                   message.senderName,
-                  style: AppText.tiny.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
+                  style: context.typography.labelSmall?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 2),
               ],
-              Text(
-                message.body,
-                style: AppText.body.copyWith(
-                  color: mine ? Colors.white : AppColors.textPrimary,
-                  height: 1.35,
+              if (message.imageUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: Image.network(
+                    message.imageUrl!,
+                    width: double.infinity,
+                    height: 190,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        width: double.infinity,
+                        height: 190,
+                        color: colors.surfaceContainerHighest,
+                        child: const Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, _, _) => Container(
+                      width: double.infinity,
+                      height: 190,
+                      color: colors.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                if (message.body.isNotEmpty) const SizedBox(height: 7),
+              ],
+              if (message.body.isNotEmpty)
+                Text(
+                  message.body,
+                  style: context.typography.bodyLarge?.copyWith(
+                    color: foreground,
+                    height: 1.35,
+                  ),
+                ),
               const SizedBox(height: 3),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -677,11 +773,9 @@ class _MessageBubble extends StatelessWidget {
                 children: [
                   Text(
                     _timeLabel(message.createdAt),
-                    style: AppText.tiny.copyWith(
+                    style: context.typography.labelSmall?.copyWith(
                       fontSize: 9.5,
-                      color: mine
-                          ? Colors.white.withValues(alpha: 0.7)
-                          : AppColors.textTertiary,
+                      color: mine ? colors.onPrimary : colors.onSurfaceVariant,
                     ),
                   ),
                   if (mine) ...[
@@ -689,9 +783,9 @@ class _MessageBubble extends StatelessWidget {
                     AppIcon(
                       'check-read-linear',
                       size: 13,
-                      color: Colors.white.withValues(
-                        alpha: message.readAt != null ? 0.9 : 0.55,
-                      ),
+                      color: message.readAt != null
+                          ? colors.onPrimary
+                          : colors.primaryContainer,
                     ),
                   ],
                 ],
@@ -713,25 +807,31 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.onAttach,
     this.coordinationRemaining,
+    this.attachmentBytes,
+    this.attachmentName,
+    this.onRemoveAttachment,
   });
 
   final TextEditingController controller;
   final bool sending;
   final bool showQuickReplies;
   final int? coordinationRemaining;
+  final Uint8List? attachmentBytes;
+  final String? attachmentName;
   final ValueChanged<String> onQuickReply;
   final Future<void> Function() onSend;
   final VoidCallback onAttach;
+  final VoidCallback? onRemoveAttachment;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final remaining = coordinationRemaining;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.divider)),
-        boxShadow: AppShadows.nav,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.outlineVariant)),
       ),
       child: SafeArea(
         top: false,
@@ -746,8 +846,8 @@ class _Composer extends StatelessWidget {
                   child: Text(
                     '$remaining message${remaining > 1 ? 's' : ''} '
                     'de coordination restant${remaining > 1 ? 's' : ''}.',
-                    style: AppText.tiny.copyWith(
-                      color: AppColors.accent,
+                    style: context.typography.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -755,7 +855,7 @@ class _Composer extends StatelessWidget {
               ),
             if (showQuickReplies)
               SizedBox(
-                height: 46,
+                height: 54,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 4),
@@ -777,6 +877,52 @@ class _Composer extends StatelessWidget {
                   ],
                 ),
               ),
+            if (attachmentBytes != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    border: Border.all(color: colors.outlineVariant),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        child: Image.memory(
+                          attachmentBytes!,
+                          width: 42,
+                          height: 42,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          attachmentName ?? 'photo.jpg',
+                          style: context.typography.labelSmall?.copyWith(
+                            color: colors.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: onRemoveAttachment,
+                        icon: const Icon(Icons.close, size: 18),
+                        color: colors.onSurfaceVariant,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
               child: Row(
@@ -792,85 +938,41 @@ class _Composer extends StatelessWidget {
                       maxLength: 1000,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.newline,
-                      style: AppText.body.copyWith(
-                        color: AppColors.textPrimary,
+                      style: context.typography.bodyLarge?.copyWith(
+                        color: colors.onSurface,
                       ),
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         counterText: '',
                         hintText: 'Écrivez un message…',
-                        hintStyle: AppText.body.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
-                        filled: true,
-                        fillColor: AppColors.input,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: AppColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: AppColors.primary,
-                            width: 1.5,
-                          ),
-                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
-                    width: 46,
-                    height: 46,
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(15),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(15),
-                        onTap: sending ? null : onSend,
-                        child: Ink(
-                          decoration: BoxDecoration(
-                            gradient: sending
-                                ? null
-                                : const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Color(0xFF5B4DF5),
-                                      AppColors.primary,
-                                    ],
-                                  ),
-                            color: sending ? AppColors.textTertiary : null,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: sending ? null : AppShadows.primary,
-                          ),
-                          child: Center(
-                            child: sending
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const AppIcon(
-                                    'plain-linear',
-                                    size: 20,
-                                    color: Colors.white,
-                                  ),
-                          ),
+                    width: 48,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: sending ? null : onSend,
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(48, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
+                      child: sending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                              ),
+                            )
+                          : AppIcon(
+                              'plain-linear',
+                              size: 20,
+                              color: colors.onPrimary,
+                            ),
                     ),
                   ),
                 ],
@@ -890,20 +992,21 @@ class _AttachButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return PressableScale(
       onTap: onTap,
       child: Container(
-        width: 46,
-        height: 46,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
-          color: AppColors.surfaceAlt,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: AppColors.divider),
+          color: colors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: colors.outlineVariant),
         ),
-        child: const AppIcon(
+        child: AppIcon(
           'paperclip-linear',
-          size: 19,
-          color: AppColors.textSecondary,
+          size: 20,
+          color: colors.onSurfaceVariant,
         ),
       ),
     );
@@ -918,19 +1021,20 @@ class _QuickReply extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
         decoration: BoxDecoration(
-          color: AppColors.primarySoft,
+          color: colors.secondaryContainer,
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+          border: Border.all(color: colors.outlineVariant),
         ),
         child: Text(
           label,
-          style: AppText.tiny.copyWith(
-            color: AppColors.primaryDark,
+          style: context.typography.labelSmall?.copyWith(
+            color: colors.onSecondaryContainer,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -944,6 +1048,7 @@ class _EmptyChat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -954,23 +1059,28 @@ class _EmptyChat extends StatelessWidget {
               width: 82,
               height: 82,
               decoration: BoxDecoration(
-                color: AppColors.primarySoft,
+                color: colors.primaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: const Center(
+              child: Center(
                 child: AppIcon(
                   'chat-round-dots-linear',
                   size: 36,
-                  color: AppColors.primary,
+                  color: colors.primary,
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            Text('Démarrez la conversation', style: AppText.h3),
+            Text(
+              'Démarrez la conversation',
+              style: context.typography.titleLarge,
+            ),
             const SizedBox(height: 5),
             Text(
               'Échangez quelques détails pour organiser la restitution en toute sécurité.',
-              style: AppText.body.copyWith(color: AppColors.textSecondary),
+              style: context.typography.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -987,6 +1097,7 @@ class _ChatLocked extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -997,23 +1108,28 @@ class _ChatLocked extends StatelessWidget {
               width: 82,
               height: 82,
               decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
+                color: colors.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
-              child: const Center(
+              child: Center(
                 child: AppIcon(
                   'lock-keyhole-linear',
                   size: 34,
-                  color: AppColors.textTertiary,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            Text('Messagerie verrouillée', style: AppText.h3),
+            Text(
+              'Messagerie verrouillée',
+              style: context.typography.titleLarge,
+            ),
             const SizedBox(height: 5),
             Text(
               reason,
-              style: AppText.body.copyWith(color: AppColors.textSecondary),
+              style: context.typography.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1031,27 +1147,26 @@ class _ChatError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const AppIcon(
+            AppIcon(
               'lock-keyhole-linear',
               size: 40,
-              color: AppColors.textTertiary,
+              color: colors.onSurfaceVariant,
             ),
             const SizedBox(height: 12),
-            Text(message, style: AppText.body, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: onRetry,
-              child: Text(
-                'Réessayer',
-                style: AppText.label.copyWith(color: AppColors.primary),
-              ),
+            Text(
+              message,
+              style: context.typography.bodyLarge,
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 12),
+            TextButton(onPressed: onRetry, child: const Text('Réessayer')),
           ],
         ),
       ),

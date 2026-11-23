@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
-import '../core/theme/app_typography.dart';
+import '../core/theme/app_theme.dart';
 
 /// Signaux d'accord textuel entre deux annonces : score, details partages et
 /// contradictions. N'affiche rien quand le moteur n'a aucun signal a montrer,
@@ -23,41 +22,33 @@ class AgreementSignals extends StatelessWidget {
   final String title;
   final bool compact;
 
-  bool get _empty =>
-      score <= 0 && shared.isEmpty && contradictions.isEmpty;
+  bool get _empty => score <= 0 && shared.isEmpty && contradictions.isEmpty;
 
   @override
   Widget build(BuildContext context) {
     if (_empty) return const SizedBox.shrink();
 
+    final colors = context.colors;
     final hasContradictions = contradictions.isNotEmpty;
 
-    return Container(
-      width: double.infinity,
+    return AppCard(
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.notes_rounded,
-                size: 17,
-                color: AppColors.primary,
-              ),
+              Icon(Icons.notes_rounded, size: 17, color: colors.primary),
               const SizedBox(width: AppSpacing.xs),
-              Expanded(child: Text(title, style: AppText.h3)),
+              Expanded(
+                child: Text(title, style: context.typography.headlineSmall),
+              ),
               if (score > 0)
                 Text(
                   '$score/100',
-                  style: AppText.label.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
+                  style: context.typography.labelMedium?.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
             ],
@@ -69,16 +60,14 @@ class AgreementSignals extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: score / 100,
                 minHeight: 6,
-                backgroundColor: AppColors.surfaceAlt,
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  AppColors.primary,
-                ),
+                backgroundColor: colors.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
               ),
             ),
           ],
           if (shared.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text('Détails partagés', style: AppText.label),
+            Text('Détails partagés', style: context.typography.labelMedium),
             const SizedBox(height: AppSpacing.xs),
             Wrap(
               spacing: 6,
@@ -91,22 +80,22 @@ class AgreementSignals extends StatelessWidget {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.foundSoft,
+                      color: colors.tertiaryContainer,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.check_rounded,
                           size: 13,
-                          color: AppColors.found,
+                          color: colors.onTertiaryContainer,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           detail,
-                          style: AppText.caption.copyWith(
-                            color: AppColors.found,
+                          style: context.typography.bodySmall?.copyWith(
+                            color: colors.onTertiaryContainer,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -118,7 +107,10 @@ class AgreementSignals extends StatelessWidget {
           ],
           if (hasContradictions) ...[
             const SizedBox(height: AppSpacing.sm),
-            Text('Contradictions détectées', style: AppText.label),
+            Text(
+              'Contradictions détectées',
+              style: context.typography.labelMedium,
+            ),
             const SizedBox(height: AppSpacing.xs),
             for (final contradiction in contradictions)
               Padding(
@@ -126,17 +118,17 @@ class AgreementSignals extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.warning_amber_rounded,
                       size: 15,
-                      color: AppColors.danger,
+                      color: colors.error,
                     ),
                     const SizedBox(width: 5),
                     Expanded(
                       child: Text(
                         contradiction,
-                        style: AppText.caption.copyWith(
-                          color: AppColors.danger,
+                        style: context.typography.bodySmall?.copyWith(
+                          color: colors.error,
                           height: 1.3,
                         ),
                       ),

@@ -29,7 +29,8 @@ class AppConfig {
   /// projet Google Cloud que le client OAuth Android de l'application.
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
-    defaultValue: '103241478877-9injf5juroq9an661l1fl5315g22edk8.apps.googleusercontent.com',
+    defaultValue:
+        '103241478877-9injf5juroq9an661l1fl5315g22edk8.apps.googleusercontent.com',
   );
 
   /// Client OAuth Web. GoogleSignIn exige un `clientId` sur le Web ; sur

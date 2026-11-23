@@ -8,14 +8,12 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/perceptual_hash.dart';
 import '../../../../core/router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
-import '../../../../widgets/pressable_scale.dart';
 import '../../data/models/location_model.dart';
 import '../../data/providers/objects_providers.dart';
 import '../../data/services/location_service.dart';
@@ -116,9 +114,6 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   Future<void> _pickImage() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -126,17 +121,17 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.photo_camera_rounded,
-                  color: AppColors.primary,
+                  color: sheetContext.colors.primary,
                 ),
                 title: const Text('Prendre une photo'),
                 onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.photo_library_rounded,
-                  color: AppColors.primary,
+                  color: sheetContext.colors.primary,
                 ),
                 title: const Text('Choisir dans la galerie'),
                 onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
@@ -203,16 +198,6 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
       initialDate: _occurredAt,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-            onSurface: AppColors.textPrimary,
-          ),
-        ),
-        child: child ?? const SizedBox.shrink(),
-      ),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -325,14 +310,10 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
         title: Text(
           _isEditing ? 'Modifier l\'annonce' : 'Signaler un objet',
-          style: AppText.h3,
+          style: context.typography.titleLarge,
         ),
       ),
       body: SafeArea(
@@ -349,7 +330,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
             const SizedBox(height: AppSpacing.lg),
             _buildImagePicker(),
             const SizedBox(height: AppSpacing.lg),
-            Text('Titre', style: AppText.label),
+            Text('Titre', style: context.typography.titleMedium),
             const SizedBox(height: AppSpacing.xs),
             TextField(
               controller: _titleController,
@@ -358,7 +339,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
               decoration: _decoration('Ex : Sac à dos noir Nike'),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text('Description', style: AppText.label),
+            Text('Description', style: context.typography.titleMedium),
             const SizedBox(height: AppSpacing.xs),
             TextField(
               controller: _descriptionController,
@@ -372,17 +353,20 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
             const SizedBox(height: AppSpacing.sm),
             _buildSecretField(),
             const SizedBox(height: AppSpacing.lg),
-            Text('Catégorie', style: AppText.label),
+            Text('Catégorie', style: context.typography.titleMedium),
             const SizedBox(height: AppSpacing.sm),
             _buildCategoryGrid(),
             const SizedBox(height: AppSpacing.lg),
             _buildLocationSection(),
             const SizedBox(height: AppSpacing.lg),
-            Text('Quand ?', style: AppText.label),
+            Text('Quand ?', style: context.typography.titleMedium),
             const SizedBox(height: AppSpacing.xs),
             _buildDateField(),
             const SizedBox(height: AppSpacing.lg),
-            Text('Téléphone de contact (optionnel)', style: AppText.label),
+            Text(
+              'Téléphone de contact (optionnel)',
+              style: context.typography.titleMedium,
+            ),
             const SizedBox(height: AppSpacing.xs),
             TextField(
               controller: _phoneController,
@@ -403,200 +387,183 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   }
 
   InputDecoration _decoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: AppText.caption,
-      filled: true,
-      fillColor: AppColors.surface,
-      counterText: '',
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.md,
-      ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
-      ),
-    );
+    return InputDecoration(hintText: hint, counterText: '');
   }
 
   Widget _buildTypeSelector() {
-    return Row(
-      children: [
-        Expanded(
-          child: _TypeOption(
-            label: 'Perdu',
-            iconName: 'magnifer-linear',
-            selected: _type == ItemType.lost,
-            color: AppColors.lost,
-            background: AppColors.lostSoft,
-            onTap: () => setState(() => _type = ItemType.lost),
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<ItemType>(
+        segments: const [
+          ButtonSegment<ItemType>(
+            value: ItemType.lost,
+            icon: Icon(Icons.search_rounded),
+            label: Text('Perdu'),
           ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: _TypeOption(
-            label: 'Trouvé',
-            iconName: 'hand-heart-linear',
-            selected: _type == ItemType.found,
-            color: AppColors.found,
-            background: AppColors.foundSoft,
-            onTap: () => setState(() => _type = ItemType.found),
+          ButtonSegment<ItemType>(
+            value: ItemType.found,
+            icon: Icon(Icons.volunteer_activism_rounded),
+            label: Text('Trouvé'),
           ),
+        ],
+        selected: {_type},
+        showSelectedIcon: false,
+        multiSelectionEnabled: false,
+        style: SegmentedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
         ),
-      ],
+        onSelectionChanged: (selection) =>
+            setState(() => _type = selection.first),
+      ),
     );
   }
 
   Widget _buildImagePicker() {
     final hasImage =
         _imageBytes != null || (_existingImageUrl != null && !_removeImage);
-    return PressableScale(
+    return AppCard(
       onTap: _pickImage,
-      child: Container(
+      padding: EdgeInsets.zero,
+      child: SizedBox(
         height: 170,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: hasImage
-            ? Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (_imageBytes != null)
-                    Image.memory(_imageBytes!, fit: BoxFit.cover)
-                  else
-                    Image.network(
-                      _existingImageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          Center(child: ItemArtwork(category: _category)),
-                    ),
-                  Positioned(
-                    right: 10,
-                    top: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
+          child: hasImage
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (_imageBytes != null)
+                      Image.memory(_imageBytes!, fit: BoxFit.cover)
+                    else
+                      Image.network(
+                        _existingImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            Center(child: ItemArtwork(category: _category)),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55),
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const AppIcon(
-                            'camera-linear',
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Changer',
-                            style: AppText.tiny.copyWith(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 10,
-                    top: 10,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _imageBytes = null;
-                          _imageName = null;
-                          _existingImageUrl = null;
-                          _removeImage = true;
-                        });
-                      },
+                    Positioned(
+                      right: 10,
+                      top: 10,
                       child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          shape: BoxShape.circle,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
                         ),
-                        child: const Icon(
+                        decoration: BoxDecoration(
+                          color: context.colors.inverseSurface.withValues(
+                            alpha: 0.7,
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AppIcon(
+                              'camera-linear',
+                              size: 14,
+                              color: context.colors.onInverseSurface,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Changer',
+                              style: context.typography.labelSmall?.copyWith(
+                                color: context.colors.onInverseSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 10,
+                      top: 10,
+                      child: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _imageBytes = null;
+                            _imageName = null;
+                            _existingImageUrl = null;
+                            _removeImage = true;
+                          });
+                        },
+                        icon: Icon(
                           Icons.delete_outline_rounded,
                           size: 18,
-                          color: Colors.white,
+                          color: context.colors.onInverseSurface,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: context.colors.inverseSurface
+                              .withValues(alpha: 0.7),
+                          minimumSize: const Size(48, 48),
+                          shape: const CircleBorder(),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppColors.primarySoft,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: const Center(
-                      child: AppIcon(
-                        'gallery-linear',
-                        size: 26,
-                        color: AppColors.primary,
+                  ],
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: AppSpacing.huge + 8,
+                      height: AppSpacing.huge + 8,
+                      decoration: BoxDecoration(
+                        color: context.colors.primaryContainer,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Center(
+                        child: AppIcon(
+                          'gallery-linear',
+                          size: 26,
+                          color: context.colors.onPrimaryContainer,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('Ajouter une photo', style: AppText.bodyStrong),
-                  const SizedBox(height: 2),
-                  Text('Optionnel — JPG ou PNG', style: AppText.caption),
-                ],
-              ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Ajouter une photo',
+                      style: context.typography.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Optionnel — JPG ou PNG',
+                      style: context.typography.bodySmall,
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
 
   Widget _buildSecretField() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.mint,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.mintDark.withValues(alpha: 0.2)),
-      ),
+    return AppCard(
+      color: context.colors.secondaryContainer,
+      showBorder: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const AppIcon(
+              AppIcon(
                 'lock-keyhole-linear',
                 size: 16,
-                color: AppColors.mintDark,
+                color: context.colors.onSecondaryContainer,
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'Détail secret de vérification',
-                style: AppText.bodyStrong.copyWith(color: AppColors.mintDark),
+                style: context.typography.titleMedium?.copyWith(
+                  color: context.colors.onSecondaryContainer,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             'Visible uniquement par vous. Il servira à prouver que l\'objet vous appartient.',
-            style: AppText.caption.copyWith(
-              color: AppColors.mintDark.withValues(alpha: 0.8),
+            style: context.typography.bodySmall?.copyWith(
+              color: context.colors.onSecondaryContainer,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -605,26 +572,15 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
             obscureText: !_showSecret,
             decoration: InputDecoration(
               hintText: 'Ex : étiquette bleue à l\'intérieur',
-              hintStyle: AppText.caption,
-              filled: true,
-              fillColor: Colors.white,
               suffixIcon: IconButton(
                 icon: Icon(
                   _showSecret
                       ? Icons.visibility_off_rounded
                       : Icons.visibility_rounded,
                   size: 20,
-                  color: AppColors.mintDark,
+                  color: context.colors.onSecondaryContainer,
                 ),
                 onPressed: () => setState(() => _showSecret = !_showSecret),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide.none,
               ),
             ),
           ),
@@ -639,42 +595,21 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
       runSpacing: AppSpacing.xs,
       children: ItemCategory.values.map((category) {
         final selected = _category == category;
-        final color = categoryColor(category);
-        return GestureDetector(
-          onTap: () => setState(() => _category = category),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-            decoration: BoxDecoration(
-              color: selected
-                  ? color.withValues(alpha: 0.14)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(
-                color: selected ? color : AppColors.border,
-                width: selected ? 1.6 : 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIcon(
-                  categoryIconName(category),
-                  size: 16,
-                  color: selected ? color : AppColors.textTertiary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  category.label,
-                  style: AppText.label.copyWith(
-                    color: selected ? color : AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+        return FilterChip(
+          label: Text(category.label),
+          avatar: AppIcon(
+            categoryIconName(category),
+            size: 16,
+            color: selected
+                ? context.colors.onSecondaryContainer
+                : context.colors.onSurfaceVariant,
+          ),
+          selected: selected,
+          showCheckmark: false,
+          onSelected: (_) => setState(() => _category = category),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 14,
           ),
         );
       }).toList(),
@@ -689,10 +624,9 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Localisation', style: AppText.label),
+            Text('Localisation', style: context.typography.titleMedium),
             Switch(
               value: _gpsEnabled,
-              activeThumbColor: AppColors.primary,
               onChanged: (value) => setState(() => _gpsEnabled = value),
             ),
           ],
@@ -715,10 +649,10 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const AppIcon(
+                      : AppIcon(
                           'map-point-linear',
                           size: 17,
-                          color: AppColors.primary,
+                          color: context.colors.primary,
                         ),
                   label: Text(_locating ? 'Localisation…' : 'Ma position'),
                 ),
@@ -727,10 +661,10 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _pickOnMap,
-                  icon: const AppIcon(
+                  icon: AppIcon(
                     'map-linear',
                     size: 17,
-                    color: AppColors.primary,
+                    color: context.colors.primary,
                   ),
                   label: const Text('Sur la carte'),
                 ),
@@ -741,7 +675,7 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
             const SizedBox(height: 6),
             Text(
               '${_latitude!.toStringAsFixed(5)}, ${_longitude!.toStringAsFixed(5)}',
-              style: AppText.tiny,
+              style: context.typography.bodySmall,
             ),
           ],
         ],
@@ -750,95 +684,30 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
   }
 
   Widget _buildDateField() {
-    return PressableScale(
+    return AppCard(
       onTap: _pickDate,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.md,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const AppIcon(
-              'calendar-linear',
-              size: 18,
-              color: AppColors.primary,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              '${_occurredAt.day.toString().padLeft(2, '0')}/'
-              '${_occurredAt.month.toString().padLeft(2, '0')}/'
-              '${_occurredAt.year} à '
-              '${_occurredAt.hour.toString().padLeft(2, '0')}:'
-              '${_occurredAt.minute.toString().padLeft(2, '0')}',
-              style: AppText.bodyStrong,
-            ),
-            const Spacer(),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textTertiary,
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.md,
       ),
-    );
-  }
-}
-
-class _TypeOption extends StatelessWidget {
-  const _TypeOption({
-    required this.label,
-    required this.iconName,
-    required this.selected,
-    required this.color,
-    required this.background,
-    required this.onTap,
-  });
-
-  final String label;
-  final String iconName;
-  final bool selected;
-  final Color color;
-  final Color background;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: selected ? background : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: selected ? color : AppColors.border,
-            width: selected ? 1.6 : 1,
+      child: Row(
+        children: [
+          AppIcon('calendar-linear', size: 18, color: context.colors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            '${_occurredAt.day.toString().padLeft(2, '0')}/'
+            '${_occurredAt.month.toString().padLeft(2, '0')}/'
+            '${_occurredAt.year} à '
+            '${_occurredAt.hour.toString().padLeft(2, '0')}:'
+            '${_occurredAt.minute.toString().padLeft(2, '0')}',
+            style: context.typography.titleMedium,
           ),
-        ),
-        child: Column(
-          children: [
-            AppIcon(
-              iconName,
-              size: 22,
-              color: selected ? color : AppColors.textTertiary,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: AppText.label.copyWith(
-                color: selected ? color : AppColors.textSecondary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
+          const Spacer(),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.colors.onSurfaceVariant,
+          ),
+        ],
       ),
     );
   }

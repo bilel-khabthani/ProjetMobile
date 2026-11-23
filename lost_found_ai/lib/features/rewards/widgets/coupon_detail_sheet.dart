@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/reward.dart';
 import '../../../data/providers.dart';
 import 'official_voucher_dialog.dart';
@@ -43,10 +42,13 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.mail_outline_rounded, color: AppColors.primary),
+              child: Icon(
+                Icons.mail_outline_rounded,
+                color: Theme.of(ctx).colorScheme.primary,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -61,9 +63,12 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Le bon de réduction avec le PDF officiel en pièce jointe sera transmis à cette adresse :',
-              style: TextStyle(fontSize: 13, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(ctx).colorScheme.onSurface,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -73,13 +78,18 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
                 labelText: 'Adresse e-mail',
                 hintText: 'ex: votre-email@gmail.com',
                 prefixIcon: const Icon(Icons.alternate_email_rounded),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '💡 Astuce : l\'e-mail contient le bon officiel en PDF. En développement, consultez-le dans Mailpit sur http://127.0.0.1:8025',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+            Text(
+              'Astuce : l\'e-mail contient le bon officiel en PDF. En développement, consultez-le dans Mailpit sur http://127.0.0.1:8025',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -108,16 +118,15 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
     HapticFeedback.lightImpact();
 
     try {
-      final msg = await ref.read(repositoryProvider).sendCouponEmail(
-            widget.coupon.id,
-            targetEmail: targetEmail,
-          );
+      final msg = await ref
+          .read(repositoryProvider)
+          .sendCouponEmail(widget.coupon.id, targetEmail: targetEmail);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
-          backgroundColor: AppColors.success,
+          backgroundColor: context.colors.primary,
           duration: const Duration(seconds: 4),
         ),
       );
@@ -126,7 +135,7 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur : $e'),
-          backgroundColor: AppColors.danger,
+          backgroundColor: context.colors.error,
         ),
       );
     } finally {
@@ -144,9 +153,9 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Coupon marqué comme utilisé !'),
-          backgroundColor: AppColors.success,
+        SnackBar(
+          content: const Text('Coupon marqué comme utilisé !'),
+          backgroundColor: context.colors.primary,
         ),
       );
     } catch (e) {
@@ -154,7 +163,7 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur : $e'),
-          backgroundColor: AppColors.danger,
+          backgroundColor: context.colors.error,
         ),
       );
     } finally {
@@ -173,8 +182,8 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
     final isUsed = coupon.status == CouponStatus.used;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: context.colors.surfaceContainerLow,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -188,191 +197,201 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          // Barre de glissement
-          Center(
-            child: Container(
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-
-          // En-tête du Bon
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
+            // Barre de glissement
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: const Icon(
-                  Icons.card_giftcard_rounded,
-                  color: AppColors.accent,
-                  size: 26,
+                  color: context.colors.outlineVariant,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      coupon.partnerName,
-                      style: AppText.caption.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    Text(
-                      coupon.discountText,
-                      style: AppText.h2.copyWith(fontSize: 20),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: AppSpacing.lg),
-
-          // Cadre Code Promo & Barcode
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: AppColors.border),
             ),
-            child: Column(
-              children: [
-                Text(
-                  'CODE DE RÉDUCTION EXCLUSIF',
-                  style: AppText.caption.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                SelectableText(
-                  coupon.code,
-                  style: AppText.h1.copyWith(
-                    fontSize: 26,
-                    letterSpacing: 3,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.lg),
 
-                // Simulation Code-barres
+            // En-tête du Bon
+            Row(
+              children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    border: Border.all(color: AppColors.border),
+                    color: context.colors.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
+                  child: Icon(
+                    Icons.card_giftcard_rounded,
+                    color: context.colors.tertiary,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '|||| | ||| |||| | ||| |||| | ||| | ||',
-                        style: TextStyle(
-                          fontFamily: 'Courier',
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 4,
-                          color: Colors.grey.shade800,
+                        coupon.partnerName,
+                        style: context.typography.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        'N° ${coupon.id.substring(0, 8).toUpperCase()}',
-                        style: AppText.caption.copyWith(fontSize: 10),
+                        coupon.discountText,
+                        style: context.typography.headlineSmall?.copyWith(
+                          fontSize: 20,
+                        ),
                       ),
                     ],
                   ),
                 ),
+              ],
+            ),
 
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: coupon.code));
-                    HapticFeedback.lightImpact();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Code promo copié !')),
-                    );
-                  },
-                  icon: const Icon(Icons.copy_rounded, size: 16),
-                  label: const Text('Copier le code'),
+            const SizedBox(height: AppSpacing.lg),
+
+            // Cadre Code Promo & Barcode
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: context.colors.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: context.colors.outlineVariant),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'CODE DE RÉDUCTION EXCLUSIF',
+                    style: context.typography.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  SelectableText(
+                    coupon.code,
+                    style: context.typography.headlineMedium?.copyWith(
+                      fontSize: 26,
+                      letterSpacing: 3,
+                      color: context.colors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // Simulation Code-barres
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: context.colors.surface,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(color: context.colors.outlineVariant),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '|||| | ||| |||| | ||| |||| | ||| | ||',
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 4,
+                            color: context.colors.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'N° ${coupon.id.substring(0, 8).toUpperCase()}',
+                          style: context.typography.bodySmall?.copyWith(
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: coupon.code));
+                      HapticFeedback.lightImpact();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Code promo copié !')),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('Copier le code'),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+
+            // Conditions
+            Text(
+              '• Valable jusqu\'au ${coupon.expiresAt.day}/${coupon.expiresAt.month}/${coupon.expiresAt.year}',
+              style: context.typography.bodySmall,
+            ),
+            if (coupon.terms != null && coupon.terms!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text('• ${coupon.terms}', style: context.typography.caption),
+            ],
+
+            const SizedBox(height: AppSpacing.xl),
+
+            // Boutons d'action Métier Avancé : PDF & Mail
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _downloadPdf,
+                    icon: const Icon(Icons.picture_as_pdf_rounded),
+                    label: const Text('Bon PDF'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _sendingEmail ? null : _showEmailDialog,
+                    icon: _sendingEmail
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: context.colors.surface,
+                            ),
+                          )
+                        : const Icon(Icons.email_rounded),
+                    label: Text(_sendingEmail ? 'Envoi...' : 'Par E-mail'),
+                  ),
                 ),
               ],
             ),
-          ),
 
-          const SizedBox(height: AppSpacing.md),
-
-          // Conditions
-          Text(
-            '• Valable jusqu\'au ${coupon.expiresAt.day}/${coupon.expiresAt.month}/${coupon.expiresAt.year}',
-            style: AppText.caption,
-          ),
-          if (coupon.terms != null && coupon.terms!.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text('• ${coupon.terms}', style: AppText.caption),
-          ],
-
-          const SizedBox(height: AppSpacing.xl),
-
-          // Boutons d'action Métier Avancé : PDF & Mail
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _downloadPdf,
-                  icon: const Icon(Icons.picture_as_pdf_rounded),
-                  label: const Text('Bon PDF'),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _sendingEmail ? null : _showEmailDialog,
-                  icon: _sendingEmail
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.email_rounded),
-                  label: Text(_sendingEmail ? 'Envoi...' : 'Par E-mail'),
+            if (!isUsed) ...[
+              const SizedBox(height: AppSpacing.sm),
+              TextButton.icon(
+                onPressed: _markingUsed ? null : _markUsed,
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                label: Text(
+                  _markingUsed
+                      ? 'Validation...'
+                      : 'Marquer comme utilisé en caisse / livraison',
+                  style: context.typography.bodySmall?.copyWith(
+                    color: context.colors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
-          ),
-
-          if (!isUsed) ...[
-            const SizedBox(height: AppSpacing.sm),
-            TextButton.icon(
-              onPressed: _markingUsed ? null : _markUsed,
-              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-              label: Text(
-                _markingUsed ? 'Validation...' : 'Marquer comme utilisé en caisse / livraison',
-                style: AppText.caption.copyWith(color: AppColors.textSecondary),
-              ),
-            ),
           ],
-        ],
         ),
       ),
     );
   }
 }
-

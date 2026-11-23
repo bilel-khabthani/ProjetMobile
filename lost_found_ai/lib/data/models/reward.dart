@@ -12,10 +12,10 @@ enum CouponStatus {
   }
 
   String get label => switch (this) {
-        CouponStatus.active => 'Actif',
-        CouponStatus.used => 'Utilisé',
-        CouponStatus.expired => 'Expiré',
-      };
+    CouponStatus.active => 'Actif',
+    CouponStatus.used => 'Utilisé',
+    CouponStatus.expired => 'Expiré',
+  };
 }
 
 class Reward {
@@ -59,17 +59,17 @@ class Reward {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'partner_name': partnerName,
-        'partner_type': partnerType,
-        'description': description,
-        'points_cost': pointsCost,
-        'discount_text': discountText,
-        'icon_name': iconName,
-        'color_hex': colorHex,
-        'terms': terms,
-      };
+    'id': id,
+    'title': title,
+    'partner_name': partnerName,
+    'partner_type': partnerType,
+    'description': description,
+    'points_cost': pointsCost,
+    'discount_text': discountText,
+    'icon_name': iconName,
+    'color_hex': colorHex,
+    'terms': terms,
+  };
 }
 
 class UserCoupon {
@@ -103,7 +103,8 @@ class UserCoupon {
   final String? terms;
   final String? pdfUrl;
 
-  bool get isExpired => DateTime.now().isAfter(expiresAt) && status != CouponStatus.used;
+  bool get isExpired =>
+      DateTime.now().isAfter(expiresAt) && status != CouponStatus.used;
   bool get isValid => status == CouponStatus.active && !isExpired;
 
   factory UserCoupon.fromJson(Map<String, dynamic> json) {
@@ -116,10 +117,15 @@ class UserCoupon {
       discountText: json['discount_text'] as String? ?? '',
       status: CouponStatus.fromString(json['status'] as String?),
       source: json['source'] as String? ?? 'RESTITUTION',
-      expiresAt: DateTime.tryParse(json['expires_at'] as String? ?? '') ??
+      expiresAt:
+          DateTime.tryParse(json['expires_at'] as String? ?? '') ??
           DateTime.now().add(const Duration(days: 30)),
-      usedAt: json['used_at'] != null ? DateTime.tryParse(json['used_at'] as String) : null,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+      usedAt: json['used_at'] != null
+          ? DateTime.tryParse(json['used_at'] as String)
+          : null,
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.now(),
       terms: json['terms'] as String?,
       pdfUrl: json['pdf_url'] as String?,
     );
@@ -213,7 +219,9 @@ class RewardTransaction {
       type: json['type'] as String? ?? '',
       points: (json['points'] as num?)?.toInt() ?? 0,
       description: json['description'] as String? ?? '',
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -243,4 +251,3 @@ class RewardWallet {
     );
   }
 }
-

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
+import '../core/theme/app_theme.dart';
 
 class SkeletonBox extends StatefulWidget {
   const SkeletonBox({
@@ -33,6 +33,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -40,17 +41,12 @@ class _SkeletonBoxState extends State<SkeletonBox>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            gradient: LinearGradient(
-              begin: Alignment(-1 - 2 * _controller.value, 0),
-              end: Alignment(1 - 2 * _controller.value, 0),
-              colors: const [
-                AppColors.surfaceAlt,
-                Color(0xFFF6EFE7),
-                AppColors.surfaceAlt,
-              ],
-              stops: const [0.1, 0.5, 0.9],
+            color: Color.lerp(
+              colors.surfaceContainerLow,
+              colors.surfaceContainerHighest,
+              _controller.value,
             ),
+            borderRadius: BorderRadius.circular(widget.borderRadius),
           ),
         );
       },

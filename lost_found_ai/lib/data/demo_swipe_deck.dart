@@ -11,11 +11,13 @@ final List<SwipeCandidate> demoSwipeDeck = [
     matchId: 'demo-sac-nike',
     status: 'PENDING',
     lostTitle: 'Sac Nike noir',
-    lostDescription: 'Sac de sport noir avec une bande rouge sur le côté et un cadenas doré.',
+    lostDescription:
+        'Sac de sport noir avec une bande rouge sur le côté et un cadenas doré.',
     lostCategory: ItemCategory.bag,
     lostPlace: 'Bloc A — vestiaire',
     foundTitle: 'Sac noir à bande rouge',
-    foundDescription: 'Sac de sport trouvé près du vestiaire. Contient une serviette et une gourde bleue.',
+    foundDescription:
+        'Sac de sport trouvé près du vestiaire. Contient une serviette et une gourde bleue.',
     foundCategory: ItemCategory.bag,
     foundPlace: 'Cafétéria centrale',
     foundTimeLabel: '05 novembre · 11:05',
@@ -34,7 +36,8 @@ final List<SwipeCandidate> demoSwipeDeck = [
     ai: const AiInsight(
       verdict: AiVerdict.strong,
       confidence: 94,
-      summary: 'La description, la couleur de la bande et l’écart de 35 minutes convergent fortement.',
+      summary:
+          'La description, la couleur de la bande et l’écart de 35 minutes convergent fortement.',
       reasons: [
         'Même catégorie : sac de sport',
         'Bande rouge mentionnée dans les deux descriptions',
@@ -42,7 +45,8 @@ final List<SwipeCandidate> demoSwipeDeck = [
         'Score texte 91/100 sur les mots-clés',
       ],
       tags: ['Sac', 'Bande rouge', 'Très proche'],
-      icebreaker: 'Bonjour Karim, je pense que ce sac est le mien : il a une bande rouge et un cadenas doré. Serait-il possible de vérifier ensemble ?',
+      icebreaker:
+          'Bonjour Karim, je pense que ce sac est le mien : il a une bande rouge et un cadenas doré. Serait-il possible de vérifier ensemble ?',
       source: 'demo',
     ),
   ),
@@ -50,11 +54,13 @@ final List<SwipeCandidate> demoSwipeDeck = [
     matchId: 'demo-cles-biblio',
     status: 'PENDING',
     lostTitle: 'Trousseau de clés',
-    lostDescription: 'Trousseau avec une clé de voiture, deux clés de maison et un porte-clés vert en forme de feuille.',
+    lostDescription:
+        'Trousseau avec une clé de voiture, deux clés de maison et un porte-clés vert en forme de feuille.',
     lostCategory: ItemCategory.keys,
     lostPlace: 'Bibliothèque universitaire',
     foundTitle: 'Trousseau avec étiquette verte',
-    foundDescription: 'Trousseau trouvé sur une table du 2e étage. Porte-clés en forme de feuille verte.',
+    foundDescription:
+        'Trousseau trouvé sur une table du 2e étage. Porte-clés en forme de feuille verte.',
     foundCategory: ItemCategory.keys,
     foundPlace: 'Hall de la bibliothèque',
     foundTimeLabel: '04 novembre · 15:20',
@@ -73,14 +79,16 @@ final List<SwipeCandidate> demoSwipeDeck = [
     ai: const AiInsight(
       verdict: AiVerdict.strong,
       confidence: 90,
-      summary: 'Le porte-clés vert et la localisation quasi identique rendent cette piste très crédible.',
+      summary:
+          'Le porte-clés vert et la localisation quasi identique rendent cette piste très crédible.',
       reasons: [
         'Porte-clés vert présent dans les deux annonces',
         'Découvert à 80 m du lieu de perte',
         'Même créneau horaire (moins de 2 h)',
       ],
       tags: ['Clés', 'Porte-clés vert', 'Même bâtiment'],
-      icebreaker: 'Bonjour Inès, ce trousseau correspond à ma description : les clés sont attachées à un porte-clés vert en forme de feuille. Puis-je vous donner plus de détails ?',
+      icebreaker:
+          'Bonjour Inès, ce trousseau correspond à ma description : les clés sont attachées à un porte-clés vert en forme de feuille. Puis-je vous donner plus de détails ?',
       source: 'demo',
     ),
   ),
@@ -88,11 +96,13 @@ final List<SwipeCandidate> demoSwipeDeck = [
     matchId: 'demo-iphone-amphi',
     status: 'PENDING',
     lostTitle: 'iPhone 13 noir',
-    lostDescription: 'iPhone 13 noir avec une coque transparente et une fissure en bas à droite de l’écran.',
+    lostDescription:
+        'iPhone 13 noir avec une coque transparente et une fissure en bas à droite de l’écran.',
     lostCategory: ItemCategory.phone,
     lostPlace: 'Amphithéâtre B',
     foundTitle: 'Téléphone noir écran fissuré',
-    foundDescription: 'Téléphone noir trouvé sur une chaise de l’amphi. Coque transparente, écran fissuré en bas à droite.',
+    foundDescription:
+        'Téléphone noir trouvé sur une chaise de l’amphi. Coque transparente, écran fissuré en bas à droite.',
     foundCategory: ItemCategory.phone,
     foundPlace: 'Amphithéâtre B — rangée 4',
     foundTimeLabel: '03 novembre · 17:40',
@@ -111,14 +121,16 @@ final List<SwipeCandidate> demoSwipeDeck = [
     ai: const AiInsight(
       verdict: AiVerdict.possible,
       confidence: 78,
-      summary: 'La fissure et la coque sont des indices forts, mais l’écart de deux jours demande une vérification.',
+      summary:
+          'La fissure et la coque sont des indices forts, mais l’écart de deux jours demande une vérification.',
       reasons: [
         'Fissure en bas à droite décrite des deux côtés',
         'Même amphithéâtre, à quelques mètres près',
         'Écart de 2 jours : demander une preuve supplémentaire',
       ],
       tags: ['Téléphone', 'Écran fissuré', 'Vérifier'],
-      icebreaker: 'Bonjour Youssef, je crois reconnaître mon téléphone : il a une coque transparente et une fissure en bas à droite. Pourriez-vous me dire si le fond d’écran est bleu ?',
+      icebreaker:
+          'Bonjour Youssef, je crois reconnaître mon téléphone : il a une coque transparente et une fissure en bas à droite. Pourriez-vous me dire si le fond d’écran est bleu ?',
       source: 'demo',
     ),
   ),
@@ -131,7 +143,8 @@ final List<SwipeCandidate> demoSwipeDeck = [
     lostCategory: ItemCategory.glasses,
     lostPlace: 'Terrain de sport',
     foundTitle: 'Lunettes noires sans étui',
-    foundDescription: 'Lunettes de vue noires trouvées sur les gradins. Monture fine, verres légèrement rayés.',
+    foundDescription:
+        'Lunettes de vue noires trouvées sur les gradins. Monture fine, verres légèrement rayés.',
     foundCategory: ItemCategory.glasses,
     foundPlace: 'Gradins du terrain',
     foundTimeLabel: '02 novembre · 09:10',
@@ -150,14 +163,16 @@ final List<SwipeCandidate> demoSwipeDeck = [
     ai: const AiInsight(
       verdict: AiVerdict.possible,
       confidence: 66,
-      summary: 'La monture et le lieu correspondent, mais l’étui n’est pas mentionné et l’heure est incertaine.',
+      summary:
+          'La monture et le lieu correspondent, mais l’étui n’est pas mentionné et l’heure est incertaine.',
       reasons: [
         'Monture noire fine dans les deux annonces',
         'Trouvées sur le même terrain',
         'Étui absent de l’annonce trouvée : à confirmer',
       ],
       tags: ['Lunettes', 'Monture fine', 'Étui manquant'],
-      icebreaker: 'Bonjour Lina, ces lunettes ressemblent aux miennes. Pouvez-vous me confirmer si les branches portent une petite inscription dorée ?',
+      icebreaker:
+          'Bonjour Lina, ces lunettes ressemblent aux miennes. Pouvez-vous me confirmer si les branches portent une petite inscription dorée ?',
       source: 'demo',
     ),
   ),
@@ -165,11 +180,13 @@ final List<SwipeCandidate> demoSwipeDeck = [
     matchId: 'demo-portefeuille-hall',
     status: 'PENDING',
     lostTitle: 'Portefeuille marron',
-    lostDescription: 'Portefeuille en cuir marron avec une carte étudiante et un ticket de cantine.',
+    lostDescription:
+        'Portefeuille en cuir marron avec une carte étudiante et un ticket de cantine.',
     lostCategory: ItemCategory.wallet,
     lostPlace: 'Hall principal',
     foundTitle: 'Petit portefeuille marron',
-    foundDescription: 'Portefeuille marron trouvé près des casiers. Contient une carte de transport.',
+    foundDescription:
+        'Portefeuille marron trouvé près des casiers. Contient une carte de transport.',
     foundCategory: ItemCategory.wallet,
     foundPlace: 'Hall principal — casiers',
     foundTimeLabel: '01 novembre · 12:30',
@@ -188,14 +205,16 @@ final List<SwipeCandidate> demoSwipeDeck = [
     ai: const AiInsight(
       verdict: AiVerdict.weak,
       confidence: 51,
-      summary: 'Même objet et même lieu, mais le contenu décrit diffère. Une question de vérification est nécessaire.',
+      summary:
+          'Même objet et même lieu, mais le contenu décrit diffère. Une question de vérification est nécessaire.',
       reasons: [
         'Portefeuille marron dans les deux annonces',
         'Même hall, à 100 m près',
         'Contenu différent : carte étudiante contre carte de transport',
       ],
       tags: ['Portefeuille', 'Contenu divergent', 'À vérifier'],
-      icebreaker: 'Bonjour Adam, merci d’avoir signalé ce portefeuille. Pourriez-vous me dire s’il contient une carte étudiante au nom de Yasmine ?',
+      icebreaker:
+          'Bonjour Adam, merci d’avoir signalé ce portefeuille. Pourriez-vous me dire s’il contient une carte étudiante au nom de Yasmine ?',
       source: 'demo',
     ),
   ),
@@ -203,11 +222,13 @@ final List<SwipeCandidate> demoSwipeDeck = [
     matchId: 'demo-veste-salle',
     status: 'PENDING',
     lostTitle: 'Veste bleue taille M',
-    lostDescription: 'Veste en jean bleue taille M, avec un badge brodé sur la manche gauche.',
+    lostDescription:
+        'Veste en jean bleue taille M, avec un badge brodé sur la manche gauche.',
     lostCategory: ItemCategory.clothing,
     lostPlace: 'Salle 204',
     foundTitle: 'Veste en jean bleue',
-    foundDescription: 'Veste en jean bleue trouvée après le cours. Badge brodé visible sur la manche gauche.',
+    foundDescription:
+        'Veste en jean bleue trouvée après le cours. Badge brodé visible sur la manche gauche.',
     foundCategory: ItemCategory.clothing,
     foundPlace: 'Salle 204 — bureau',
     foundTimeLabel: '31 octobre · 18:15',
@@ -226,14 +247,16 @@ final List<SwipeCandidate> demoSwipeDeck = [
     ai: const AiInsight(
       verdict: AiVerdict.strong,
       confidence: 88,
-      summary: 'Le badge brodé sur la manche gauche et la salle identique sont des indices très discriminants.',
+      summary:
+          'Le badge brodé sur la manche gauche et la salle identique sont des indices très discriminants.',
       reasons: [
         'Badge brodé sur la manche gauche mentionné deux fois',
         'Même salle, découverte après le cours',
         'Taille et couleur compatibles',
       ],
       tags: ['Veste', 'Badge brodé', 'Même salle'],
-      icebreaker: 'Bonjour Nour, cette veste est probablement la mienne : elle porte un badge brodé sur la manche gauche. Pouvez-vous me dire de quelle couleur il est ?',
+      icebreaker:
+          'Bonjour Nour, cette veste est probablement la mienne : elle porte un badge brodé sur la manche gauche. Pouvez-vous me dire de quelle couleur il est ?',
       source: 'demo',
     ),
   ),

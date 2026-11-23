@@ -4,15 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
 import '../../../../data/providers.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
-import '../../../../widgets/pressable_scale.dart';
 import '../../../../widgets/skeleton.dart';
 import '../../data/providers/objects_providers.dart';
 
@@ -27,11 +25,7 @@ class ObjectDetailScreen extends ConsumerWidget {
     final user = ref.watch(sessionProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
         actions: [
           objectAsync.maybeWhen(
             data: (object) => user != null && object.canEdit(user.id)
@@ -52,10 +46,7 @@ class ObjectDetailScreen extends ConsumerWidget {
           error: error.toString(),
           onRetry: () => ref.invalidate(objectDetailProvider(objectId)),
         ),
-        data: (object) => _Content(
-          object: object,
-          currentUserId: user?.id,
-        ),
+        data: (object) => _Content(object: object, currentUserId: user?.id),
       ),
     );
   }
@@ -73,8 +64,10 @@ class _Content extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
-    final background = isLost ? AppColors.lostSoft : AppColors.foundSoft;
+    final color = isLost ? context.colors.primary : context.colors.tertiary;
+    final background = isLost
+        ? context.colors.primaryContainer
+        : context.colors.tertiaryContainer;
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -87,7 +80,12 @@ class _Content extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text(object.title, style: AppText.h1)),
+                  Expanded(
+                    child: Text(
+                      object.title,
+                      style: context.typography.headlineMedium,
+                    ),
+                  ),
                   _StatusBadge(object: object),
                 ],
               ),
@@ -114,7 +112,7 @@ class _Content extends ConsumerWidget {
                         const SizedBox(width: 5),
                         Text(
                           object.category.label,
-                          style: AppText.tiny.copyWith(
+                          style: context.typography.labelSmall?.copyWith(
                             color: color,
                             fontWeight: FontWeight.w800,
                           ),
@@ -123,11 +121,14 @@ class _Content extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(object.formattedDate, style: AppText.caption),
+                  Text(
+                    object.formattedDate,
+                    style: context.typography.bodySmall,
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text(object.description, style: AppText.body),
+              Text(object.description, style: context.typography.bodyMedium),
               const SizedBox(height: AppSpacing.xl),
               _InfoTile(
                 iconName: 'map-point-linear',
@@ -171,8 +172,10 @@ class _Content extends ConsumerWidget {
                   title: 'Contact',
                   subtitle: object.contactPhone!,
                   trailing: IconButton(
-                    icon: const Icon(Icons.call_rounded,
-                        color: AppColors.found),
+                    icon: Icon(
+                      Icons.call_rounded,
+                      color: context.colors.primary,
+                    ),
                     onPressed: () => _call(object.contactPhone!),
                   ),
                 ),
@@ -195,7 +198,11 @@ class _Content extends ConsumerWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.object, required this.color, required this.background});
+  const _Hero({
+    required this.object,
+    required this.color,
+    required this.background,
+  });
 
   final LostFoundObject object;
   final Color color;
@@ -210,8 +217,7 @@ class _Hero extends StatelessWidget {
           ? Image.network(
               object.imageUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  ItemArtwork(category: object.category),
+              errorBuilder: (_, _, _) => ItemArtwork(category: object.category),
             )
           : ItemArtwork(category: object.category),
     );
@@ -226,8 +232,10 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
-    final background = isLost ? AppColors.lostSoft : AppColors.foundSoft;
+    final color = isLost ? context.colors.primary : context.colors.tertiary;
+    final background = isLost
+        ? context.colors.primaryContainer
+        : context.colors.tertiaryContainer;
     final label = object.status == ItemStatus.active
         ? object.type.shortLabel
         : object.status.label.toUpperCase();
@@ -241,7 +249,10 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: AppText.tiny.copyWith(color: color, fontWeight: FontWeight.w800),
+        style: context.typography.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
@@ -262,24 +273,23 @@ class _InfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: AppSpacing.huge - 8,
+            height: AppSpacing.huge - 8,
             decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+              color: context.colors.primaryContainer,
+              borderRadius: BorderRadius.circular(AppSpacing.sm),
             ),
             child: Center(
-              child: AppIcon(iconName, size: 19, color: AppColors.primary),
+              child: AppIcon(
+                iconName,
+                size: 19,
+                color: context.colors.onPrimaryContainer,
+              ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -287,9 +297,9 @@ class _InfoTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppText.bodyStrong),
+                Text(title, style: context.typography.titleMedium),
                 const SizedBox(height: 2),
-                Text(subtitle, style: AppText.caption),
+                Text(subtitle, style: context.typography.bodySmall),
               ],
             ),
           ),
@@ -343,7 +353,9 @@ class _OwnerActionsState extends ConsumerState<_OwnerActions> {
             child: const Text('Annuler'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.error,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Supprimer'),
           ),
@@ -373,10 +385,7 @@ class _OwnerActionsState extends ConsumerState<_OwnerActions> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
@@ -402,7 +411,8 @@ class _OwnerActionsState extends ConsumerState<_OwnerActions> {
                 variant: AppButtonVariant.secondary,
                 onPressed: _busy
                     ? null
-                    : () => context.push(AppRoutes.objectEdit(widget.object.id)),
+                    : () =>
+                          context.push(AppRoutes.objectEdit(widget.object.id)),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -457,30 +467,21 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 48, color: AppColors.danger),
-            const SizedBox(height: AppSpacing.md),
-            Text('Objet introuvable', style: AppText.h2),
-            const SizedBox(height: AppSpacing.sm),
-            Text(error, style: AppText.body, textAlign: TextAlign.center),
-            const SizedBox(height: AppSpacing.lg),
-            PressableScale(
-              onTap: onRetry,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Text(
-                  'Réessayer',
-                  style: AppText.label.copyWith(color: Colors.white),
-                ),
-              ),
+            Icon(
+              Icons.cloud_off_rounded,
+              size: 48,
+              color: context.colors.error,
             ),
+            const SizedBox(height: AppSpacing.md),
+            Text('Objet introuvable', style: context.typography.headlineSmall),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              error,
+              style: context.typography.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton(onPressed: onRetry, child: const Text('Réessayer')),
           ],
         ),
       ),

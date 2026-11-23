@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 
 /// Module 5 - Reclamation (signalement).
 ///
@@ -26,26 +25,11 @@ class _ClaimScreenState extends State<ClaimScreen> {
   String? _type;
 
   static const List<Map<String, String>> _claimTypes = [
-    {
-      'value': 'OBJET_NON_REMIS',
-      'label': 'Objet non remis',
-    },
-    {
-      'value': 'CONTESTATION_PROPRIETE',
-      'label': 'Contestation de propriete',
-    },
-    {
-      'value': 'SUSPICION_FRAUDE',
-      'label': 'Suspicion de fraude',
-    },
-    {
-      'value': 'COMPORTEMENT_ABUSIF',
-      'label': 'Comportement abusif',
-    },
-    {
-      'value': 'ERREUR_CORRESPONDANCE',
-      'label': 'Erreur de correspondance',
-    },
+    {'value': 'OBJET_NON_REMIS', 'label': 'Objet non remis'},
+    {'value': 'CONTESTATION_PROPRIETE', 'label': 'Contestation de propriete'},
+    {'value': 'SUSPICION_FRAUDE', 'label': 'Suspicion de fraude'},
+    {'value': 'COMPORTEMENT_ABUSIF', 'label': 'Comportement abusif'},
+    {'value': 'ERREUR_CORRESPONDANCE', 'label': 'Erreur de correspondance'},
   ];
 
   @override
@@ -59,9 +43,9 @@ class _ClaimScreenState extends State<ClaimScreen> {
 
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Reclamation envoyee. Vous recevrez une reponse.'),
-        backgroundColor: AppColors.success,
+      SnackBar(
+        content: const Text('Reclamation envoyee. Vous recevrez une reponse.'),
+        backgroundColor: context.colors.primary,
       ),
     );
     context.pop();
@@ -77,7 +61,10 @@ class _ClaimScreenState extends State<ClaimScreen> {
           child: ListView(
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
-              Text('Type de reclamation', style: AppText.bodyStrong),
+              Text(
+                'Type de reclamation',
+                style: context.typography.titleMedium,
+              ),
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<String>(
                 initialValue: _type,
@@ -97,7 +84,7 @@ class _ClaimScreenState extends State<ClaimScreen> {
                 onChanged: (value) => setState(() => _type = value),
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text('Description', style: AppText.bodyStrong),
+              Text('Description', style: context.typography.titleMedium),
               const SizedBox(height: AppSpacing.sm),
               TextFormField(
                 controller: _descriptionController,
@@ -118,13 +105,15 @@ class _ClaimScreenState extends State<ClaimScreen> {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
+                  color: context.colors.tertiaryContainer.withValues(
+                    alpha: 0.45,
+                  ),
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Text(
                   'Toute reclamation est enregistree, traitee et repondue. '
                   'Le systeme n\'applique aucune sanction automatiquement.',
-                  style: AppText.caption,
+                  style: context.typography.bodySmall,
                 ),
               ),
               const SizedBox(height: AppSpacing.xxxl),

@@ -4,9 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
@@ -121,7 +120,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ? 'Nouveau code OTP envoyé par e-mail$where.'
                 : 'Code OTP envoyé à votre adresse e-mail$where.',
           ),
-          backgroundColor: AppColors.success,
         ),
       );
     } on Object catch (error) {
@@ -143,7 +141,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     final code = _codeController.text.trim();
     if (code.length != 6) {
-      setState(() => _error = 'Le code OTP doit comporter exactement 6 chiffres.');
+      setState(
+        () => _error = 'Le code OTP doit comporter exactement 6 chiffres.',
+      );
       return;
     }
 
@@ -153,18 +153,21 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     });
 
     try {
-      await ref.read(sessionProvider.notifier).resetPassword(
-        email: _emailController.text.trim(),
-        code: code,
-        password: _passwordController.text,
-        passwordConfirmation: _confirmController.text,
-      );
+      await ref
+          .read(sessionProvider.notifier)
+          .resetPassword(
+            email: _emailController.text.trim(),
+            code: code,
+            password: _passwordController.text,
+            passwordConfirmation: _confirmController.text,
+          );
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Mot de passe réinitialisé avec succès ! Connectez-vous.'),
-          backgroundColor: AppColors.success,
+          content: Text(
+            'Mot de passe réinitialisé avec succès ! Connectez-vous.',
+          ),
         ),
       );
       context.go(AppRoutes.signIn);
@@ -244,7 +247,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     keyboardType: TextInputType.number,
                     textInputAction: TextInputAction.next,
                     maxLength: 6,
-                    style: AppText.h2.copyWith(letterSpacing: 8),
+                    style: context.typography.headlineMedium?.copyWith(
+                      letterSpacing: 8,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Code de vérification OTP',
                       hintText: '123456',
@@ -260,7 +265,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                             ? const SizedBox(
                                 width: 14,
                                 height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.refresh_rounded, size: 16),
                         label: Text(
@@ -313,9 +320,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                               ? Icons.visibility_outlined
                               : Icons.visibility_off_outlined,
                         ),
-                        onPressed: () => setState(
-                          () => _obscureConfirm = !_obscureConfirm,
-                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                     ),
                     validator: (v) => v != _passwordController.text
@@ -325,25 +331,23 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ],
                 if (_info != null) ...[
                   const SizedBox(height: AppSpacing.md),
-                  Container(
+                  AppCard(
                     padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.mail_outline_rounded,
                           size: 18,
-                          color: AppColors.primary,
+                          color: context.colors.primary,
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             _info!,
-                            style: AppText.caption.copyWith(color: AppColors.textPrimary),
+                            style: context.typography.bodySmall?.copyWith(
+                              color: context.colors.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -352,25 +356,25 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ],
                 if (_error != null) ...[
                   const SizedBox(height: AppSpacing.md),
-                  Container(
+                  AppCard(
                     padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: AppColors.lostSoft,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
+                    color: context.colors.errorContainer,
+                    showBorder: false,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline_rounded,
                           size: 18,
-                          color: AppColors.danger,
+                          color: context.colors.error,
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             _error!,
-                            style: AppText.caption.copyWith(color: AppColors.danger),
+                            style: context.typography.bodySmall?.copyWith(
+                              color: context.colors.onErrorContainer,
+                            ),
                           ),
                         ),
                       ],
@@ -382,7 +386,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                   label: _codeSent
                       ? 'Réinitialiser le mot de passe'
                       : 'Envoyer le code OTP par e-mail',
-                  icon: _codeSent ? Icons.check_circle_outline_rounded : Icons.send_rounded,
+                  icon: _codeSent
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.send_rounded,
                   loading: _loading,
                   onPressed: _codeSent ? _reset : () => _requestCode(),
                 ),
@@ -390,10 +396,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 Center(
                   child: TextButton(
                     onPressed: () => context.go(AppRoutes.signIn),
-                    child: Text(
-                      'Retour à la connexion',
-                      style: AppText.label.copyWith(color: AppColors.primary),
-                    ),
+                    child: const Text('Retour à la connexion'),
                   ),
                 ),
               ],

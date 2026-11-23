@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/item.dart';
 import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
@@ -104,7 +103,7 @@ class _DetailAppBar extends StatelessWidget {
           Expanded(
             child: Text(
               AppStrings.matchTitle,
-              style: AppText.h2,
+              style: context.typography.headlineSmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -122,8 +121,9 @@ class _ScoreHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final score = match.scores.global;
-    final color = _scoreColor(score);
+    final color = _scoreColor(score, colors);
     final verdict = score >= 80
         ? AppStrings.matchScoreExcellent
         : score >= 65
@@ -133,15 +133,9 @@ class _ScoreHero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withValues(alpha: 0.14),
-            color.withValues(alpha: 0.04),
-          ],
-        ),
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
         children: [
@@ -150,9 +144,9 @@ class _ScoreHero extends StatelessWidget {
             size: 168,
             strokeWidth: 15,
             color: color,
-            secondaryColor: color.withValues(alpha: 0.5),
+            secondaryColor: color,
             label: AppStrings.matchScore,
-            labelColor: AppColors.textSecondary,
+            labelColor: colors.onSurfaceVariant,
           ),
           const SizedBox(height: AppSpacing.md),
           Container(
@@ -161,9 +155,9 @@ class _ScoreHero extends StatelessWidget {
               vertical: 7,
             ),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: colors.surface,
               borderRadius: BorderRadius.circular(AppRadius.pill),
-              boxShadow: AppShadows.card,
+              border: Border.all(color: colors.outlineVariant),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -172,10 +166,10 @@ class _ScoreHero extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   verdict,
-                  style: AppText.caption.copyWith(
-                    color: Color.lerp(color, Colors.black, 0.2),
+                  style: context.typography.bodySmall?.copyWith(
+                    color: colors.onSurface,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -194,41 +188,37 @@ class _ScoreBreakdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final scores = match.scores;
     final rows = <_ScoreRowData>[
       _ScoreRowData(
         label: AppStrings.dimensionImage,
         value: scores.image,
         icon: Icons.image_rounded,
-        color: AppColors.primary,
+        color: colors.primary,
       ),
       _ScoreRowData(
         label: AppStrings.dimensionLocation,
         value: scores.location,
         icon: Icons.place_rounded,
-        color: AppColors.found,
+        color: colors.tertiary,
       ),
       _ScoreRowData(
         label: AppStrings.dimensionTime,
         value: scores.time,
         icon: Icons.schedule_rounded,
-        color: AppColors.accent,
+        color: colors.secondary,
       ),
       _ScoreRowData(
         label: AppStrings.dimensionText,
         value: scores.text,
         icon: Icons.text_snippet_rounded,
-        color: const Color(0xFF8B7BD8),
+        color: Color.lerp(colors.primary, colors.tertiary, 0.5)!,
       ),
     ];
 
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -237,7 +227,10 @@ class _ScoreBreakdown extends StatelessWidget {
               left: AppSpacing.xs,
               bottom: AppSpacing.sm,
             ),
-            child: Text('Détail de l’analyse', style: AppText.h3),
+            child: Text(
+              'Détail de l’analyse',
+              style: context.typography.headlineSmall,
+            ),
           ),
           ...List.generate(rows.length, (index) {
             return Padding(
@@ -273,13 +266,14 @@ class _ScoreRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Row(
       children: [
         Container(
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: data.color.withValues(alpha: 0.13),
+            color: colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Icon(data.icon, size: 17, color: data.color),
@@ -289,9 +283,8 @@ class _ScoreRow extends StatelessWidget {
           width: 96,
           child: Text(
             data.label,
-            style: AppText.label.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 14,
+            style: context.typography.labelMedium?.copyWith(
+              color: colors.onSurface,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -311,7 +304,7 @@ class _ScoreRow extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: value,
                 minHeight: 8,
-                backgroundColor: AppColors.surfaceAlt,
+                backgroundColor: colors.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(data.color),
               ),
             ),
@@ -323,9 +316,8 @@ class _ScoreRow extends StatelessWidget {
           child: Text(
             '${data.value.round()} %',
             textAlign: TextAlign.right,
-            style: AppText.label.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 13,
+            style: context.typography.labelMedium?.copyWith(
+              color: colors.onSurfaceVariant,
             ),
           ),
         ),
@@ -341,13 +333,8 @@ class _ComparisonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         children: [
           _ComparisonRow(
@@ -379,14 +366,15 @@ class _ConnectorLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Row(
       children: [
         const SizedBox(width: 17),
-        Container(width: 2, height: 18, color: AppColors.border),
+        Container(width: 2, height: 18, color: colors.outlineVariant),
         const SizedBox(width: AppSpacing.sm),
-        Icon(Icons.link_rounded, size: 16, color: AppColors.textTertiary),
+        Icon(Icons.link_rounded, size: 16, color: colors.onSurfaceVariant),
         const SizedBox(width: 6),
-        Text('Même objet probable', style: AppText.caption),
+        Text('Même objet probable', style: context.typography.bodySmall),
       ],
     );
   }
@@ -427,7 +415,7 @@ class _ComparisonRow extends StatelessWidget {
                   Flexible(
                     child: Text(
                       title,
-                      style: AppText.caption,
+                      style: context.typography.bodySmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -439,13 +427,13 @@ class _ComparisonRow extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 badge,
-                style: AppText.h3.copyWith(fontSize: 15),
+                style: context.typography.headlineSmall?.copyWith(fontSize: 15),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 subtitle,
-                style: AppText.caption,
+                style: context.typography.bodySmall,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -464,30 +452,29 @@ class _FinderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final colors = context.colors;
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
       child: Row(
         children: [
           Avatar(
             initials: match.finderInitials,
             size: 46,
-            color: AppColors.found,
+            color: colors.tertiary,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(AppStrings.matchFoundBy, style: AppText.caption),
+                Text(
+                  AppStrings.matchFoundBy,
+                  style: context.typography.bodySmall,
+                ),
                 const SizedBox(height: 1),
                 Text(
                   match.finderName,
-                  style: AppText.h3,
+                  style: context.typography.headlineSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -497,18 +484,24 @@ class _FinderCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.accentSoft,
+              color: colors.secondaryContainer,
               borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Column(
               children: [
                 Text(
                   '${match.finderReputation}',
-                  style: AppText.h3.copyWith(fontSize: 15),
+                  style: context.typography.headlineSmall?.copyWith(
+                    fontSize: 15,
+                    color: colors.onSecondaryContainer,
+                  ),
                 ),
                 Text(
                   '${match.finderRecoveredCount} rendus',
-                  style: AppText.caption.copyWith(fontSize: 10),
+                  style: context.typography.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: colors.onSecondaryContainer,
+                  ),
                 ),
               ],
             ),
@@ -526,22 +519,20 @@ class _CoordinationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final remaining = match.coordinationMessagesRemaining ?? 0;
 
-    return Container(
+    return AppCard(
+      color: colors.secondaryContainer,
+      showBorder: false,
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.accentSoft,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.handshake_rounded,
             size: 22,
-            color: AppColors.accent,
+            color: colors.onSecondaryContainer,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -550,9 +541,8 @@ class _CoordinationCard extends StatelessWidget {
               children: [
                 Text(
                   'Mode coordination',
-                  style: AppText.label.copyWith(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
+                  style: context.typography.labelMedium?.copyWith(
+                    color: colors.onSecondaryContainer,
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -560,7 +550,10 @@ class _CoordinationCard extends StatelessWidget {
                   'Votre score permet 5 messages maximum pour organiser la '
                   'restitution. Il en reste $remaining. Le chat complet '
                   's’ouvre à 40 points de confiance.',
-                  style: AppText.caption.copyWith(height: 1.4),
+                  style: context.typography.bodySmall?.copyWith(
+                    color: colors.onSecondaryContainer,
+                    height: 1.4,
+                  ),
                 ),
               ],
             ),
@@ -572,21 +565,22 @@ class _CoordinationCard extends StatelessWidget {
 }
 
 class _HowItWorksCard extends StatelessWidget {
+  const _HowItWorksCard();
+
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final colors = context.colors;
+    return AppCard(
+      color: colors.primaryContainer,
+      showBorder: false,
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline_rounded,
             size: 20,
-            color: AppColors.primary,
+            color: colors.onPrimaryContainer,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -595,16 +589,15 @@ class _HowItWorksCard extends StatelessWidget {
               children: [
                 Text(
                   AppStrings.matchHowTitle,
-                  style: AppText.label.copyWith(
-                    color: AppColors.primaryDark,
-                    fontSize: 14,
+                  style: context.typography.labelMedium?.copyWith(
+                    color: colors.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   AppStrings.matchHowBody,
-                  style: AppText.caption.copyWith(
-                    color: AppColors.primaryDark,
+                  style: context.typography.bodySmall?.copyWith(
+                    color: colors.onPrimaryContainer,
                     height: 1.45,
                   ),
                 ),
@@ -624,6 +617,7 @@ class _VerifyBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
     final Widget action;
     if (match.isVerified && match.canChat) {
       action = AppButton(
@@ -670,9 +664,9 @@ class _VerifyBar extends ConsumerWidget {
         AppSpacing.xl,
         AppSpacing.lg,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.divider)),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.outlineVariant)),
       ),
       child: action,
     );
@@ -687,20 +681,23 @@ class _VerificationNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.primarySoft,
+        color: colors.secondaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.primary),
+          Icon(icon, size: 20, color: colors.onSecondaryContainer),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               message,
-              style: AppText.caption.copyWith(color: AppColors.primaryDark),
+              style: context.typography.bodySmall?.copyWith(
+                color: colors.onSecondaryContainer,
+              ),
             ),
           ),
         ],
@@ -739,26 +736,27 @@ class _DetailError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: 44,
-              color: AppColors.textTertiary,
+              color: colors.onSurfaceVariant,
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text('Impossible de charger', style: AppText.h3),
+            Text(
+              'Impossible de charger',
+              style: context.typography.headlineSmall,
+            ),
             const SizedBox(height: AppSpacing.xs),
             TextButton(
               onPressed: () => context.pop(),
-              child: Text(
-                'Retour',
-                style: AppText.label.copyWith(color: AppColors.primary),
-              ),
+              child: const Text('Retour'),
             ),
           ],
         ),
@@ -767,8 +765,8 @@ class _DetailError extends StatelessWidget {
   }
 }
 
-Color _scoreColor(double score) {
-  if (score >= 80) return AppColors.found;
-  if (score >= 65) return AppColors.accent;
-  return AppColors.textTertiary;
+Color _scoreColor(double score, ColorScheme colors) {
+  if (score >= 80) return colors.tertiary;
+  if (score >= 65) return colors.secondary;
+  return colors.onSurfaceVariant;
 }

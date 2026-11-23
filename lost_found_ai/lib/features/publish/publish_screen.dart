@@ -11,9 +11,8 @@ import '../../core/app_config.dart';
 import '../../core/app_strings.dart';
 import '../../core/perceptual_hash.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/item.dart';
 import '../../data/providers.dart';
 import '../objects/data/models/location_model.dart';
@@ -21,7 +20,6 @@ import '../objects/data/providers/objects_providers.dart';
 import '../objects/data/services/location_service.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/photo_placeholder.dart';
-import '../../widgets/pressable_scale.dart';
 
 class PublishScreen extends ConsumerStatefulWidget {
   const PublishScreen({
@@ -113,9 +111,6 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
   Future<void> _pickImage() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -123,17 +118,17 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.photo_camera_rounded,
-                  color: AppColors.primary,
+                  color: sheetContext.colors.primary,
                 ),
                 title: const Text('Prendre une photo'),
                 onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.photo_library_rounded,
-                  color: AppColors.primary,
+                  color: sheetContext.colors.primary,
                 ),
                 title: const Text('Choisir dans la galerie'),
                 onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
@@ -217,16 +212,6 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
       initialDate: _occurredAt,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-            onSurface: AppColors.textPrimary,
-          ),
-        ),
-        child: child ?? const SizedBox.shrink(),
-      ),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -417,6 +402,7 @@ class _ProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.xl,
@@ -434,7 +420,7 @@ class _ProgressBar extends StatelessWidget {
               height: 6,
               margin: EdgeInsets.only(right: index == 2 ? 0 : 6),
               decoration: BoxDecoration(
-                color: active ? AppColors.primary : AppColors.border,
+                color: active ? colors.primary : colors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
             ),
@@ -468,9 +454,9 @@ class _StepScaffold extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: AppText.h1),
+          Text(title, style: context.typography.headlineMedium),
           const SizedBox(height: AppSpacing.xs),
-          Text(subtitle, style: AppText.body),
+          Text(subtitle, style: context.typography.bodyMedium),
           const SizedBox(height: AppSpacing.xl),
           ...children,
         ],
@@ -492,27 +478,21 @@ class _PhotoStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final added = imageBytes != null;
 
     return _StepScaffold(
       title: AppStrings.stepPhotoTitle,
       subtitle: AppStrings.stepPhotoSubtitle,
       children: [
-        PressableScale(
+        AppCard(
           onTap: onAdd,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
+          padding: EdgeInsets.zero,
+          borderRadius: AppRadius.xl,
+          color: colors.surfaceContainerLow,
+          child: SizedBox(
             height: 260,
             width: double.infinity,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: added ? AppColors.primarySoft : AppColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              border: Border.all(
-                color: added ? AppColors.primary : AppColors.border,
-                width: 2,
-              ),
-            ),
             child: added
                 ? Stack(
                     children: [
@@ -522,21 +502,13 @@ class _PhotoStep extends StatelessWidget {
                       Positioned(
                         top: AppSpacing.sm,
                         right: AppSpacing.sm,
-                        child: PressableScale(
-                          onTap: onRemove,
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.92),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close_rounded,
-                              size: 20,
-                              color: AppColors.textPrimary,
-                            ),
+                        child: IconButton(
+                          onPressed: onRemove,
+                          icon: const Icon(Icons.close_rounded),
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                            backgroundColor: colors.surfaceContainerHighest,
+                            foregroundColor: colors.onSurface,
                           ),
                         ),
                       ),
@@ -551,7 +523,7 @@ class _PhotoStep extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.found,
+                              color: colors.primary,
                               borderRadius: BorderRadius.circular(
                                 AppRadius.pill,
                               ),
@@ -559,18 +531,19 @@ class _PhotoStep extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.check_circle_rounded,
                                   size: 16,
-                                  color: Colors.white,
+                                  color: colors.onPrimary,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Photo ajoutée',
-                                  style: AppText.caption.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                  style: context.typography.labelMedium
+                                      ?.copyWith(
+                                        color: colors.onPrimary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                 ),
                               ],
                             ),
@@ -586,24 +559,26 @@ class _PhotoStep extends StatelessWidget {
                         width: 78,
                         height: 78,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: colors.primaryContainer,
                           shape: BoxShape.circle,
-                          boxShadow: AppShadows.card,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.add_a_photo_rounded,
                           size: 32,
-                          color: AppColors.primary,
+                          color: colors.onPrimaryContainer,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
                         AppStrings.photoDropzone,
-                        style: AppText.h3,
+                        style: context.typography.titleMedium,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 4),
-                      Text(AppStrings.photoHint, style: AppText.caption),
+                      Text(
+                        AppStrings.photoHint,
+                        style: context.typography.bodySmall,
+                      ),
                     ],
                   ),
           ),
@@ -612,16 +587,16 @@ class _PhotoStep extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.lightbulb_outline_rounded,
               size: 16,
-              color: AppColors.accent,
+              color: colors.primary,
             ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 'Une photo similaire suffit si vous n\'avez plus l\'originale.',
-                style: AppText.caption,
+                style: context.typography.bodySmall,
               ),
             ),
           ],
@@ -658,6 +633,7 @@ class _DetailsStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return _StepScaffold(
       title: AppStrings.stepDetailsTitle,
       subtitle: AppStrings.stepDetailsSubtitle,
@@ -669,8 +645,6 @@ class _DetailsStep extends StatelessWidget {
                 label: 'Perdu',
                 icon: Icons.search_off_rounded,
                 selected: type == ItemType.lost,
-                color: AppColors.lost,
-                background: AppColors.lostSoft,
                 onTap: () => onType(ItemType.lost),
               ),
             ),
@@ -680,15 +654,13 @@ class _DetailsStep extends StatelessWidget {
                 label: 'Trouvé',
                 icon: Icons.redeem_rounded,
                 selected: type == ItemType.found,
-                color: AppColors.found,
-                background: AppColors.foundSoft,
                 onTap: () => onType(ItemType.found),
               ),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text('Titre', style: AppText.label),
+        Text('Titre', style: context.typography.titleMedium),
         const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: titleController,
@@ -701,53 +673,45 @@ class _DetailsStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text(AppStrings.fieldCategory, style: AppText.label),
+        Text(AppStrings.fieldCategory, style: context.typography.titleMedium),
         const SizedBox(height: AppSpacing.sm),
         Wrap(
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
           children: ItemCategory.values.map((item) {
             final selected = item == category;
-            return PressableScale(
-              onTap: () => onCategory(selected ? null : item),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: selected ? AppColors.primary : AppColors.border,
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      categoryIcon(item),
-                      size: 17,
-                      color: selected ? Colors.white : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      item.label,
-                      style: AppText.label.copyWith(
-                        color: selected ? Colors.white : AppColors.textPrimary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+            return FilterChip(
+              label: Text(
+                item.label,
+                style: context.typography.labelLarge?.copyWith(
+                  color: selected
+                      ? colors.onSecondaryContainer
+                      : colors.onSurface,
                 ),
               ),
+              avatar: Icon(
+                categoryIcon(item),
+                size: 18,
+                color: selected
+                    ? colors.onSecondaryContainer
+                    : colors.onSurfaceVariant,
+              ),
+              selected: selected,
+              showCheckmark: false,
+              onSelected: (_) => onCategory(selected ? null : item),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              labelPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+              ),
+              materialTapTargetSize: MaterialTapTargetSize.padded,
             );
           }).toList(),
         ),
         const SizedBox(height: AppSpacing.xl),
-        Text(AppStrings.fieldDescription, style: AppText.label),
+        Text(
+          AppStrings.fieldDescription,
+          style: context.typography.titleMedium,
+        ),
         const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: descriptionController,
@@ -784,27 +748,27 @@ class _SecretDetailFieldState extends State<_SecretDetailField> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final colors = context.colors;
+    return AppCard(
+      color: colors.tertiaryContainer,
+      showBorder: false,
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.mint,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.mintDark.withValues(alpha: 0.2)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.lock_outline_rounded,
                 size: 17,
-                color: AppColors.mintDark,
+                color: colors.onTertiaryContainer,
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
                 'Détail secret de vérification',
-                style: AppText.bodyStrong.copyWith(color: AppColors.mintDark),
+                style: context.typography.titleMedium?.copyWith(
+                  color: colors.onTertiaryContainer,
+                ),
               ),
             ],
           ),
@@ -812,8 +776,8 @@ class _SecretDetailFieldState extends State<_SecretDetailField> {
           Text(
             'Visible uniquement par vous. Il servira à prouver que l’objet vous '
             'appartient lorsqu’une personne publie un objet trouvé correspondant.',
-            style: AppText.caption.copyWith(
-              color: AppColors.mintDark.withValues(alpha: 0.8),
+            style: context.typography.bodySmall?.copyWith(
+              color: colors.onTertiaryContainer,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -826,21 +790,15 @@ class _SecretDetailFieldState extends State<_SecretDetailField> {
             decoration: InputDecoration(
               hintText: 'Ex : étiquette bleue à l’intérieur',
               counterText: '',
-              filled: true,
-              fillColor: Colors.white,
               suffixIcon: IconButton(
                 icon: Icon(
                   _visible
                       ? Icons.visibility_off_rounded
                       : Icons.visibility_rounded,
                   size: 20,
-                  color: AppColors.mintDark,
+                  color: colors.onTertiaryContainer,
                 ),
                 onPressed: () => setState(() => _visible = !_visible),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide.none,
               ),
             ),
           ),
@@ -855,50 +813,50 @@ class _TypeChip extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
-    required this.color,
-    required this.background,
     required this.onTap,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
-  final Color color;
-  final Color background;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-        decoration: BoxDecoration(
-          color: selected ? background : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: selected ? color : AppColors.border,
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Column(
+    final colors = context.colors;
+    return SizedBox(
+      width: double.infinity,
+      child: ChoiceChip(
+        label: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               size: 22,
-              color: selected ? color : AppColors.textTertiary,
+              color: selected
+                  ? colors.onSecondaryContainer
+                  : colors.onSurfaceVariant,
             ),
             const SizedBox(height: 6),
             Text(
               label,
-              style: AppText.label.copyWith(
-                color: selected ? color : AppColors.textSecondary,
-                fontWeight: FontWeight.w800,
+              style: context.typography.labelLarge?.copyWith(
+                color: selected
+                    ? colors.onSecondaryContainer
+                    : colors.onSurface,
               ),
             ),
           ],
         ),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: (_) => onTap(),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        labelPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        materialTapTargetSize: MaterialTapTargetSize.padded,
       ),
     );
   }
@@ -968,6 +926,7 @@ class _PlaceStepState extends State<_PlaceStep> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final position = widget.position;
 
     return _StepScaffold(
@@ -1008,24 +967,23 @@ class _PlaceStepState extends State<_PlaceStep> {
                                   width: 38,
                                   height: 38,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary,
+                                    color: colors.primary,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: colors.surface,
                                       width: 3,
                                     ),
-                                    boxShadow: AppShadows.raised,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.place_rounded,
                                     size: 20,
-                                    color: Colors.white,
+                                    color: colors.onPrimary,
                                   ),
                                 ),
                                 Container(
                                   width: 3,
                                   height: 8,
-                                  color: AppColors.primary,
+                                  color: colors.primary,
                                 ),
                               ],
                             ),
@@ -1037,10 +995,10 @@ class _PlaceStepState extends State<_PlaceStep> {
                 Positioned(
                   top: AppSpacing.sm,
                   left: AppSpacing.sm,
-                  child: FloatingActionButton.small(
+                  child: FloatingActionButton(
                     heroTag: 'publish-map-locate',
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.primary,
+                    backgroundColor: colors.surfaceContainerLow,
+                    foregroundColor: colors.primary,
                     onPressed: widget.locating
                         ? null
                         : widget.onUseCurrentLocation,
@@ -1056,10 +1014,10 @@ class _PlaceStepState extends State<_PlaceStep> {
                 Positioned(
                   top: AppSpacing.sm,
                   right: AppSpacing.sm,
-                  child: FloatingActionButton.small(
+                  child: FloatingActionButton(
                     heroTag: 'publish-map-fullscreen',
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.primary,
+                    backgroundColor: colors.surfaceContainerLow,
+                    foregroundColor: colors.primary,
                     onPressed: widget.onFullScreen,
                     child: const Icon(Icons.open_in_full_rounded),
                   ),
@@ -1074,7 +1032,7 @@ class _PlaceStepState extends State<_PlaceStep> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.94),
+                        color: colors.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Row(
@@ -1086,7 +1044,10 @@ class _PlaceStepState extends State<_PlaceStep> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                           const SizedBox(width: 6),
-                          Text('Recherche de l\'adresse…', style: AppText.tiny),
+                          Text(
+                            'Recherche de l\'adresse…',
+                            style: context.typography.labelSmall,
+                          ),
                         ],
                       ),
                     ),
@@ -1096,26 +1057,25 @@ class _PlaceStepState extends State<_PlaceStep> {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        Container(
+        AppCard(
           padding: const EdgeInsets.all(AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.border),
-          ),
           child: Row(
             children: [
               Container(
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
+                  color: position == null
+                      ? colors.errorContainer
+                      : colors.primaryContainer,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.place_rounded,
                   size: 19,
-                  color: AppColors.primary,
+                  color: position == null
+                      ? colors.onErrorContainer
+                      : colors.onPrimaryContainer,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -1125,7 +1085,7 @@ class _PlaceStepState extends State<_PlaceStep> {
                   children: [
                     Text(
                       'Emplacement sélectionné',
-                      style: AppText.caption.copyWith(fontSize: 11),
+                      style: context.typography.labelSmall,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -1136,7 +1096,7 @@ class _PlaceStepState extends State<_PlaceStep> {
                                 : widget.placeLabel),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppText.bodyStrong,
+                      style: context.typography.titleMedium,
                     ),
                   ],
                 ),
@@ -1145,54 +1105,44 @@ class _PlaceStepState extends State<_PlaceStep> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        Text('Quand ?', style: AppText.label),
+        Text('Quand ?', style: context.typography.titleMedium),
         const SizedBox(height: AppSpacing.sm),
-        PressableScale(
+        AppCard(
           onTap: widget.onPickDateTime,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_rounded,
-                  size: 18,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  _dateTimeLabel(widget.occurredAt),
-                  style: AppText.bodyStrong,
-                ),
-                const Spacer(),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textTertiary,
-                ),
-              ],
-            ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 18,
+                color: colors.primary,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                _dateTimeLabel(widget.occurredAt),
+                style: context.typography.titleMedium,
+              ),
+              const Spacer(),
+              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.md),
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.touch_app_outlined,
               size: 16,
-              color: AppColors.accent,
+              color: position == null ? colors.error : colors.primary,
             ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
                 'Touchez la carte pour ajuster la position exacte.',
-                style: AppText.caption,
+                style: context.typography.bodySmall,
               ),
             ),
           ],
@@ -1217,42 +1167,48 @@ class _BottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.md,
-        AppSpacing.xl,
-        AppSpacing.lg,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.divider)),
-      ),
-      child: Row(
-        children: [
-          if (onBack != null) ...[
-            SizedBox(
-              width: 56,
-              child: AppButton(
-                label: 'Retour',
-                variant: AppButtonVariant.secondary,
-                onPressed: onBack,
-                height: 56,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-          ],
-          Expanded(
-            child: AppButton(
-              label: step == 2 ? AppStrings.publish : AppStrings.onboardingNext,
-              icon: step == 2
-                  ? Icons.check_rounded
-                  : Icons.arrow_forward_rounded,
-              onPressed: canContinue ? onContinue : null,
-            ),
+    final colors = context.colors;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Divider(height: 1),
+        Container(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.xl,
+            AppSpacing.lg,
           ),
-        ],
-      ),
+          color: colors.surface,
+          child: Row(
+            children: [
+              if (onBack != null) ...[
+                SizedBox(
+                  width: 88,
+                  child: AppButton(
+                    label: 'Retour',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: onBack,
+                    height: 56,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(
+                child: AppButton(
+                  label: step == 2
+                      ? AppStrings.publish
+                      : AppStrings.onboardingNext,
+                  icon: step == 2
+                      ? Icons.check_rounded
+                      : Icons.arrow_forward_rounded,
+                  onPressed: canContinue ? onContinue : null,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1277,21 +1233,18 @@ class _PublishStatusScreen extends StatelessWidget {
               const SizedBox(
                 width: 84,
                 height: 84,
-                child: CircularProgressIndicator(
-                  strokeWidth: 5,
-                  color: AppColors.primary,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 5),
               ),
               const SizedBox(height: AppSpacing.xxl),
               Text(
                 AppStrings.searching,
-                style: AppText.h1,
+                style: context.typography.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 AppStrings.searchingSubtitle,
-                style: AppText.body,
+                style: context.typography.bodyMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.xxl),
@@ -1333,9 +1286,14 @@ class _SearchStepRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 16, color: AppColors.found),
+        Icon(icon, size: 16, color: context.colors.primary),
         const SizedBox(width: AppSpacing.xs),
-        Text(label, style: AppText.label),
+        Text(
+          label,
+          style: context.typography.labelLarge?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+        ),
       ],
     );
   }
@@ -1359,13 +1317,13 @@ class _PublishSuccess extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
               Text(
                 AppStrings.publishedTitle,
-                style: AppText.h1,
+                style: context.typography.headlineMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 AppStrings.publishedSubtitle,
-                style: AppText.body,
+                style: context.typography.bodyMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.huge),
@@ -1400,19 +1358,20 @@ class _SuccessBadgeState extends State<_SuccessBadge>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return ScaleTransition(
       scale: CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
       child: Container(
         width: 116,
         height: 116,
-        decoration: const BoxDecoration(
-          color: AppColors.foundSoft,
+        decoration: BoxDecoration(
+          color: colors.tertiaryContainer,
           shape: BoxShape.circle,
         ),
-        child: const Icon(
+        child: Icon(
           Icons.check_rounded,
           size: 60,
-          color: AppColors.found,
+          color: colors.onTertiaryContainer,
         ),
       ),
     );

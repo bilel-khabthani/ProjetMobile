@@ -42,7 +42,8 @@ class ObjectsStats {
       totalLostObjects: totalLostObjects ?? this.totalLostObjects,
       totalFoundObjects: totalFoundObjects ?? this.totalFoundObjects,
       activeAnnouncements: activeAnnouncements ?? this.activeAnnouncements,
-      recoveredAnnouncements: recoveredAnnouncements ?? this.recoveredAnnouncements,
+      recoveredAnnouncements:
+          recoveredAnnouncements ?? this.recoveredAnnouncements,
       recentObjects: recentObjects ?? this.recentObjects,
     );
   }

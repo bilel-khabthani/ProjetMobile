@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/models/trust.dart';
 import '../../data/providers.dart';
-import '../../widgets/score_gauge.dart';
 
 /// Module 4 - Score de confiance et historique des evenements.
 ///
@@ -20,6 +18,7 @@ class TrustScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trust = ref.watch(trustProvider);
+    final textTheme = context.typography;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Fiabilite du compte')),
@@ -37,7 +36,7 @@ class TrustScreen extends ConsumerWidget {
               const SizedBox(height: AppSpacing.lg),
               _ExplainCard(inProbation: summary.inProbation),
               const SizedBox(height: AppSpacing.lg),
-              Text('Historique des evenements', style: AppText.bodyStrong),
+              Text('Historique des evenements', style: textTheme.titleMedium),
               const SizedBox(height: AppSpacing.sm),
               if (summary.history.isEmpty)
                 const _EmptyHistory()
@@ -58,16 +57,38 @@ class _ScoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final scheme = context.colors;
+    final textTheme = context.typography;
+
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         children: [
-          ScoreGauge(value: summary.score, label: 'Score de confiance'),
+          SizedBox(
+            width: 96,
+            height: 96,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: (summary.score / 100).clamp(0.0, 1.0),
+                  strokeWidth: 10,
+                  color: scheme.primary,
+                  backgroundColor: scheme.surfaceContainerHighest,
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${summary.score.round()}',
+                      style: textTheme.headlineSmall,
+                    ),
+                    Text('Score de confiance', style: textTheme.bodySmall),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
@@ -104,12 +125,15 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
+
     return Column(
       children: [
-        Icon(icon, color: AppColors.primary, size: 22),
+        Icon(icon, color: scheme.primary, size: 22),
         const SizedBox(height: AppSpacing.xs),
-        Text(value, style: AppText.bodyStrong),
-        Text(label, style: AppText.caption),
+        Text(value, style: textTheme.titleMedium),
+        Text(label, style: textTheme.bodySmall),
       ],
     );
   }
@@ -122,17 +146,19 @@ class _AccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
     final (icon, color, title, body) = switch (summary) {
       TrustSummary(canChat: true) => (
         Icons.chat_bubble_rounded,
-        AppColors.success,
+        scheme.primary,
         'Chat complet actif',
         'Vous pouvez échanger librement avec les personnes dont la '
             'correspondance est vérifiée.',
       ),
       TrustSummary(canCoordinate: true) => (
         Icons.handshake_rounded,
-        AppColors.accent,
+        scheme.tertiary,
         'Mode coordination actif',
         'Vous disposez de 5 messages maximum par correspondance vérifiée '
             'pour organiser la restitution. À ${summary.minScoreToChat} points, '
@@ -140,20 +166,15 @@ class _AccessCard extends StatelessWidget {
       ),
       _ => (
         Icons.lock_outline_rounded,
-        AppColors.danger,
+        scheme.error,
         'Chat verrouillé',
         'Il vous faut au moins ${summary.minScoreToCoordinate} points pour '
             'accéder au mode coordination.',
       ),
     };
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
+    return AppCard(
+      color: color.withValues(alpha: 0.08),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -163,9 +184,12 @@ class _AccessCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppText.bodyStrong.copyWith(color: color)),
+                Text(
+                  title,
+                  style: textTheme.titleMedium?.copyWith(color: color),
+                ),
                 const SizedBox(height: 3),
-                Text(body, style: AppText.caption.copyWith(height: 1.4)),
+                Text(body, style: textTheme.bodySmall),
               ],
             ),
           ),
@@ -182,18 +206,18 @@ class _ExplainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: inProbation ? AppColors.accentSoft : AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-      ),
+    final scheme = context.colors;
+    final textTheme = context.typography;
+    final color = inProbation ? scheme.tertiary : scheme.primary;
+
+    return AppCard(
+      color: inProbation ? scheme.tertiaryContainer : scheme.secondaryContainer,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             inProbation ? Icons.timelapse_rounded : Icons.verified_user_rounded,
-            color: inProbation ? AppColors.accent : AppColors.primary,
+            color: color,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -204,7 +228,7 @@ class _ExplainCard extends StatelessWidget {
                         'et que le compte a moins de 14 jours.'
                   : 'Votre score evolue uniquement lors d\'evenements verifies. '
                         'Vous ne pouvez pas le modifier vous-meme.',
-              style: AppText.caption,
+              style: textTheme.bodySmall,
             ),
           ),
         ],
@@ -276,8 +300,10 @@ class _HistoryTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
     final isGain = event.points >= 0;
-    final color = isGain ? AppColors.success : AppColors.danger;
+    final color = isGain ? scheme.primary : scheme.error;
     final appealLabel = switch (event.appealStatus) {
       'OUVERTE' => 'Appel en cours d’examen',
       'RESOLUE' => 'Appel accepté',
@@ -285,14 +311,9 @@ class _HistoryTile extends ConsumerWidget {
       _ => null,
     };
 
-    return Container(
+    return AppCard(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Row(
         children: [
           Icon(
@@ -305,22 +326,22 @@ class _HistoryTile extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(event.label, style: AppText.body),
+                Text(event.label, style: textTheme.bodyMedium),
                 Text(
                   event.automatic
                       ? 'Genere automatiquement'
                       : 'Valide par un administrateur',
-                  style: AppText.caption,
+                  style: textTheme.bodySmall,
                 ),
                 if (appealLabel != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       appealLabel,
-                      style: AppText.caption.copyWith(
+                      style: textTheme.bodySmall?.copyWith(
                         color: event.appealStatus == 'RESOLUE'
-                            ? AppColors.success
-                            : AppColors.accent,
+                            ? scheme.primary
+                            : scheme.tertiary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -329,16 +350,11 @@ class _HistoryTile extends ConsumerWidget {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton(
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 30),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
                       onPressed: () => _openAppeal(context, ref),
                       child: Text(
                         'Contester',
-                        style: AppText.label.copyWith(
-                          color: AppColors.primary,
+                        style: textTheme.labelLarge?.copyWith(
+                          color: scheme.primary,
                           fontSize: 12,
                         ),
                       ),
@@ -349,7 +365,7 @@ class _HistoryTile extends ConsumerWidget {
           ),
           Text(
             '${isGain ? '+' : ''}${event.points}',
-            style: AppText.bodyStrong.copyWith(color: color),
+            style: textTheme.titleMedium?.copyWith(color: color),
           ),
         ],
       ),
@@ -362,17 +378,13 @@ class _EmptyHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: AppColors.border),
-      ),
+    final textTheme = context.typography;
+
+    return AppCard(
       child: Text(
         'Aucun evenement pour le moment. Votre score evoluera apres vos '
         'premieres restitutions confirmees.',
-        style: AppText.caption,
+        style: textTheme.bodySmall,
       ),
     );
   }
@@ -385,24 +397,27 @@ class _TrustError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final textTheme = context.typography;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.cloud_off_rounded,
               size: 44,
-              color: AppColors.textTertiary,
+              color: scheme.onSurfaceVariant,
             ),
             const SizedBox(height: AppSpacing.md),
-            Text('Score indisponible', style: AppText.bodyStrong),
+            Text('Score indisponible', style: textTheme.titleMedium),
             const SizedBox(height: AppSpacing.xs),
             Text(
               'Verifiez que le serveur est lance puis reessayez.',
               textAlign: TextAlign.center,
-              style: AppText.caption,
+              style: textTheme.bodySmall,
             ),
           ],
         ),

@@ -110,7 +110,11 @@ class MatchController extends Controller
             'chat_mode' => $chatMode,
             'coordination_messages_remaining' => $coordinationRemaining,
             'chat_locked_reason' => $chatLockReason,
-            'last_message' => $lastMessage?->body,
+            'last_message' => $lastMessage
+                ? ($lastMessage->body !== ''
+                    ? $lastMessage->body
+                    : ($lastMessage->image_path ? '📷 Photo' : null))
+                : null,
             'last_message_at' => $lastMessage?->created_at?->toIso8601String(),
             'last_message_is_mine' => $viewer !== null
                 && $lastMessage?->sender_id === $viewer->id,
@@ -350,16 +354,20 @@ class MatchController extends Controller
             }
         }
 
-        $data = $request->validate(['body' => ['required', 'string', 'max:1000']]);
-        $body = trim($data['body']);
+        $data = $request->validate([
+            'body' => ['nullable', 'string', 'max:1000'],
+            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+        $body = trim((string) ($data['body'] ?? ''));
+        $hasImage = $request->hasFile('image');
 
-        if ($body === '') {
+        if ($body === '' && ! $hasImage) {
             return response()->json(['message' => 'Le message est vide.'], 422);
         }
 
-        $result = $moderation->moderate($body);
+        $result = $body === '' ? null : $moderation->moderate($body);
 
-        if ($result->isBlocked()) {
+        if ($result?->isBlocked()) {
             $this->recordModerationEvent($user->id, $match->id, $body, $result);
             $strikes = $this->applyStrike($user, $match, $result);
 
@@ -370,14 +378,19 @@ class MatchController extends Controller
             ], 422);
         }
 
+        $imagePath = $hasImage
+            ? $request->file('image')->store('messages', 'public')
+            : null;
+
         $message = Message::create([
             'match_id' => $match->id,
             'sender_id' => $user->id,
             'body' => $body,
+            'image_path' => $imagePath,
             'status' => Message::STATUS_APPROVED,
-            'moderation_categories' => $result->categories ?: null,
-            'moderation_scores' => $result->scores ?: null,
-            'moderation_provider' => $result->provider,
+            'moderation_categories' => $result?->categories ?: null,
+            'moderation_scores' => $result?->scores ?: null,
+            'moderation_provider' => $result?->provider,
         ]);
 
         $message->load('sender:id,name');

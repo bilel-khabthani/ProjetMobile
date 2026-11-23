@@ -3,9 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../data/models/location_model.dart';
@@ -50,8 +49,10 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
       _label = null;
       _resolving = true;
     });
-    final resolved =
-        await LocationService.getAddressFromCoordinates(point.latitude, point.longitude);
+    final resolved = await LocationService.getAddressFromCoordinates(
+      point.latitude,
+      point.longitude,
+    );
     if (!mounted) return;
     setState(() {
       _resolving = false;
@@ -78,22 +79,18 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text('Choisir un emplacement'),
+        title: Text(
+          'Choisir un emplacement',
+          style: context.typography.titleLarge,
+        ),
       ),
       body: Column(
         children: [
@@ -128,26 +125,25 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                                   width: 38,
                                   height: 38,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary,
+                                    color: context.colors.primary,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white,
+                                      color: context.colors.surface,
                                       width: 3,
                                     ),
-                                    boxShadow: AppShadows.raised,
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: AppIcon(
                                       'map-point-bold',
                                       size: 20,
-                                      color: Colors.white,
+                                      color: context.colors.onPrimary,
                                     ),
                                   ),
                                 ),
                                 Container(
                                   width: 3,
                                   height: 8,
-                                  color: AppColors.primary,
+                                  color: context.colors.primary,
                                 ),
                               ],
                             ),
@@ -161,8 +157,8 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                   left: AppSpacing.md,
                   child: FloatingActionButton.small(
                     heroTag: 'locate',
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.primary,
+                    backgroundColor: context.colors.surfaceContainerLow,
+                    foregroundColor: context.colors.primary,
                     onPressed: _locating ? null : _useCurrentLocation,
                     child: _locating
                         ? const SizedBox(
@@ -177,22 +173,22 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                   left: AppSpacing.md,
                   right: AppSpacing.md,
                   bottom: AppSpacing.md,
-                  child: Container(
+                  child: AppCard(
+                    color: context.colors.surface.withValues(alpha: 0.95),
+                    showBorder: false,
                     padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.95),
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      boxShadow: AppShadows.raised,
-                    ),
                     child: Row(
                       children: [
-                        const Icon(Icons.touch_app_outlined,
-                            size: 18, color: AppColors.primary),
+                        Icon(
+                          Icons.touch_app_outlined,
+                          size: 18,
+                          color: context.colors.primary,
+                        ),
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
                             'Touche la carte pour placer le point.',
-                            style: AppText.tiny,
+                            style: context.typography.bodySmall,
                           ),
                         ),
                       ],
@@ -207,27 +203,22 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
+                AppCard(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                    border: Border.all(color: AppColors.border),
-                  ),
                   child: Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: AppSpacing.huge - 8,
+                        height: AppSpacing.huge - 8,
                         decoration: BoxDecoration(
-                          color: AppColors.primarySoft,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          color: context.colors.primaryContainer,
+                          borderRadius: BorderRadius.circular(AppSpacing.sm),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: AppIcon(
                             'map-point-linear',
                             size: 19,
-                            color: AppColors.primary,
+                            color: context.colors.onPrimaryContainer,
                           ),
                         ),
                       ),
@@ -236,17 +227,20 @@ class _MapSelectionScreenState extends State<MapSelectionScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Emplacement choisi', style: AppText.tiny),
+                            Text(
+                              'Emplacement choisi',
+                              style: context.typography.bodySmall,
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               _picked == null
                                   ? 'Aucun point sélectionné'
                                   : (_resolving
-                                      ? 'Recherche de l\'adresse…'
-                                      : (_label ?? _formatCoords(_picked!))),
+                                        ? 'Recherche de l\'adresse…'
+                                        : (_label ?? _formatCoords(_picked!))),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: AppText.bodyStrong,
+                              style: context.typography.titleMedium,
                             ),
                           ],
                         ),

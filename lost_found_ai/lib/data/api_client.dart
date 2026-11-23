@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -107,6 +107,28 @@ class ApiClient {
         .timeout(const Duration(seconds: 15));
 
     return _decode(response);
+  }
+
+  /// Envoie un formulaire multipart (texte + fichier) avec le jeton Sanctum.
+  Future<dynamic> postMultipart(
+    String path,
+    Map<String, String> fields, {
+    required String fileField,
+    required List<int> fileBytes,
+    required String fileName,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path))
+      ..headers.addAll({
+        'Accept': 'application/json',
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      })
+      ..fields.addAll(fields)
+      ..files.add(
+        http.MultipartFile.fromBytes(fileField, fileBytes, filename: fileName),
+      );
+
+    final streamed = await request.send().timeout(const Duration(seconds: 30));
+    return _decode(await http.Response.fromStream(streamed));
   }
 
   Future<dynamic> put(String path, Map<String, dynamic> body) async {

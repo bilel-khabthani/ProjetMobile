@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/scene_art.dart';
 import 'services/google_auth_service.dart';
@@ -46,21 +45,24 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               const SizedBox(height: AppSpacing.xxl),
               Text(
                 AppStrings.appName,
-                style: AppText.display.copyWith(color: AppColors.primary),
+                style: context.typography.headlineMedium?.copyWith(
+                  color: context.colors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
                 AppStrings.appTagline,
-                style: AppText.label.copyWith(
+                style: context.typography.labelMedium?.copyWith(
                   letterSpacing: 1.4,
-                  color: AppColors.textTertiary,
+                  color: context.colors.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
               Text(
                 AppStrings.welcomeSubtitle,
-                style: AppText.body.copyWith(fontSize: 16),
+                style: context.typography.bodyMedium,
                 textAlign: TextAlign.center,
               ),
               const Spacer(flex: 3),
@@ -75,15 +77,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 onPressed: () => context.push(AppRoutes.signUp),
               ),
               const SizedBox(height: AppSpacing.sm),
-              AppButton(
-                label: AppStrings.signIn,
-                variant: AppButtonVariant.secondary,
+              OutlinedButton(
                 onPressed: () => context.push(AppRoutes.signIn),
+                child: Text(AppStrings.signIn),
               ),
               const SizedBox(height: AppSpacing.xl),
               Text(
                 'En continuant, vous acceptez les conditions d’utilisation.',
-                style: AppText.caption,
+                style: context.typography.bodySmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),

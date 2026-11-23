@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/models/item.dart';
 import '../../data/providers.dart';
@@ -22,18 +22,14 @@ class ItemDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final itemAsync = ref.watch(itemProvider(itemId));
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        title: Text('Détail', style: AppText.h2.copyWith(fontSize: 18)),
+        title: Text('Détail', style: context.typography.titleLarge),
       ),
       body: itemAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -41,10 +37,10 @@ class ItemDetailScreen extends ConsumerWidget {
                   error is ApiException
                       ? error.userMessage
                       : 'Cette annonce est introuvable ou le serveur ne répond pas.',
-                  style: AppText.body,
+                  style: context.typography.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.sm),
                 TextButton(
                   onPressed: () => ref.invalidate(itemProvider(itemId)),
                   child: const Text('Réessayer'),
@@ -71,22 +67,28 @@ class _DetailBody extends ConsumerWidget {
         '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     final accent = item.type == ItemType.lost
-        ? AppColors.lost
-        : AppColors.found;
+        ? context.colors.primary
+        : context.colors.tertiary;
+    final soft = item.type == ItemType.lost
+        ? context.colors.primaryContainer
+        : context.colors.tertiaryContainer;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xxl,
+      ),
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppSpacing.xl),
           child: SizedBox(
             height: 200,
             width: double.infinity,
             child: item.imageUrl == null
                 ? ColoredBox(
-                    color: item.type == ItemType.lost
-                        ? AppColors.lostSoft
-                        : AppColors.foundSoft,
+                    color: soft,
                     child: Icon(
                       Icons.inventory_2_outlined,
                       size: 48,
@@ -96,65 +98,70 @@ class _DetailBody extends ConsumerWidget {
                 : Image.network(
                     item.imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const ColoredBox(
-                      color: AppColors.background,
-                      child: Icon(Icons.broken_image_outlined, size: 40),
+                    errorBuilder: (_, _, _) => ColoredBox(
+                      color: context.colors.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        size: 40,
+                        color: context.colors.onSurfaceVariant,
+                      ),
                     ),
                   ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
             StatusPill(type: item.type),
-            const SizedBox(width: 8),
-            Text(item.status.label, style: AppText.label),
+            const SizedBox(width: AppSpacing.xs),
+            Text(item.status.label, style: context.typography.labelLarge),
           ],
         ),
-        const SizedBox(height: 10),
-        Text(item.title, style: AppText.h1),
-        const SizedBox(height: 8),
-        Text(item.description, style: AppText.body.copyWith(height: 1.4)),
-        const SizedBox(height: 16),
-        _InfoRow(label: 'Catégorie', value: item.category.label),
-        _InfoRow(label: 'Date', value: dateLabel),
-        _InfoRow(
-          label: 'Lieu',
-          value: item.place.isEmpty ? 'Non précisé' : item.place,
+        const SizedBox(height: AppSpacing.xs + 2),
+        Text(item.title, style: context.typography.headlineMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Text(item.description, style: context.typography.bodyMedium),
+        const SizedBox(height: AppSpacing.lg),
+        AppCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            children: [
+              _InfoRow(label: 'Catégorie', value: item.category.label),
+              _InfoRow(label: 'Date', value: dateLabel),
+              _InfoRow(
+                label: 'Lieu',
+                value: item.place.isEmpty ? 'Non précisé' : item.place,
+              ),
+              _InfoRow(
+                label: 'Coordonnées',
+                value: item.hasCoordinates
+                    ? '${item.latitude!.toStringAsFixed(5)}, ${item.longitude!.toStringAsFixed(5)}'
+                    : 'Non renseignées',
+              ),
+              _InfoRow(
+                label: 'Contact',
+                value: item.ownerName?.trim().isNotEmpty == true
+                    ? item.ownerName!
+                    : 'Membre du campus',
+              ),
+              if (item.isMine && (item.secretDetail?.isNotEmpty ?? false))
+                _InfoRow(label: 'Détail secret', value: item.secretDetail!),
+            ],
+          ),
         ),
-        _InfoRow(
-          label: 'Coordonnées',
-          value: item.hasCoordinates
-              ? '${item.latitude!.toStringAsFixed(5)}, ${item.longitude!.toStringAsFixed(5)}'
-              : 'Non renseignées',
-        ),
-        _InfoRow(
-          label: 'Contact',
-          value: item.ownerName?.trim().isNotEmpty == true
-              ? item.ownerName!
-              : 'Membre du campus',
-        ),
-        if (item.isMine && (item.secretDetail?.isNotEmpty ?? false))
-          _InfoRow(label: 'Détail secret', value: item.secretDetail!),
         if (item.isMine &&
             item.type == ItemType.lost &&
             (item.secretDetail?.trim().isEmpty ?? true)) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.accentSoft,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: AppColors.accent.withValues(alpha: 0.4),
-              ),
-            ),
+          const SizedBox(height: AppSpacing.lg),
+          AppCard(
+            color: context.colors.secondaryContainer,
+            showBorder: false,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
+                Icon(
                   Icons.shield_outlined,
-                  color: AppColors.accent,
+                  color: context.colors.onSecondaryContainer,
                   size: 22,
                 ),
                 const SizedBox(width: 10),
@@ -164,15 +171,15 @@ class _DetailBody extends ConsumerWidget {
                     children: [
                       Text(
                         'Détail secret manquant',
-                        style: AppText.bodyStrong.copyWith(
-                          color: AppColors.textPrimary,
+                        style: context.typography.titleMedium?.copyWith(
+                          color: context.colors.onSecondaryContainer,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Ajoutez un détail secret en modifiant cette annonce pour pouvoir vérifier une correspondance et débloquer le chat.',
-                        style: AppText.caption.copyWith(
-                          color: AppColors.textSecondary,
+                        style: context.typography.bodySmall?.copyWith(
+                          color: context.colors.onSecondaryContainer,
                         ),
                       ),
                     ],
@@ -183,9 +190,9 @@ class _DetailBody extends ConsumerWidget {
           ),
         ],
         if (item.hasCoordinates) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           ClipRRect(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppSpacing.lg - 2),
             child: SizedBox(
               height: 160,
               child: FlutterMap(
@@ -218,7 +225,7 @@ class _DetailBody extends ConsumerWidget {
           ),
         ],
         if (item.isMine) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.lg),
           AppButton(
             label: 'Modifier',
             iconName: 'pen-linear',
@@ -248,7 +255,10 @@ class _DetailBody extends ConsumerWidget {
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Annuler'),
           ),
-          TextButton(
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: context.colors.error,
+            ),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Supprimer'),
           ),
@@ -291,7 +301,7 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -299,10 +309,12 @@ class _InfoRow extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: AppText.label.copyWith(color: AppColors.textTertiary),
+              style: context.typography.labelLarge?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
             ),
           ),
-          Expanded(child: Text(value, style: AppText.body)),
+          Expanded(child: Text(value, style: context.typography.bodyMedium)),
         ],
       ),
     );

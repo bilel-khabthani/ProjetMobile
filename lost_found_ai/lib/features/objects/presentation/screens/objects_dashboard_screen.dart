@@ -3,13 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
-import '../../../../widgets/pressable_scale.dart';
 import '../../../../widgets/skeleton.dart';
 import '../../data/providers/objects_providers.dart';
 
@@ -21,10 +19,9 @@ class ObjectsDashboardScreen extends ConsumerWidget {
     final statsAsync = ref.watch(objectsStatsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.primary,
+          color: context.colors.primary,
           onRefresh: () async {
             ref.invalidate(objectsStatsProvider);
             ref.invalidate(allObjectsProvider);
@@ -40,8 +37,8 @@ class ObjectsDashboardScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
         onPressed: () => context.push(AppRoutes.objectAdd),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Signaler'),
@@ -71,24 +68,31 @@ class _Content extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Objets perdus & trouvés', style: AppText.h1),
-                  const SizedBox(height: 6),
+                  Text(
+                    'Objets perdus & trouvés',
+                    style: context.typography.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs - 2),
                   Text(
                     'Gérez vos annonces et retrouvez vos objets.',
-                    style: AppText.body,
+                    style: context.typography.bodyMedium,
                   ),
                 ],
               ),
             ),
             Container(
-              width: 56,
-              height: 56,
+              width: AppSpacing.huge + 8,
+              height: AppSpacing.huge + 8,
               decoration: BoxDecoration(
-                color: AppColors.primarySoft,
+                color: context.colors.primaryContainer,
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: const Center(
-                child: AppIcon('magnifer-linear', size: 26, color: AppColors.primary),
+              child: Center(
+                child: AppIcon(
+                  'magnifer-linear',
+                  size: 26,
+                  color: context.colors.onPrimaryContainer,
+                ),
               ),
             ),
           ],
@@ -101,8 +105,8 @@ class _Content extends StatelessWidget {
                 title: 'Perdus',
                 value: stats.totalLostObjects.toString(),
                 iconName: 'magnifer-linear',
-                color: AppColors.lost,
-                background: AppColors.lostSoft,
+                color: context.colors.primary,
+                background: context.colors.primaryContainer,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -111,8 +115,8 @@ class _Content extends StatelessWidget {
                 title: 'Trouvés',
                 value: stats.totalFoundObjects.toString(),
                 iconName: 'hand-heart-linear',
-                color: AppColors.found,
-                background: AppColors.foundSoft,
+                color: context.colors.secondary,
+                background: context.colors.secondaryContainer,
               ),
             ),
           ],
@@ -125,8 +129,8 @@ class _Content extends StatelessWidget {
                 title: 'Actifs',
                 value: stats.activeAnnouncements.toString(),
                 iconName: 'bolt-linear',
-                color: AppColors.primary,
-                background: AppColors.primarySoft,
+                color: context.colors.tertiary,
+                background: context.colors.tertiaryContainer,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -135,14 +139,14 @@ class _Content extends StatelessWidget {
                 title: 'Récupérés',
                 value: stats.recoveredAnnouncements.toString(),
                 iconName: 'check-circle-bold',
-                color: AppColors.success,
-                background: AppColors.mint,
+                color: context.colors.primary,
+                background: context.colors.secondaryContainer,
               ),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.xl),
-        Text('Actions rapides', style: AppText.h2),
+        Text('Actions rapides', style: context.typography.headlineSmall),
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
@@ -150,10 +154,9 @@ class _Content extends StatelessWidget {
               child: _QuickAction(
                 label: 'Signaler\nperdu',
                 iconName: 'magnifer-linear',
-                color: AppColors.lost,
-                background: AppColors.lostSoft,
-                onTap: () =>
-                    context.push('${AppRoutes.objectAdd}?type=lost'),
+                color: context.colors.primary,
+                background: context.colors.primaryContainer,
+                onTap: () => context.push('${AppRoutes.objectAdd}?type=lost'),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -161,10 +164,9 @@ class _Content extends StatelessWidget {
               child: _QuickAction(
                 label: 'Signaler\ntrouvé',
                 iconName: 'hand-heart-linear',
-                color: AppColors.found,
-                background: AppColors.foundSoft,
-                onTap: () =>
-                    context.push('${AppRoutes.objectAdd}?type=found'),
+                color: context.colors.secondary,
+                background: context.colors.secondaryContainer,
+                onTap: () => context.push('${AppRoutes.objectAdd}?type=found'),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -172,8 +174,8 @@ class _Content extends StatelessWidget {
               child: _QuickAction(
                 label: 'Voir sur\nla carte',
                 iconName: 'map-point-linear',
-                color: AppColors.accent,
-                background: AppColors.accentSoft,
+                color: context.colors.tertiary,
+                background: context.colors.tertiaryContainer,
                 onTap: () => context.push(AppRoutes.objectsMap),
               ),
             ),
@@ -183,13 +185,10 @@ class _Content extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Récemment publiés', style: AppText.h2),
-            PressableScale(
-              onTap: () => context.push(AppRoutes.objectsList),
-              child: Text(
-                'Voir tous',
-                style: AppText.label.copyWith(color: AppColors.primary),
-              ),
+            Text('Récemment publiés', style: context.typography.headlineSmall),
+            TextButton(
+              onPressed: () => context.push(AppRoutes.objectsList),
+              child: const Text('Voir tous'),
             ),
           ],
         ),
@@ -225,29 +224,27 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: AppSpacing.huge - 8,
+            height: AppSpacing.huge - 8,
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+              color: background,
+              borderRadius: BorderRadius.circular(AppSpacing.sm),
             ),
-            child: Center(child: AppIcon(iconName, size: 20, color: Colors.white)),
+            child: Center(child: AppIcon(iconName, size: 20, color: color)),
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(value, style: AppText.score),
+          Text(
+            value,
+            style: context.typography.headlineSmall?.copyWith(color: color),
+          ),
           const SizedBox(height: 2),
-          Text(title, style: AppText.label),
+          Text(title, style: context.typography.labelLarge),
         ],
       ),
     );
@@ -271,37 +268,24 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PressableScale(
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: color.withValues(alpha: 0.28)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Center(
-                child: AppIcon(iconName, size: 18, color: Colors.white),
-              ),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: AppSpacing.huge - 12,
+            height: AppSpacing.huge - 12,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(AppSpacing.sm),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              label,
-              style: AppText.label.copyWith(fontSize: 12),
-              maxLines: 2,
-            ),
-          ],
-        ),
+            child: Center(child: AppIcon(iconName, size: 18, color: color)),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(label, style: context.typography.labelLarge, maxLines: 2),
+        ],
       ),
     );
   }
@@ -315,98 +299,94 @@ class _ObjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? AppColors.lost : AppColors.found;
-    final background = isLost ? AppColors.lostSoft : AppColors.foundSoft;
+    final color = isLost ? context.colors.primary : context.colors.tertiary;
+    final background = isLost
+        ? context.colors.primaryContainer
+        : context.colors.tertiaryContainer;
 
-    return PressableScale(
+    return AppCard(
       onTap: () => context.push(AppRoutes.objectDetail(object.id)),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.border),
-          boxShadow: AppShadows.card,
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 64,
-              height: 64,
-              child: object.imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      child: Image.network(
-                        object.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            ItemArtwork(category: object.category, compact: true),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Row(
+        children: [
+          SizedBox(
+            width: AppSpacing.huge + 16,
+            height: AppSpacing.huge + 16,
+            child: object.imageUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.sm),
+                    child: Image.network(
+                      object.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          ItemArtwork(category: object.category, compact: true),
+                    ),
+                  )
+                : ItemArtwork(category: object.category, compact: true),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        object.title,
+                        style: context.typography.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    )
-                  : ItemArtwork(category: object.category, compact: true),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: background,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        object.type.shortLabel,
+                        style: context.typography.labelSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    AppIcon(
+                      'map-point-linear',
+                      size: 13,
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        object.placeLabel,
+                        style: context.typography.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(object.formattedDate, style: context.typography.bodySmall),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          object.title,
-                          style: AppText.bodyStrong,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: background,
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                        ),
-                        child: Text(
-                          object.type.shortLabel,
-                          style: AppText.tiny.copyWith(
-                            color: color,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      AppIcon('map-point-linear',
-                          size: 13, color: AppColors.textTertiary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          object.placeLabel,
-                          style: AppText.caption,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    object.formattedDate,
-                    style: AppText.caption.copyWith(fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textTertiary),
-          ],
-        ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.colors.onSurfaceVariant,
+          ),
+        ],
       ),
     );
   }
@@ -417,27 +397,25 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(
         children: [
-          const AppIcon('box-linear', size: 40, color: AppColors.textTertiary),
+          AppIcon(
+            'box-linear',
+            size: 40,
+            color: context.colors.onSurfaceVariant,
+          ),
           const SizedBox(height: AppSpacing.sm),
-          Text('Aucun objet signalé', style: AppText.h3),
+          Text('Aucun objet signalé', style: context.typography.headlineSmall),
           const SizedBox(height: 4),
           Text(
             'Soyez le premier à signaler un objet perdu ou trouvé.',
-            style: AppText.caption,
+            style: context.typography.bodySmall,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () => context.push(AppRoutes.objectAdd),
             icon: const Icon(Icons.add_rounded),
             label: const Text('Signaler un objet'),
@@ -492,19 +470,22 @@ class _ErrorState extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.xl),
       children: [
         const SizedBox(height: 80),
-        const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.danger),
+        Icon(Icons.cloud_off_rounded, size: 48, color: context.colors.error),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Impossible de charger les objets',
-          style: AppText.h2,
+          style: context.typography.headlineSmall,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
-        Text(error, style: AppText.body, textAlign: TextAlign.center),
+        Text(
+          error,
+          style: context.typography.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: AppSpacing.lg),
         Center(
           child: FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: onRetry,
             child: const Text('Réessayer'),
           ),

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
+import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
 import 'app_icon.dart';
-import 'pressable_scale.dart';
 
 enum AppButtonVariant { primary, secondary, ghost, success, danger }
 
@@ -24,8 +23,6 @@ class AppButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
-
-  /// Icone du set Solar (nom de fichier sans extension), alternative a [icon].
   final String? iconName;
   final AppButtonVariant variant;
   final bool loading;
@@ -34,127 +31,116 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = _AppButtonVisual(
-      variant: variant,
-      loading: loading,
-      icon: icon,
-      iconName: iconName,
-    );
+    final scheme = context.colors;
+    final enabled = onPressed != null && !loading;
+    final action = enabled ? onPressed : null;
+    final foreground = _foreground(scheme, variant);
+    final style = _style(scheme, variant, foreground);
+    final content = _content(context, foreground);
 
-    final child = SizedBox(
+    final Widget button = switch (variant) {
+      AppButtonVariant.secondary => FilledButton.tonal(
+        onPressed: action,
+        style: style,
+        child: content,
+      ),
+      AppButtonVariant.ghost => TextButton(
+        onPressed: action,
+        style: style,
+        child: content,
+      ),
+      _ => FilledButton(onPressed: action, style: style, child: content),
+    };
+
+    return SizedBox(
       height: height,
       width: expand ? double.infinity : null,
-      child: DecoratedBox(
-        decoration: visual.decoration,
-        child: Center(
-          child: loading
-              ? SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      visual.foreground,
-                    ),
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (visual.iconName != null) ...[
-                      AppIcon(
-                        visual.iconName!,
-                        size: 20,
-                        color: visual.foreground,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                    ] else if (visual.icon != null) ...[
-                      Icon(visual.icon, size: 20, color: visual.foreground),
-                      const SizedBox(width: AppSpacing.xs),
-                    ],
-                    Flexible(
-                      child: Text(
-                        label,
-                        style: AppText.button.copyWith(
-                          color: visual.foreground,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-
-    final enabled = onPressed != null && !loading;
-    return PressableScale(
-      onTap: enabled ? onPressed : null,
-      haptic: variant == AppButtonVariant.primary,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 180),
-        opacity: enabled ? 1 : 0.5,
-        child: child,
-      ),
+      child: button,
     );
   }
-}
 
-class _AppButtonVisual {
-  const _AppButtonVisual({
-    required this.variant,
-    required this.loading,
-    this.icon,
-    this.iconName,
-  });
+  Widget _content(BuildContext context, Color foreground) {
+    if (loading) {
+      return SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.4,
+          valueColor: AlwaysStoppedAnimation<Color>(foreground),
+        ),
+      );
+    }
 
-  final AppButtonVariant variant;
-  final bool loading;
-  final IconData? icon;
-  final String? iconName;
-
-  Color get foreground => switch (variant) {
-    AppButtonVariant.primary => Colors.white,
-    AppButtonVariant.secondary => AppColors.primary,
-    AppButtonVariant.ghost => AppColors.textSecondary,
-    AppButtonVariant.success => Colors.white,
-    AppButtonVariant.danger => Colors.white,
-  };
-
-  BoxDecoration get decoration => switch (variant) {
-    AppButtonVariant.primary => BoxDecoration(
-      color: AppColors.primary,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      boxShadow: AppShadows.primary,
-    ),
-    AppButtonVariant.success => BoxDecoration(
-      color: AppColors.found,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x402FB57C),
-          blurRadius: 22,
-          offset: Offset(0, 10),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (iconName != null) ...[
+          AppIcon(iconName!, size: 20, color: foreground),
+          const SizedBox(width: AppSpacing.xs),
+        ] else if (icon != null) ...[
+          Icon(icon, size: 20, color: foreground),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            style: context.typography.labelLarge?.copyWith(color: foreground),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
         ),
       ],
-    ),
-    AppButtonVariant.danger => BoxDecoration(
-      color: AppColors.danger,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-    ),
-    AppButtonVariant.secondary => BoxDecoration(
-      color: AppColors.primarySoft,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      border: Border.all(
-        color: AppColors.primary.withValues(alpha: 0.35),
-        width: 1.5,
+    );
+  }
+
+  ButtonStyle _style(
+    ColorScheme scheme,
+    AppButtonVariant variant,
+    Color foreground,
+  ) {
+    final base = ButtonStyle(
+      foregroundColor: WidgetStateProperty.all<Color>(foreground),
+      minimumSize: WidgetStateProperty.all<Size>(Size.fromHeight(height)),
+      shape: WidgetStateProperty.all<OutlinedBorder>(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
       ),
-    ),
-    AppButtonVariant.ghost => BoxDecoration(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-    ),
-  };
+      textStyle: WidgetStateProperty.all<TextStyle>(AppText.button),
+    );
+
+    return switch (variant) {
+      AppButtonVariant.primary => base.copyWith(
+        backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+          return states.contains(WidgetState.disabled)
+              ? scheme.onSurface.withValues(alpha: 0.12)
+              : scheme.primary;
+        }),
+      ),
+      AppButtonVariant.success => base.copyWith(
+        backgroundColor: WidgetStateProperty.all<Color>(scheme.tertiary),
+        foregroundColor: WidgetStateProperty.all<Color>(scheme.onTertiary),
+      ),
+      AppButtonVariant.danger => base.copyWith(
+        backgroundColor: WidgetStateProperty.all<Color>(scheme.error),
+        foregroundColor: WidgetStateProperty.all<Color>(scheme.onError),
+      ),
+      AppButtonVariant.secondary => base,
+      AppButtonVariant.ghost => base.copyWith(
+        backgroundColor: WidgetStateProperty.all<Color>(Colors.transparent),
+        foregroundColor: WidgetStateProperty.all<Color>(scheme.primary),
+      ),
+    };
+  }
+
+  Color _foreground(ColorScheme scheme, AppButtonVariant variant) {
+    return switch (variant) {
+      AppButtonVariant.primary => scheme.onPrimary,
+      AppButtonVariant.success => scheme.onTertiary,
+      AppButtonVariant.danger => scheme.onError,
+      AppButtonVariant.secondary => scheme.onSecondaryContainer,
+      AppButtonVariant.ghost => scheme.primary,
+    };
+  }
 }

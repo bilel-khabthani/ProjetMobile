@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/swipe_candidate.dart';
 import '../../../widgets/photo_placeholder.dart';
 import '../../../widgets/pressable_scale.dart';
@@ -25,6 +24,7 @@ class SwipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxHeight < 620;
@@ -32,9 +32,8 @@ class SwipeCard extends StatelessWidget {
         final likeOpacity = (drag.dx / 110).clamp(0.0, 1.0);
 
         return DecoratedBox(
-          decoration: const BoxDecoration(
-            borderRadius: BorderRadius.all(Radius.circular(AppRadius.xl)),
-            boxShadow: AppShadows.raised,
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.all(Radius.circular(AppRadius.xl)),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -46,20 +45,18 @@ class SwipeCard extends StatelessWidget {
                   borderRadius: 0,
                   showLabel: false,
                 ),
-                // Voile sombre pour garantir la lisibilite du texte sur
-                // n'importe quelle categorie (chaque categorie a sa couleur).
-                const DecoratedBox(
+                DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Color(0x331F1B2E),
-                        Color(0x001F1B2E),
-                        Color(0xB31F1B2E),
-                        Color(0xF21F1B2E),
+                        colors.inverseSurface.withValues(alpha: 0.2),
+                        Colors.transparent,
+                        colors.inverseSurface.withValues(alpha: 0.7),
+                        colors.inverseSurface.withValues(alpha: 0.95),
                       ],
-                      stops: [0, 0.32, 0.62, 1],
+                      stops: const [0, 0.32, 0.62, 1],
                     ),
                   ),
                 ),
@@ -84,7 +81,7 @@ class SwipeCard extends StatelessWidget {
                   left: 22,
                   child: _SwipeStamp(
                     label: 'PASSER',
-                    color: AppColors.danger,
+                    color: colors.error,
                     opacity: passOpacity,
                     angle: -0.2,
                   ),
@@ -94,7 +91,7 @@ class SwipeCard extends StatelessWidget {
                   right: 22,
                   child: _SwipeStamp(
                     label: "C'EST À MOI",
-                    color: AppColors.found,
+                    color: colors.tertiary,
                     opacity: likeOpacity,
                     angle: 0.2,
                   ),
@@ -115,13 +112,14 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
+            color: colors.surface,
             borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
           child: Row(
@@ -135,9 +133,9 @@ class _TopBar extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 'OBJET TROUVÉ',
-                style: AppText.caption.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w800,
+                style: context.typography.bodySmall?.copyWith(
+                  color: colors.onSurface,
+                  fontWeight: FontWeight.w700,
                   fontSize: 10,
                   letterSpacing: 0.6,
                 ),
@@ -149,17 +147,19 @@ class _TopBar extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.28),
+            color: colors.inverseSurface.withValues(alpha: 0.55),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            border: Border.all(
+              color: colors.onInverseSurface.withValues(alpha: 0.3),
+            ),
           ),
           child: ScoreGauge(
             value: candidate.scores.global,
             size: 56,
             strokeWidth: 5,
-            color: Colors.white,
-            secondaryColor: Colors.white70,
-            labelColor: Colors.white,
+            color: colors.onInverseSurface,
+            secondaryColor: colors.onInverseSurface,
+            labelColor: colors.onInverseSurface,
             label: 'score',
           ),
         ),
@@ -181,6 +181,9 @@ class _BottomPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final onImage = colors.onInverseSurface;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -192,8 +195,8 @@ class _BottomPanel extends StatelessWidget {
             Flexible(
               child: Text(
                 candidate.foundTimeLabel,
-                style: AppText.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.78),
+                style: context.typography.bodySmall?.copyWith(
+                  color: onImage.withValues(alpha: 0.78),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -204,8 +207,8 @@ class _BottomPanel extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(
           candidate.foundTitle,
-          style: AppText.h1.copyWith(
-            color: Colors.white,
+          style: context.typography.headlineLarge?.copyWith(
+            color: onImage,
             fontSize: compact ? 21 : 24,
             height: 1.15,
           ),
@@ -216,8 +219,8 @@ class _BottomPanel extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             candidate.foundDescription,
-            style: AppText.body.copyWith(
-              color: Colors.white.withValues(alpha: 0.76),
+            style: context.typography.bodyLarge?.copyWith(
+              color: onImage.withValues(alpha: 0.76),
               fontSize: 13,
               height: 1.35,
             ),
@@ -228,12 +231,18 @@ class _BottomPanel extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
-            const Icon(Icons.place_rounded, size: 14, color: Colors.white70),
+            Icon(
+              Icons.place_rounded,
+              size: 14,
+              color: onImage.withValues(alpha: 0.78),
+            ),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 '${candidate.foundPlace} · ${candidate.distanceLabel}',
-                style: AppText.caption.copyWith(color: Colors.white70),
+                style: context.typography.bodySmall?.copyWith(
+                  color: onImage.withValues(alpha: 0.78),
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -268,9 +277,9 @@ class _BottomPanel extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
+              color: colors.inverseSurface.withValues(alpha: 0.38),
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+              border: Border.all(color: onImage.withValues(alpha: 0.24)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,13 +288,13 @@ class _BottomPanel extends StatelessWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: onImage.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.auto_awesome_rounded,
                     size: 18,
-                    color: Colors.white,
+                    color: onImage,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
@@ -301,20 +310,22 @@ class _BottomPanel extends StatelessWidget {
                                 children: [
                                   TextSpan(
                                     text: 'Analyse IA',
-                                    style: AppText.label.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 12,
-                                    ),
+                                    style: context.typography.labelMedium
+                                        ?.copyWith(
+                                          color: onImage,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 12,
+                                        ),
                                   ),
                                   TextSpan(
                                     text: '  ${candidate.ai.confidence}%',
-                                    style: AppText.caption.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.86,
-                                      ),
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                                    style: context.typography.bodySmall
+                                        ?.copyWith(
+                                          color: onImage.withValues(
+                                            alpha: 0.86,
+                                          ),
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                   ),
                                 ],
                               ),
@@ -329,8 +340,8 @@ class _BottomPanel extends StatelessWidget {
                               textAlign: TextAlign.right,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: AppText.caption.copyWith(
-                                color: Colors.white.withValues(alpha: 0.55),
+                              style: context.typography.bodySmall?.copyWith(
+                                color: onImage.withValues(alpha: 0.55),
                                 fontSize: 9,
                               ),
                             ),
@@ -340,8 +351,8 @@ class _BottomPanel extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         candidate.ai.summary,
-                        style: AppText.caption.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
+                        style: context.typography.bodySmall?.copyWith(
+                          color: onImage.withValues(alpha: 0.84),
                           height: 1.3,
                         ),
                         maxLines: 2,
@@ -350,10 +361,10 @@ class _BottomPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 18,
-                  color: Colors.white54,
+                  color: onImage.withValues(alpha: 0.6),
                 ),
               ],
             ),
@@ -364,12 +375,12 @@ class _BottomPanel extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              backgroundColor: onImage.withValues(alpha: 0.2),
               child: Text(
                 candidate.finderInitials,
-                style: AppText.caption.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
+                style: context.typography.bodySmall?.copyWith(
+                  color: onImage,
+                  fontWeight: FontWeight.w700,
                   fontSize: 11,
                 ),
               ),
@@ -381,8 +392,8 @@ class _BottomPanel extends StatelessWidget {
                 children: [
                   Text(
                     'Trouvé par ${candidate.finderName}',
-                    style: AppText.caption.copyWith(
-                      color: Colors.white,
+                    style: context.typography.bodySmall?.copyWith(
+                      color: onImage,
                       fontWeight: FontWeight.w700,
                     ),
                     maxLines: 1,
@@ -391,8 +402,8 @@ class _BottomPanel extends StatelessWidget {
                   Text(
                     'Confiance ${candidate.finderReputation.round()} · '
                     '${candidate.finderRecoveredCount} objet(s) rendu(s)',
-                    style: AppText.caption.copyWith(
-                      color: Colors.white.withValues(alpha: 0.62),
+                    style: context.typography.bodySmall?.copyWith(
+                      color: onImage.withValues(alpha: 0.62),
                       fontSize: 10,
                     ),
                     maxLines: 1,
@@ -404,8 +415,8 @@ class _BottomPanel extends StatelessWidget {
             if (!compact)
               Text(
                 'Glissez →',
-                style: AppText.caption.copyWith(
-                  color: Colors.white.withValues(alpha: 0.55),
+                style: context.typography.bodySmall?.copyWith(
+                  color: onImage.withValues(alpha: 0.55),
                   fontSize: 10,
                 ),
               ),
@@ -423,28 +434,34 @@ class _VerdictPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (insight.verdict) {
-      AiVerdict.strong => AppColors.found,
-      AiVerdict.possible => AppColors.accent,
-      AiVerdict.weak => AppColors.textTertiary,
+    final colors = context.colors;
+    final background = switch (insight.verdict) {
+      AiVerdict.strong => colors.tertiary,
+      AiVerdict.possible => colors.secondary,
+      AiVerdict.weak => colors.surfaceContainerHighest,
+    };
+    final foreground = switch (insight.verdict) {
+      AiVerdict.strong => colors.onTertiary,
+      AiVerdict.possible => colors.onSecondary,
+      AiVerdict.weak => colors.onSurfaceVariant,
     };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color,
+        color: background,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.auto_awesome_rounded, size: 12, color: Colors.white),
+          Icon(Icons.auto_awesome_rounded, size: 12, color: foreground),
           const SizedBox(width: 4),
           Text(
             insight.verdict.label,
-            style: AppText.caption.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
+            style: context.typography.bodySmall?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w700,
               fontSize: 9,
             ),
           ),
@@ -467,22 +484,24 @@ class _ScoreChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final onImage = colors.onInverseSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: colors.inverseSurface.withValues(alpha: 0.28),
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        border: Border.all(color: onImage.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: Colors.white70),
+          Icon(icon, size: 11, color: onImage.withValues(alpha: 0.78)),
           const SizedBox(width: 4),
           Text(
             '$label ${value.round()}',
-            style: AppText.caption.copyWith(
-              color: Colors.white,
+            style: context.typography.bodySmall?.copyWith(
+              color: onImage,
               fontWeight: FontWeight.w700,
               fontSize: 10,
             ),
@@ -518,13 +537,13 @@ class _SwipeStamp extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: color, width: 3),
-              color: Colors.white.withValues(alpha: 0.08),
+              color: context.colors.onInverseSurface.withValues(alpha: 0.08),
             ),
             child: Text(
               label,
-              style: AppText.h3.copyWith(
+              style: context.typography.headlineSmall?.copyWith(
                 color: color,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
                 fontSize: 15,
               ),

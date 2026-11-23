@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 
 class AuthHeader extends StatelessWidget {
   const AuthHeader({super.key, required this.title, required this.subtitle});
@@ -14,9 +14,9 @@ class AuthHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: AppText.h1),
+        Text(title, style: context.typography.headlineMedium),
         const SizedBox(height: AppSpacing.xs),
-        Text(subtitle, style: AppText.body),
+        Text(subtitle, style: context.typography.bodyMedium),
       ],
     );
   }

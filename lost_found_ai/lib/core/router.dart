@@ -1,6 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import 'navigation/main_shell.dart';
 
 import '../data/models/item.dart';
 import '../data/providers.dart';
@@ -13,6 +15,7 @@ import '../features/chat/chat_screen.dart';
 import '../features/claim/claim_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/match/match_detail_screen.dart';
+import '../features/matches/matches_screen.dart';
 import '../features/objects/item_detail_screen.dart';
 import '../features/objects/objects_screen.dart';
 import '../features/objects/presentation/screens/map_selection_screen.dart';
@@ -29,6 +32,12 @@ import '../features/rewards/reward_screen.dart';
 import '../features/swipe/swipe_screen.dart';
 import '../features/trust/trust_screen.dart';
 
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final _homeNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'home');
+final _objectsNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'objects');
+final _matchesNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'matches');
+final _profileNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
+
 abstract final class AppRoutes {
   // ── Auth ────────────────────────────────────────────────────────────────
   static const String onboarding = '/onboarding';
@@ -40,6 +49,7 @@ abstract final class AppRoutes {
 
   // ── Main ─────────────────────────────────────────────────────────────────
   static const String home = '/home';
+  static const String matches = '/matches';
   static const String publish = '/publish';
   static const String trust = '/trust';
   static const String rewards = '/rewards';
@@ -99,6 +109,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.onboarding,
     refreshListenable: refresh,
     redirect: (context, state) {
@@ -120,38 +131,87 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // ── Auth ──────────────────────────────────────────────────────────────
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.onboarding,
         builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.welcome,
         builder: (context, state) => const WelcomeScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.signUp,
         builder: (context, state) => const SignUpScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.signIn,
         builder: (context, state) => const SignInScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.verifyPhone,
         builder: (context, state) => const VerifyPhoneScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-
-      // ── Main ──────────────────────────────────────────────────────────────
-      GoRoute(
-        path: AppRoutes.home,
-        builder: (context, state) => const HomeScreen(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _homeNavigatorKey,
+            routes: [
+              GoRoute(
+                path: AppRoutes.home,
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _objectsNavigatorKey,
+            routes: [
+              GoRoute(
+                path: AppRoutes.objects,
+                builder: (context, state) {
+                  final type = state.uri.queryParameters['type'];
+                  return ObjectsScreen(
+                    initialType: type == 'found'
+                        ? ItemType.found
+                        : ItemType.lost,
+                  );
+                },
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _matchesNavigatorKey,
+            routes: [
+              GoRoute(
+                path: AppRoutes.matches,
+                builder: (context, state) => const MatchesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: _profileNavigatorKey,
+            routes: [
+              GoRoute(
+                path: AppRoutes.profile,
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.publish,
         builder: (context, state) {
           final type = state.uri.queryParameters['type'];
@@ -163,24 +223,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.trust,
         builder: (context, state) => const TrustScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.rewards,
         builder: (context, state) => const RewardScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.swipe,
         builder: (context, state) => const SwipeScreen(),
       ),
       GoRoute(
-        path: AppRoutes.profile,
-        builder: (context, state) => const ProfileScreen(),
-      ),
-
-      // ── Matching & Claims ─────────────────────────────────────────────────
-      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.match,
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? 'match-sac';
@@ -188,6 +246,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.chat,
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
@@ -195,36 +254,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.claim,
         builder: (context, state) => const ClaimScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.claimWithId,
         builder: (context, state) {
           final id = state.pathParameters['id'];
           return ClaimScreen(matchId: id);
         },
       ),
-
-      // ── Objects module ────────────────────────────────────────────────────
       GoRoute(
-        path: AppRoutes.objects,
-        builder: (context, state) {
-          final type = state.uri.queryParameters['type'];
-          return ObjectsScreen(
-            initialType: type == 'found' ? ItemType.found : ItemType.lost,
-          );
-        },
-      ),
-      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.objectsDashboard,
         builder: (context, state) => const ObjectsDashboardScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.objectsList,
         builder: (context, state) => const ObjectsListScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.objectsAdd,
         builder: (context, state) {
           final type = state.uri.queryParameters['type'];
@@ -234,6 +287,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/objects/:id',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
@@ -241,6 +295,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/objects/:id/edit',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
@@ -248,20 +303,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.myObjects,
         builder: (context, state) => const MyObjectsScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.map,
         builder: (context, state) => const ObjectsMapScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.objectsMapSelection,
         builder: (context, state) => const MapSelectionScreen(),
       ),
-
-      // ── Item detail (legacy route used by home_screen matches) ────────────
       GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.item,
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';

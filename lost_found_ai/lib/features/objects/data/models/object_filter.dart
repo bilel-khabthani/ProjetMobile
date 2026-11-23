@@ -77,8 +77,12 @@ class ObjectFilter {
     if (category != null) params['category'] = category!.apiValue;
     if (status != null) params['status'] = status!.apiValue;
     if (searchQuery.isNotEmpty) params['q'] = searchQuery;
-    if (startDate != null) params['occurred_from'] = startDate!.toIso8601String();
-    if (endDate != null) params['occurred_to'] = endDate!.toIso8601String();
+    if (startDate != null) {
+      params['occurred_from'] = startDate!.toIso8601String();
+    }
+    if (endDate != null) {
+      params['occurred_to'] = endDate!.toIso8601String();
+    }
     if (latitude != null && longitude != null) {
       params['with_location'] = 1;
     }
@@ -108,18 +112,18 @@ class ObjectFilter {
 
   @override
   int get hashCode => Object.hash(
-        type,
-        category,
-        status,
-        searchQuery,
-        startDate,
-        endDate,
-        latitude,
-        longitude,
-        radiusKm,
-        limit,
-        offset,
-      );
+    type,
+    category,
+    status,
+    searchQuery,
+    startDate,
+    endDate,
+    latitude,
+    longitude,
+    radiusKm,
+    limit,
+    offset,
+  );
 }
 
 /// Parametres de recherche geographique.

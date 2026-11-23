@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/models/swipe_candidate.dart';
 import '../../../widgets/agreement_signals.dart';
 import '../../../widgets/photo_comparison_card.dart';
@@ -41,12 +40,13 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.86,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Column(
@@ -57,7 +57,7 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
             width: 44,
             height: 4,
             decoration: BoxDecoration(
-              color: AppColors.divider,
+              color: colors.outlineVariant,
               borderRadius: BorderRadius.circular(AppRadius.pill),
             ),
           ),
@@ -74,16 +74,12 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFF8B5CF6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: colors.primary,
                     borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.auto_awesome_rounded,
-                    color: Colors.white,
+                    color: colors.onPrimary,
                     size: 22,
                   ),
                 ),
@@ -92,10 +88,13 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Analyse IA', style: AppText.h3),
+                      Text(
+                        'Analyse IA',
+                        style: context.typography.headlineSmall,
+                      ),
                       Text(
                         '${widget.candidate.matchId} · ${widget.candidate.foundTitle}',
-                        style: AppText.caption,
+                        style: context.typography.bodySmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -131,9 +130,9 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (loading) ...[
-                        const LinearProgressIndicator(
+                        LinearProgressIndicator(
                           minHeight: 3,
-                          backgroundColor: AppColors.primarySoft,
+                          backgroundColor: colors.primaryContainer,
                         ),
                         const SizedBox(height: AppSpacing.md),
                       ],
@@ -141,7 +140,9 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                       const SizedBox(height: AppSpacing.lg),
                       Text(
                         insight.summary,
-                        style: AppText.body.copyWith(height: 1.5),
+                        style: context.typography.bodyLarge?.copyWith(
+                          height: 1.5,
+                        ),
                       ),
                       if (insight.agreementScore > 0 ||
                           insight.sharedDetails.isNotEmpty ||
@@ -164,7 +165,7 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                         const SizedBox(height: AppSpacing.xl),
                         Text(
                           'Pourquoi cette correspondance ?',
-                          style: AppText.h3,
+                          style: context.typography.headlineSmall,
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         for (final reason in insight.reasons)
@@ -175,17 +176,20 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 2),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
                                   child: Icon(
                                     Icons.check_circle_rounded,
                                     size: 17,
-                                    color: AppColors.found,
+                                    color: colors.tertiary,
                                   ),
                                 ),
                                 const SizedBox(width: AppSpacing.xs),
                                 Expanded(
-                                  child: Text(reason, style: AppText.body),
+                                  child: Text(
+                                    reason,
+                                    style: context.typography.bodyLarge,
+                                  ),
                                 ),
                               ],
                             ),
@@ -204,15 +208,15 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                                   vertical: 5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primarySoft,
+                                  color: colors.secondaryContainer,
                                   borderRadius: BorderRadius.circular(
                                     AppRadius.pill,
                                   ),
                                 ),
                                 child: Text(
                                   tag,
-                                  style: AppText.caption.copyWith(
-                                    color: AppColors.primaryDark,
+                                  style: context.typography.bodySmall?.copyWith(
+                                    color: colors.onSecondaryContainer,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -222,22 +226,21 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                       ],
                       if (insight.icebreaker.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.xl),
-                        Text('Message suggéré', style: AppText.h3),
+                        Text(
+                          'Message suggéré',
+                          style: context.typography.headlineSmall,
+                        ),
                         const SizedBox(height: AppSpacing.xs),
-                        Container(
+                        AppCard(
+                          color: colors.surfaceContainerHighest,
                           padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceAlt,
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                            border: Border.all(color: AppColors.border),
-                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '« ${insight.icebreaker} »',
-                                style: AppText.body.copyWith(
-                                  color: AppColors.textPrimary,
+                                style: context.typography.bodyLarge?.copyWith(
+                                  color: colors.onSurface,
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -270,19 +273,17 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                         ),
                       ],
                       const SizedBox(height: AppSpacing.lg),
-                      Container(
+                      AppCard(
+                        color: colors.secondaryContainer,
+                        showBorder: false,
                         padding: const EdgeInsets.all(AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                        ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.info_outline_rounded,
                               size: 18,
-                              color: AppColors.info,
+                              color: colors.onSecondaryContainer,
                             ),
                             const SizedBox(width: AppSpacing.xs),
                             Expanded(
@@ -290,8 +291,8 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                                 'L’IA analyse le texte, les photos, la distance et l’écart horaire. '
                                 'Elle ne remplace pas la question de vérification : '
                                 'le propriétaire doit toujours prouver que l’objet est le sien.',
-                                style: AppText.caption.copyWith(
-                                  color: AppColors.info,
+                                style: context.typography.bodySmall?.copyWith(
+                                  color: colors.onSecondaryContainer,
                                   height: 1.4,
                                 ),
                               ),
@@ -304,13 +305,17 @@ class _AiInsightSheetState extends State<_AiInsightSheet> {
                         insight.isLiveAi
                             ? 'Analyse générée par le modèle OpenAI.'
                             : 'Pré-analyse locale (le modèle OpenAI n’est pas configuré).',
-                        style: AppText.caption.copyWith(fontSize: 10),
+                        style: context.typography.bodySmall?.copyWith(
+                          fontSize: 10,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'L’accord des descriptions et la comparaison des photos '
                         'sont calculés sur l’appareil.',
-                        style: AppText.caption.copyWith(fontSize: 10),
+                        style: context.typography.bodySmall?.copyWith(
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -331,10 +336,16 @@ class _VerdictHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (insight.verdict) {
-      AiVerdict.strong => AppColors.found,
-      AiVerdict.possible => AppColors.accent,
-      AiVerdict.weak => AppColors.textTertiary,
+    final colors = context.colors;
+    final background = switch (insight.verdict) {
+      AiVerdict.strong => colors.tertiaryContainer,
+      AiVerdict.possible => colors.secondaryContainer,
+      AiVerdict.weak => colors.surfaceContainerHighest,
+    };
+    final foreground = switch (insight.verdict) {
+      AiVerdict.strong => colors.onTertiaryContainer,
+      AiVerdict.possible => colors.onSecondaryContainer,
+      AiVerdict.weak => colors.onSurfaceVariant,
     };
 
     return Column(
@@ -345,21 +356,23 @@ class _VerdictHeader extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
+                color: background,
                 borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
               child: Text(
                 insight.verdict.label,
-                style: AppText.caption.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
+                style: context.typography.bodySmall?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             const Spacer(),
             Text(
               '${insight.confidence}% de confiance',
-              style: AppText.label.copyWith(color: color),
+              style: context.typography.labelMedium?.copyWith(
+                color: foreground,
+              ),
             ),
           ],
         ),
@@ -369,8 +382,8 @@ class _VerdictHeader extends StatelessWidget {
           child: LinearProgressIndicator(
             value: insight.confidence / 100,
             minHeight: 8,
-            backgroundColor: color.withValues(alpha: 0.12),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
+            backgroundColor: colors.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(foreground),
           ),
         ),
       ],

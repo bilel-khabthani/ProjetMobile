@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../../core/theme/app_typography.dart';
-import '../../../widgets/pressable_scale.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// Boutons d'action du deck : passer, ouvrir l'analyse IA, valider.
 class SwipeActionBar extends StatelessWidget {
@@ -22,6 +20,7 @@ class SwipeActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,26 +28,26 @@ class SwipeActionBar extends StatelessWidget {
         _ActionButton(
           label: 'Passer',
           icon: Icons.close_rounded,
-          color: AppColors.danger,
-          background: AppColors.surface,
+          background: colors.surface,
+          foreground: colors.error,
+          outlined: true,
           onTap: enabled ? onPass : null,
         ),
         const SizedBox(width: AppSpacing.xl),
         _ActionButton(
           label: 'Analyse IA',
           icon: Icons.auto_awesome_rounded,
-          color: Colors.white,
-          background: AppColors.primary,
+          background: colors.primary,
+          foreground: colors.onPrimary,
           size: 66,
-          elevated: true,
           onTap: enabled ? onInsight : null,
         ),
         const SizedBox(width: AppSpacing.xl),
         _ActionButton(
           label: "C'est à moi",
           icon: Icons.favorite_rounded,
-          color: Colors.white,
-          background: AppColors.found,
+          background: colors.tertiary,
+          foreground: colors.onTertiary,
           onTap: enabled ? onLike : null,
         ),
       ],
@@ -60,67 +59,68 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.label,
     required this.icon,
-    required this.color,
     required this.background,
+    required this.foreground,
     this.size = 58,
-    this.elevated = false,
+    this.outlined = false,
     this.onTap,
   });
 
   final String label;
   final IconData icon;
-  final Color color;
   final Color background;
+  final Color foreground;
   final double size;
-  final bool elevated;
+  final bool outlined;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-
-    return Opacity(
-      opacity: enabled ? 1 : 0.4,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PressableScale(
-            onTap: onTap,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                color: background,
-                shape: BoxShape.circle,
-                border: background == AppColors.surface
-                    ? Border.all(
-                        color: color.withValues(alpha: 0.28),
-                        width: 1.5,
-                      )
-                    : null,
-                boxShadow: elevated
-                    ? AppShadows.primary
-                    : const [
-                        BoxShadow(
-                          color: Color(0x141F1B2E),
-                          blurRadius: 16,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-              ),
-              child: Icon(icon, color: color, size: size * 0.42),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: AppText.caption.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
+    final colors = context.colors;
+    final style = ButtonStyle(
+      backgroundColor: WidgetStatePropertyAll<Color>(background),
+      foregroundColor: WidgetStatePropertyAll<Color>(foreground),
+      minimumSize: WidgetStatePropertyAll<Size>(Size(size, size)),
+      fixedSize: WidgetStatePropertyAll<Size>(Size(size, size)),
+      maximumSize: WidgetStatePropertyAll<Size>(Size(size, size)),
+      padding: const WidgetStatePropertyAll<EdgeInsetsGeometry>(
+        EdgeInsets.zero,
       ),
+      shape: const WidgetStatePropertyAll<OutlinedBorder>(CircleBorder()),
+      side: outlined
+          ? WidgetStatePropertyAll<BorderSide>(
+              BorderSide(color: foreground, width: 1.5),
+            )
+          : const WidgetStatePropertyAll<BorderSide>(BorderSide.none),
+      elevation: const WidgetStatePropertyAll<double>(0),
+      shadowColor: const WidgetStatePropertyAll<Color>(Colors.transparent),
+    );
+
+    final button = outlined
+        ? OutlinedButton(
+            onPressed: onTap,
+            style: style,
+            child: Icon(icon, color: foreground, size: size * 0.42),
+          )
+        : FilledButton(
+            onPressed: onTap,
+            style: style,
+            child: Icon(icon, color: foreground, size: size * 0.42),
+          );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        button,
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: context.typography.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }

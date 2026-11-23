@@ -5,9 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/item.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_icon.dart';
@@ -58,13 +57,11 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
   @override
   Widget build(BuildContext context) {
     final catalog = ref.watch(catalogProvider(_catalogQuery));
-    final accent = _type == ItemType.lost ? AppColors.lost : AppColors.found;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: accent,
-        foregroundColor: _type == ItemType.lost ? Colors.white : AppColors.mintDark,
+        backgroundColor: context.colors.primary,
+        foregroundColor: context.colors.onPrimary,
         onPressed: () => context.push(
           '${AppRoutes.publish}?type=${_type == ItemType.lost ? 'lost' : 'found'}',
         ),
@@ -72,8 +69,9 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
         label: Text(_type == ItemType.lost ? 'Signaler' : 'Déclarer'),
       ),
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
-          color: AppColors.primary,
+          color: context.colors.primary,
           onRefresh: () async {
             ref.invalidate(catalogProvider(_catalogQuery));
             try {
@@ -82,7 +80,12 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
           },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(24, 14, 24, 96),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              14,
+              AppSpacing.xl,
+              96,
+            ),
             children: [
               Row(
                 children: [
@@ -103,54 +106,66 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               Text(
                 _type == ItemType.lost ? 'OBJETS PERDUS' : 'OBJETS TROUVÉS',
-                style: AppText.eyebrow.copyWith(color: AppColors.primary),
+                style: context.typography.labelLarge?.copyWith(
+                  color: context.colors.primary,
+                  letterSpacing: 0.6,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 _type == ItemType.lost
                     ? 'Annonces de perte'
                     : 'Annonces d’objets trouvés',
-                style: AppText.h1,
+                style: context.typography.headlineMedium,
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _TypeTab(
-                      label: 'Perdus',
-                      selected: _type == ItemType.lost,
-                      color: AppColors.lost,
-                      onTap: () => setState(() => _type = ItemType.lost),
+              const SizedBox(height: AppSpacing.lg - 4),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ItemType>(
+                  segments: const [
+                    ButtonSegment<ItemType>(
+                      value: ItemType.lost,
+                      label: Text('Perdus'),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _TypeTab(
-                      label: 'Trouvés',
-                      selected: _type == ItemType.found,
-                      color: AppColors.found,
-                      onTap: () => setState(() => _type = ItemType.found),
+                    ButtonSegment<ItemType>(
+                      value: ItemType.found,
+                      label: Text('Trouvés'),
                     ),
+                  ],
+                  selected: {_type},
+                  showSelectedIcon: false,
+                  multiSelectionEnabled: false,
+                  style: SegmentedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
                   ),
-                ],
+                  onSelectionChanged: (selection) =>
+                      setState(() => _type = selection.first),
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.lg - 4),
               TextField(
                 controller: _search,
                 onChanged: _onSearch,
                 decoration: InputDecoration(
                   hintText: 'Rechercher un titre, un lieu…',
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(left: 12, right: 8),
-                    child: AppIcon('magnifer-linear', size: 18),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(
+                      left: AppSpacing.sm,
+                      right: AppSpacing.xs,
+                    ),
+                    child: AppIcon(
+                      'magnifer-linear',
+                      size: 18,
+                      color: context.colors.onSurfaceVariant,
+                    ),
                   ),
                   prefixIconConstraints: const BoxConstraints(minWidth: 0),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               _HorizontalChips(
                 children: [
                   _MiniChip(
@@ -166,7 +181,7 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
               _HorizontalChips(
                 children: [
                   _MiniChip(
@@ -206,15 +221,16 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               catalog.when(
                 loading: () => const Padding(
-                  padding: EdgeInsets.only(top: 48),
+                  padding: EdgeInsets.only(top: AppSpacing.huge),
                   child: Center(child: CircularProgressIndicator()),
                 ),
                 error: (_, _) => _Message(
                   title: 'Chargement impossible',
-                  body: 'Le serveur ne répond pas. Vérifiez la connexion puis réessayez.',
+                  body:
+                      'Le serveur ne répond pas. Vérifiez la connexion puis réessayez.',
                   action: 'Réessayer',
                   onTap: () => ref.invalidate(catalogProvider(_catalogQuery)),
                 ),
@@ -222,7 +238,8 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
                   if (items.isEmpty) {
                     return _Message(
                       title: 'Aucune annonce',
-                      body: _query.isEmpty && _category == null && _status == null
+                      body:
+                          _query.isEmpty && _category == null && _status == null
                           ? 'Soyez le premier à publier dans cette catégorie.'
                           : 'Aucun résultat pour ces filtres.',
                       action: 'Publier',
@@ -236,7 +253,8 @@ class _ObjectsScreenState extends ConsumerState<ObjectsScreen> {
                       for (final item in items) ...[
                         _ObjectTile(
                           item: item,
-                          onTap: () => context.push(AppRoutes.itemDetail(item.id)),
+                          onTap: () =>
+                              context.push(AppRoutes.itemDetail(item.id)),
                         ),
                         const SizedBox(height: 10),
                       ],
@@ -263,114 +281,76 @@ class _ObjectTile extends StatelessWidget {
     final date = item.occurredAt.toLocal();
     final dateLabel =
         '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: item.imageUrl == null
-                      ? ColoredBox(
-                          color: AppColors.background,
-                          child: AppIcon(
-                            'box-linear',
-                            color: item.type == ItemType.lost
-                                ? AppColors.lost
-                                : AppColors.found,
-                          ),
-                        )
-                      : Image.network(
-                          item.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const ColoredBox(
-                            color: AppColors.background,
-                            child: Icon(Icons.broken_image_outlined),
-                          ),
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.sm),
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: item.imageUrl == null
+                  ? ColoredBox(
+                      color: context.colors.surfaceContainerHighest,
+                      child: AppIcon(
+                        'box-linear',
+                        color: item.type == ItemType.lost
+                            ? context.colors.primary
+                            : context.colors.tertiary,
+                      ),
+                    )
+                  : Image.network(
+                      item.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: context.colors.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: context.colors.onSurfaceVariant,
                         ),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: context.typography.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 2),
+                Text(
+                  item.place.isEmpty ? item.category.label : item.place,
+                  style: context.typography.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Row(
                   children: [
-                    Text(
-                      item.title,
-                      style: AppText.bodyStrong,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.place.isEmpty ? item.category.label : item.place,
-                      style: AppText.tiny.copyWith(color: AppColors.textSecondary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        StatusPill(type: item.type, compact: true),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$dateLabel · ${item.status.label}',
-                          style: AppText.tiny.copyWith(color: AppColors.textTertiary),
-                        ),
-                      ],
+                    StatusPill(type: item.type, compact: true),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        '$dateLabel · ${item.status.label}',
+                        style: context.typography.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TypeTab extends StatelessWidget {
-  const _TypeTab({
-    required this.label,
-    required this.selected,
-    required this.color,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? color : AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? color : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: AppText.label.copyWith(
-            color: selected
-                ? (color == AppColors.found ? AppColors.mintDark : Colors.white)
-                : AppColors.textSecondary,
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -384,11 +364,11 @@ class _HorizontalChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 36,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: children.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
         itemBuilder: (_, index) => children[index],
       ),
     );
@@ -396,7 +376,11 @@ class _HorizontalChips extends StatelessWidget {
 }
 
 class _MiniChip extends StatelessWidget {
-  const _MiniChip({required this.label, required this.selected, required this.onTap});
+  const _MiniChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;
@@ -404,23 +388,14 @@ class _MiniChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: AppText.tiny.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onTap(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 14,
       ),
     );
   }
@@ -434,17 +409,13 @@ class _CircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: AppIcon(icon, size: 20),
-        ),
+    return IconButton(
+      onPressed: onTap,
+      icon: AppIcon(icon, size: 20, color: context.colors.onSurfaceVariant),
+      style: IconButton.styleFrom(
+        backgroundColor: context.colors.surfaceContainerLow,
+        foregroundColor: context.colors.onSurfaceVariant,
+        minimumSize: const Size(48, 48),
       ),
     );
   }
@@ -469,14 +440,18 @@ class _Message extends StatelessWidget {
       padding: const EdgeInsets.only(top: 36),
       child: Column(
         children: [
-          Text(title, style: AppText.h2, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
           Text(
-            body,
-            style: AppText.body.copyWith(color: AppColors.textSecondary),
+            title,
+            style: context.typography.headlineSmall,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            body,
+            style: context.typography.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
           TextButton(onPressed: onTap, child: Text(action)),
         ],
       ),
