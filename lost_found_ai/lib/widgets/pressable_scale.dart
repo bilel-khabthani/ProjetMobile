@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/theme/app_motion.dart';
+
 class PressableScale extends StatefulWidget {
   const PressableScale({
     super.key,
@@ -31,6 +33,9 @@ class _PressableScaleState extends State<PressableScale> {
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = context.reduceMotion;
+    final pressed = reduceMotion ? false : _pressed;
+
     return GestureDetector(
       behavior: widget.behavior,
       onTapDown: (_) => _setPressed(true),
@@ -43,12 +48,12 @@ class _PressableScaleState extends State<PressableScale> {
               widget.onTap!();
             },
       child: AnimatedScale(
-        scale: _pressed ? widget.scale : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
+        scale: pressed ? widget.scale : 1,
+        duration: context.motion(AppMotion.micro),
+        curve: AppMotion.standard,
         child: AnimatedOpacity(
-          opacity: _pressed ? 0.92 : 1,
-          duration: const Duration(milliseconds: 120),
+          opacity: pressed ? 0.92 : 1,
+          duration: context.motion(AppMotion.micro),
           child: widget.child,
         ),
       ),

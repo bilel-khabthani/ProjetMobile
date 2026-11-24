@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_motion.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
+import '../../widgets/app_transitions.dart';
 
 ThemeData buildAppTheme() => _buildTheme(Brightness.light);
 
@@ -24,6 +26,16 @@ ThemeData _buildTheme(Brightness brightness) {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: AppFadeSlideTransition(),
+        TargetPlatform.iOS: AppFadeSlideTransition(),
+        TargetPlatform.fuchsia: AppFadeSlideTransition(),
+        TargetPlatform.linux: AppFadeSlideTransition(),
+        TargetPlatform.macOS: AppFadeSlideTransition(),
+        TargetPlatform.windows: AppFadeSlideTransition(),
+      },
+    ),
     fontFamily: AppText.family,
     scaffoldBackgroundColor: scheme.surface,
     canvasColor: scheme.surface,
@@ -146,6 +158,7 @@ ThemeData _buildTheme(Brightness brightness) {
       backgroundColor: scheme.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
       elevation: 1,
+      shadowColor: AppShadows.raised.first.color,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
         side: BorderSide(color: scheme.outlineVariant),
@@ -161,6 +174,7 @@ ThemeData _buildTheme(Brightness brightness) {
       backgroundColor: scheme.surfaceContainerHigh,
       surfaceTintColor: Colors.transparent,
       elevation: 1,
+      shadowColor: AppShadows.raised.first.color,
       shape: shape,
       titleTextStyle: AppText.h2.copyWith(color: scheme.onSurface),
       contentTextStyle: AppText.body.copyWith(color: scheme.onSurfaceVariant),
@@ -205,9 +219,17 @@ extension ColorSchemeSemantics on ColorScheme {
   Color get lost => primary;
   Color get found => tertiary;
   Color get textTertiary => onSurfaceVariant;
-  Color get scoreHigh => AppColors.scoreHigh;
-  Color get scoreMedium => AppColors.scoreMedium;
-  Color get scoreLow => AppColors.scoreLow;
+  bool get isDark => brightness == Brightness.dark;
+  Color get scoreHigh => isDark ? AppColors.scoreHighDark : AppColors.scoreHigh;
+  Color get scoreMedium =>
+      isDark ? AppColors.scoreMediumDark : AppColors.scoreMedium;
+  Color get scoreLow => isDark ? AppColors.scoreLowDark : AppColors.scoreLow;
+  Color get onScoreHigh =>
+      isDark ? AppColors.onScoreHighDark : AppColors.onScoreHigh;
+  Color get onScoreMedium =>
+      isDark ? AppColors.onScoreMediumDark : AppColors.onScoreMedium;
+  Color get onScoreLow =>
+      isDark ? AppColors.onScoreLowDark : AppColors.onScoreLow;
 }
 
 extension TextThemeSemantics on TextTheme {
@@ -267,20 +289,28 @@ class _AppCardState extends State<AppCard> {
       child: Padding(padding: widget.padding, child: widget.child),
     );
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      curve: Curves.easeOut,
-      transform: Matrix4.identity()..scale(_pressed ? 0.98 : 1.0),
-      child: widget.onTap == null
-          ? card
-          : InkWell(
-              onTap: widget.onTap,
-              onTapDown: (_) => _setPressed(true),
-              onTapUp: (_) => _setPressed(false),
-              onTapCancel: () => _setPressed(false),
-              borderRadius: radius,
-              child: card,
-            ),
+    return Semantics(
+      button: widget.onTap != null,
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: context.motion(AppMotion.micro),
+        curve: AppMotion.standard,
+        transform: Matrix4.diagonal3Values(
+          _pressed && !context.reduceMotion ? 0.985 : 1.0,
+          _pressed && !context.reduceMotion ? 0.985 : 1.0,
+          1,
+        ),
+        child: widget.onTap == null
+            ? card
+            : InkWell(
+                onTap: widget.onTap,
+                onTapDown: (_) => _setPressed(true),
+                onTapUp: (_) => _setPressed(false),
+                onTapCancel: () => _setPressed(false),
+                borderRadius: radius,
+                child: card,
+              ),
+      ),
     );
   }
 }

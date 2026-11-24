@@ -10,8 +10,11 @@ import '../../../../core/router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
+import '../../../../widgets/app_bottom_sheet.dart';
 import '../../../../widgets/app_button.dart';
+
 import '../../../../widgets/app_icon.dart';
+import '../../../../widgets/app_reveal.dart';
 import '../../../../widgets/photo_placeholder.dart';
 import '../../../../widgets/skeleton.dart';
 import '../../data/providers/objects_providers.dart';
@@ -168,9 +171,10 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
   }
 
   Future<void> _openFilters() async {
-    final result = await showModalBottomSheet<_MapFilters>(
+    final result = await showAppBottomSheet<_MapFilters>(
       context: context,
-      isScrollControlled: true,
+      showHandle: false,
+      semanticLabel: 'Filtres de la carte',
       builder: (_) => _FiltersSheet(
         type: _typeFilter,
         category: _categoryFilter,
@@ -369,8 +373,12 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                   left: AppSpacing.sm,
                   right: AppSpacing.sm,
                   bottom: AppSpacing.lg,
-                  child: _SelectedCard(
-                    object: selected,
+                  child: AppReveal(
+                    key: ValueKey(selected.id),
+                    index: 0,
+                    offset: const Offset(0, 10),
+                    child: _SelectedCard(
+                      object: selected,
                     distanceKm: _userPosition == null
                         ? null
                         : LocationService.calculateDistance(
@@ -385,6 +393,7 @@ class _ObjectsMapScreenState extends ConsumerState<ObjectsMapScreen> {
                     onItinerary: () => _openItinerary(selected),
                   ),
                 ),
+              ),
               if (visible.isEmpty)
                 Positioned(
                   left: AppSpacing.xl,
@@ -986,15 +995,14 @@ class _FiltersSheetState extends State<_FiltersSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
+        padding: const EdgeInsets.fromLTRB(
           AppSpacing.xl,
           AppSpacing.sm,
           AppSpacing.xl,
-          AppSpacing.lg + bottom,
+          AppSpacing.lg,
         ),
         child: SingleChildScrollView(
           child: Column(

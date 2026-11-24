@@ -6,6 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/reward.dart';
 import '../../../data/providers.dart';
+import '../../../widgets/app_dialog.dart';
 
 /// Affichage plein écran du Bon Officiel format PDF dans l'application mobile.
 class OfficialVoucherDialog extends ConsumerStatefulWidget {
@@ -14,9 +15,10 @@ class OfficialVoucherDialog extends ConsumerStatefulWidget {
   final UserCoupon coupon;
 
   static Future<void> show(BuildContext context, UserCoupon coupon) {
-    return showDialog(
+    return showAppDialog<void>(
       context: context,
-      barrierDismissible: true,
+      backgroundColor: Colors.transparent,
+      semanticLabel: 'Bon officiel',
       builder: (_) => OfficialVoucherDialog(coupon: coupon),
     );
   }
@@ -79,11 +81,8 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
     final createdFormatted =
         '${coupon.createdAt.day.toString().padLeft(2, '0')}/${coupon.createdAt.month.toString().padLeft(2, '0')}/${coupon.createdAt.year}';
 
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      backgroundColor: Colors.transparent,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 420),
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 420),
         decoration: BoxDecoration(
           color: context.colors.surface,
           borderRadius: BorderRadius.circular(20),
@@ -449,7 +448,6 @@ class _OfficialVoucherDialogState extends ConsumerState<OfficialVoucherDialog> {
             ],
           ),
         ),
-      ),
     );
   }
 }

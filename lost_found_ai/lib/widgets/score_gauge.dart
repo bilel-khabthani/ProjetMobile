@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_theme.dart';
 
 class ScoreGauge extends StatelessWidget {
@@ -11,7 +11,7 @@ class ScoreGauge extends StatelessWidget {
     required this.value,
     this.size = 96,
     this.strokeWidth = 10,
-    this.color = AppColors.primary,
+    this.color,
     this.secondaryColor,
     this.label,
     this.labelColor,
@@ -22,7 +22,7 @@ class ScoreGauge extends StatelessWidget {
   final double value;
   final double size;
   final double strokeWidth;
-  final Color color;
+  final Color? color;
   final Color? secondaryColor;
   final String? label;
   final Color? labelColor;
@@ -32,13 +32,14 @@ class ScoreGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clamped = (value / 100).clamp(0.0, 1.0);
+    final gaugeColor = color ?? context.colors.primary;
 
-    if (!animate) {
+    if (!animate || context.reduceMotion) {
       return _GaugeBody(
         progress: clamped,
         size: size,
         strokeWidth: strokeWidth,
-        color: color,
+        color: gaugeColor,
         secondaryColor: secondaryColor,
         label: label,
         labelColor: labelColor,
@@ -47,13 +48,13 @@ class ScoreGauge extends StatelessWidget {
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: clamped),
-      duration: duration,
-      curve: Curves.easeOutCubic,
+      duration: context.motion(duration),
+      curve: AppMotion.standard,
       builder: (context, progress, _) => _GaugeBody(
         progress: progress,
         size: size,
         strokeWidth: strokeWidth,
-        color: color,
+        color: gaugeColor,
         secondaryColor: secondaryColor,
         label: label,
         labelColor: labelColor,

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
 import '../../../../data/providers.dart';
 import '../../../../widgets/app_button.dart';
+import '../../../../widgets/app_dialog.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
 import '../../../../widgets/skeleton.dart';
@@ -210,16 +211,20 @@ class _Hero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 240,
-      width: double.infinity,
-      child: object.imageUrl != null
-          ? Image.network(
-              object.imageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => ItemArtwork(category: object.category),
-            )
-          : ItemArtwork(category: object.category),
+    return Hero(
+      tag: 'object-image-${object.id}',
+      child: SizedBox(
+        height: 240,
+        width: double.infinity,
+        child: object.imageUrl != null
+            ? Image.network(
+                object.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) =>
+                    ItemArtwork(category: object.category),
+              )
+            : ItemArtwork(category: object.category),
+      ),
     );
   }
 }
@@ -342,8 +347,9 @@ class _OwnerActionsState extends ConsumerState<_OwnerActions> {
   }
 
   Future<void> _delete() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
+      semanticLabel: 'Supprimer l\'annonce',
       builder: (context) => AlertDialog(
         title: const Text('Supprimer l\'annonce ?'),
         content: const Text('Cette action est définitive.'),

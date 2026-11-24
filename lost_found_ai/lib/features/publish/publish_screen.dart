@@ -11,6 +11,7 @@ import '../../core/app_config.dart';
 import '../../core/app_strings.dart';
 import '../../core/perceptual_hash.dart';
 import '../../core/router.dart';
+import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/item.dart';
@@ -18,8 +19,11 @@ import '../../data/providers.dart';
 import '../objects/data/models/location_model.dart';
 import '../objects/data/providers/objects_providers.dart';
 import '../objects/data/services/location_service.dart';
+import '../../widgets/app_bottom_sheet.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_reveal.dart';
 import '../../widgets/photo_placeholder.dart';
+import '../../widgets/success_badge.dart';
 
 class PublishScreen extends ConsumerStatefulWidget {
   const PublishScreen({
@@ -82,8 +86,8 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
     setState(() => _step = step);
     _controller.animateToPage(
       step,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
+      duration: context.motion(AppMotion.medium),
+      curve: AppMotion.enter,
     );
     if (step == 2 && _position == null) {
       _useCurrentLocation();
@@ -109,8 +113,9 @@ class _PublishScreenState extends ConsumerState<PublishScreen> {
   }
 
   Future<void> _pickImage() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showAppBottomSheet<ImageSource>(
       context: context,
+      semanticLabel: 'Choisir une photo',
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -415,8 +420,8 @@ class _ProgressBar extends StatelessWidget {
           final active = index <= step;
           return Expanded(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
+              duration: context.motion(AppMotion.medium),
+              curve: AppMotion.enter,
               height: 6,
               margin: EdgeInsets.only(right: index == 2 ? 0 : 6),
               decoration: BoxDecoration(
@@ -1248,24 +1253,36 @@ class _PublishStatusScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.xxl),
-              const _SearchStepRow(
-                icon: Icons.photo_rounded,
-                label: 'Image analysée',
+              AppReveal(
+                index: 0,
+                child: const _SearchStepRow(
+                  icon: Icons.photo_rounded,
+                  label: 'Image analysée',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              const _SearchStepRow(
-                icon: Icons.place_rounded,
-                label: 'Localisation comparée',
+              AppReveal(
+                index: 1,
+                child: const _SearchStepRow(
+                  icon: Icons.place_rounded,
+                  label: 'Localisation comparée',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              const _SearchStepRow(
-                icon: Icons.schedule_rounded,
-                label: 'Horodatage vérifié',
+              AppReveal(
+                index: 2,
+                child: const _SearchStepRow(
+                  icon: Icons.schedule_rounded,
+                  label: 'Horodatage vérifié',
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              const _SearchStepRow(
-                icon: Icons.text_snippet_rounded,
-                label: 'Description analysée',
+              AppReveal(
+                index: 3,
+                child: const _SearchStepRow(
+                  icon: Icons.text_snippet_rounded,
+                  label: 'Description analysée',
+                ),
               ),
             ],
           ),
@@ -1313,65 +1330,32 @@ class _PublishSuccess extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const _SuccessBadge(),
+              SuccessBadge(size: 116, color: context.colors.tertiary),
               const SizedBox(height: AppSpacing.xl),
-              Text(
-                AppStrings.publishedTitle,
-                style: context.typography.headlineMedium,
-                textAlign: TextAlign.center,
+              AppReveal(
+                index: 0,
+                child: Text(
+                  AppStrings.publishedTitle,
+                  style: context.typography.headlineMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Text(
-                AppStrings.publishedSubtitle,
-                style: context.typography.bodyMedium,
-                textAlign: TextAlign.center,
+              AppReveal(
+                index: 1,
+                child: Text(
+                  AppStrings.publishedSubtitle,
+                  style: context.typography.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
               const SizedBox(height: AppSpacing.huge),
-              AppButton(label: AppStrings.backHome, onPressed: onDone),
+              AppReveal(
+                index: 2,
+                child: AppButton(label: AppStrings.backHome, onPressed: onDone),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SuccessBadge extends StatefulWidget {
-  const _SuccessBadge();
-
-  @override
-  State<_SuccessBadge> createState() => _SuccessBadgeState();
-}
-
-class _SuccessBadgeState extends State<_SuccessBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..forward();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return ScaleTransition(
-      scale: CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-      child: Container(
-        width: 116,
-        height: 116,
-        decoration: BoxDecoration(
-          color: colors.tertiaryContainer,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          Icons.check_rounded,
-          size: 60,
-          color: colors.onTertiaryContainer,
         ),
       ),
     );

@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/api_client.dart';
 import '../../data/models/trust.dart';
 import '../../data/providers.dart';
+import '../../widgets/app_dialog.dart';
 
 /// Module 4 - Score de confiance et historique des evenements.
 ///
@@ -244,8 +245,9 @@ class _HistoryTile extends ConsumerWidget {
 
   Future<void> _openAppeal(BuildContext context, WidgetRef ref) async {
     final reasonController = TextEditingController();
-    final reason = await showDialog<String>(
+    final reason = await showAppDialog<String>(
       context: context,
+      semanticLabel: 'Contester cette sanction',
       builder: (dialogContext) => AlertDialog(
         title: const Text('Contester cette sanction'),
         content: TextField(

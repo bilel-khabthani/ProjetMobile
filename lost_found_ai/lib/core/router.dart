@@ -17,7 +17,6 @@ import '../features/home/home_screen.dart';
 import '../features/match/match_detail_screen.dart';
 import '../features/matches/matches_screen.dart';
 import '../features/objects/item_detail_screen.dart';
-import '../features/objects/objects_screen.dart';
 import '../features/objects/presentation/screens/map_selection_screen.dart';
 import '../features/objects/presentation/screens/my_objects_screen.dart';
 import '../features/objects/presentation/screens/object_detail_screen.dart';
@@ -179,14 +178,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.objects,
-                builder: (context, state) {
-                  final type = state.uri.queryParameters['type'];
-                  return ObjectsScreen(
-                    initialType: type == 'found'
-                        ? ItemType.found
-                        : ItemType.lost,
-                  );
-                },
+                builder: (context, state) => const ObjectsListScreen(
+                  allowAllTypes: false,
+                  fallbackType: ItemType.lost,
+                ),
               ),
             ],
           ),
@@ -274,7 +269,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.objectsList,
-        builder: (context, state) => const ObjectsListScreen(),
+        builder: (context, state) => const ObjectsListScreen(
+          allowAllTypes: true,
+          fallbackType: null,
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

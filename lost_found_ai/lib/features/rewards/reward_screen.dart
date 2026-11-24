@@ -6,6 +6,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/reward.dart';
 import '../../data/providers.dart';
+import '../../widgets/app_dialog.dart';
 import 'widgets/coupon_card.dart';
 import 'widgets/coupon_detail_sheet.dart';
 import 'widgets/lucky_wheel.dart';
@@ -50,8 +51,9 @@ class _RewardScreenState extends ConsumerState<RewardScreen>
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
+      semanticLabel: 'Confirmer l\'échange',
       builder: (ctx) => AlertDialog(
         title: const Text('Confirmer l\'échange'),
         content: Text(

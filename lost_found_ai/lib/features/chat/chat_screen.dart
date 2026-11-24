@@ -7,12 +7,16 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
+import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
+import '../../widgets/app_bottom_sheet.dart';
+import '../../widgets/app_dialog.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_reveal.dart';
 import '../../widgets/pressable_scale.dart';
 import '../../widgets/status_pill.dart';
 
@@ -76,12 +80,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _pickImage() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showAppBottomSheet<ImageSource>(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
-        side: BorderSide(color: context.colors.outlineVariant),
-      ),
+      semanticLabel: 'Choisir une photo',
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -170,16 +171,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
+        duration: context.motion(AppMotion.short),
+        curve: AppMotion.enter,
       );
     });
   }
 
   Future<void> _report(ChatMessage message) async {
     final reasonController = TextEditingController();
-    final reason = await showDialog<String>(
+    final reason = await showAppDialog<String>(
       context: context,
+      semanticLabel: 'Signaler ce message',
       builder: (dialogContext) => AlertDialog(
         title: const Text('Signaler ce message'),
         content: TextField(
@@ -612,9 +614,14 @@ class _ChatBody extends ConsumerWidget {
         }
 
         final message = row as ChatMessage;
-        return _MessageBubble(
-          message: message,
-          onReport: message.isMine ? null : () => onReport(message),
+        return RepaintBoundary(
+          child: AppReveal(
+            index: (index - headerCount) % AppMotion.maxStaggerItems,
+            child: _MessageBubble(
+              message: message,
+              onReport: message.isMine ? null : () => onReport(message),
+            ),
+          ),
         );
       },
     );

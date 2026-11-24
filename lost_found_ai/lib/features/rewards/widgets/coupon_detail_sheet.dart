@@ -6,6 +6,8 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/reward.dart';
 import '../../../data/providers.dart';
+import '../../../widgets/app_bottom_sheet.dart';
+import '../../../widgets/app_dialog.dart';
 import 'official_voucher_dialog.dart';
 
 class CouponDetailSheet extends ConsumerStatefulWidget {
@@ -14,10 +16,11 @@ class CouponDetailSheet extends ConsumerStatefulWidget {
   final UserCoupon coupon;
 
   static Future<void> show(BuildContext context, UserCoupon coupon) {
-    return showModalBottomSheet(
+    return showAppBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
+      showHandle: false,
       backgroundColor: Colors.transparent,
+      semanticLabel: 'Détail du coupon',
       builder: (_) => CouponDetailSheet(coupon: coupon),
     );
   }
@@ -33,8 +36,9 @@ class _CouponDetailSheetState extends ConsumerState<CouponDetailSheet> {
   void _showEmailDialog() {
     final userEmail = ref.read(sessionProvider)?.email ?? '';
     final emailCtrl = TextEditingController(text: userEmail);
-    showDialog(
+    showAppDialog<void>(
       context: context,
+      semanticLabel: 'Envoyer le bon par e-mail',
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(

@@ -8,16 +8,19 @@ import '../../data/api_client.dart';
 import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
 import '../../widgets/agreement_signals.dart';
+import '../../widgets/app_bottom_sheet.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/item_photo.dart';
 import '../../widgets/photo_comparison_card.dart';
 import '../../widgets/status_pill.dart';
+import '../../widgets/success_badge.dart';
 
 Future<void> showVerificationSheet(BuildContext context, ItemMatch match) {
-  return showModalBottomSheet<void>(
+  return showAppBottomSheet<void>(
     context: context,
-    isScrollControlled: true,
+    showHandle: false,
     backgroundColor: Colors.transparent,
+    semanticLabel: 'Vérification de la correspondance',
     builder: (_) => VerificationSheet(match: match),
   );
 }
@@ -504,7 +507,9 @@ class _SuccessState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _Handle(),
-        const Center(child: _SuccessCheck()),
+        Center(
+          child: SuccessBadge(size: 96, color: colors.tertiary),
+        ),
         const SizedBox(height: AppSpacing.lg),
         Text(
           AppStrings.answerCorrect,
@@ -586,44 +591,6 @@ class _SuccessState extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ],
-    );
-  }
-}
-
-class _SuccessCheck extends StatefulWidget {
-  const _SuccessCheck();
-
-  @override
-  State<_SuccessCheck> createState() => _SuccessCheckState();
-}
-
-class _SuccessCheckState extends State<_SuccessCheck>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 800),
-  )..forward();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return ScaleTransition(
-      scale: CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-      child: Container(
-        width: 96,
-        height: 96,
-        decoration: BoxDecoration(
-          color: colors.tertiaryContainer,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.check_rounded, size: 50, color: colors.tertiary),
-      ),
     );
   }
 }

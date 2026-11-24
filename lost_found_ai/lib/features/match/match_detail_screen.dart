@@ -4,12 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
+import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/item.dart';
 import '../../data/models/item_match.dart';
 import '../../data/providers.dart';
+import '../../widgets/animated_count.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_reveal.dart';
+import '../../widgets/hero_tags.dart';
 import '../../widgets/photo_placeholder.dart';
 import '../../widgets/score_gauge.dart';
 import '../../widgets/skeleton.dart';
@@ -56,19 +60,19 @@ class _DetailBody extends StatelessWidget {
               AppSpacing.xl,
             ),
             children: [
-              _ScoreHero(match: match),
+              AppReveal(index: 0, child: _ScoreHero(match: match)),
               const SizedBox(height: AppSpacing.xl),
-              _ScoreBreakdown(match: match),
+              AppReveal(index: 1, child: _ScoreBreakdown(match: match)),
               const SizedBox(height: AppSpacing.xl),
-              _ComparisonCard(match: match),
+              AppReveal(index: 2, child: _ComparisonCard(match: match)),
               const SizedBox(height: AppSpacing.md),
-              _FinderCard(match: match),
+              AppReveal(index: 3, child: _FinderCard(match: match)),
               if (match.isCoordination) ...[
                 const SizedBox(height: AppSpacing.md),
-                _CoordinationCard(match: match),
+                AppReveal(index: 4, child: _CoordinationCard(match: match)),
               ],
               const SizedBox(height: AppSpacing.md),
-              _HowItWorksCard(),
+              AppReveal(index: 5, child: const _HowItWorksCard()),
               const SizedBox(height: AppSpacing.xl),
             ],
           ),
@@ -297,8 +301,8 @@ class _ScoreRow extends StatelessWidget {
               begin: 0,
               end: (data.value / 100).clamp(0.0, 1.0),
             ),
-            duration: Duration(milliseconds: 900 + delayMs),
-            curve: Curves.easeOutCubic,
+            duration: context.motion(Duration(milliseconds: 900 + delayMs)),
+            curve: AppMotion.enter,
             builder: (context, value, _) => ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.pill),
               child: LinearProgressIndicator(
@@ -311,16 +315,17 @@ class _ScoreRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        SizedBox(
-          width: 38,
-          child: Text(
-            '${data.value.round()} %',
-            textAlign: TextAlign.right,
-            style: context.typography.labelMedium?.copyWith(
-              color: colors.onSurfaceVariant,
+          SizedBox(
+            width: 38,
+            child: AnimatedCount(
+              value: data.value,
+              format: (value) => '${value.round()} %',
+              textAlign: TextAlign.right,
+              style: context.typography.labelMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -354,6 +359,7 @@ class _ComparisonCard extends StatelessWidget {
             category: match.foundItemCategory,
             badge: match.foundItemTitle,
             pill: const StatusPill(type: ItemType.found),
+            heroTag: AppHeroTags.matchPhoto(match.id),
           ),
         ],
       ),
@@ -387,6 +393,7 @@ class _ComparisonRow extends StatelessWidget {
     required this.category,
     required this.badge,
     required this.pill,
+    this.heroTag,
   });
 
   final String title;
@@ -394,16 +401,20 @@ class _ComparisonRow extends StatelessWidget {
   final ItemCategory category;
   final String badge;
   final Widget pill;
+  final String? heroTag;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        PhotoPlaceholder(
-          category: category,
-          size: 52,
-          borderRadius: AppRadius.md,
-          showLabel: false,
+        Hero(
+          tag: heroTag ?? AppHeroTags.comparison(badge),
+          child: PhotoPlaceholder(
+            category: category,
+            size: 52,
+            borderRadius: AppRadius.md,
+            showLabel: false,
+          ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(

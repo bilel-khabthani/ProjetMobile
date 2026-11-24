@@ -49,6 +49,15 @@ abstract final class AppColors {
   static const Color onInverseSurface = Color(0xFFF4EFF4);
 
   static const Color scoreHigh = Color(0xFF1B7F4B);
-  static const Color scoreMedium = Color(0xFFE08A00);
+  static const Color scoreMedium = Color(0xFFA65D00);
   static const Color scoreLow = Color(0xFFC62828);
+  static const Color scoreHighDark = Color(0xFF69D6A0);
+  static const Color scoreMediumDark = Color(0xFFFFB454);
+  static const Color scoreLowDark = Color(0xFFFF8A80);
+  static const Color onScoreHigh = Color(0xFFFFFFFF);
+  static const Color onScoreMedium = Color(0xFFFFFFFF);
+  static const Color onScoreLow = Color(0xFFFFFFFF);
+  static const Color onScoreHighDark = Color(0xFF0B2A1A);
+  static const Color onScoreMediumDark = Color(0xFF352000);
+  static const Color onScoreLowDark = Color(0xFF3F0B0B);
 }

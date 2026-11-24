@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../data/models/item.dart';
@@ -95,16 +94,11 @@ class ScorePill extends StatelessWidget {
 }
 
 class Avatar extends StatelessWidget {
-  const Avatar({
-    super.key,
-    required this.initials,
-    this.size = 44,
-    this.color = AppColors.primary,
-  });
+  const Avatar({super.key, required this.initials, this.size = 44, this.color});
 
   final String initials;
   final double size;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +115,7 @@ class Avatar extends StatelessWidget {
       child: Text(
         initials,
         style: context.typography.labelMedium?.copyWith(
-          color: color,
+          color: color ?? colors.primary,
           fontSize: size * 0.34,
           fontWeight: FontWeight.w700,
         ),

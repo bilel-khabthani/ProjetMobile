@@ -11,6 +11,7 @@ import '../../data/api_client.dart';
 import '../../data/models/item.dart';
 import '../../data/providers.dart';
 import '../../widgets/app_button.dart';
+import '../../widgets/app_dialog.dart';
 import '../../widgets/status_pill.dart';
 
 class ItemDetailScreen extends ConsumerWidget {
@@ -243,8 +244,9 @@ class _DetailBody extends ConsumerWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
+      semanticLabel: 'Supprimer cette annonce',
       builder: (context) => AlertDialog(
         title: const Text('Supprimer cette annonce ?'),
         content: const Text(

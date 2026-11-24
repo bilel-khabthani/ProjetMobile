@@ -2,9 +2,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/theme/app_motion.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/reward.dart';
+import '../../../widgets/app_dialog.dart';
 
 class LuckyWheelWidget extends StatefulWidget {
   const LuckyWheelWidget({
@@ -79,7 +81,7 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4500),
+      duration: AppMotion.celebration,
     );
   }
 
@@ -128,11 +130,19 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
           extraTurns +
           (finalAngleNormalized - (_currentAngle % (2 * math.pi)));
 
+      if (!mounted) return;
+      if (context.reduceMotion) {
+        _currentAngle = targetAngle % (2 * math.pi);
+        HapticFeedback.heavyImpact();
+        if (mounted) _showWinDialog(result);
+        return;
+      }
+
       _rotationAnimation = Tween<double>(begin: _currentAngle, end: targetAngle)
           .animate(
             CurvedAnimation(
               parent: _animController,
-              curve: Curves.easeOutCubic,
+              curve: AppMotion.enter,
             ),
           );
 
@@ -164,19 +174,16 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
   void _showWinDialog(SpinResult result) {
     final scheme = context.colors;
     final textTheme = context.typography;
-    showDialog<void>(
+    showAppDialog<void>(
       context: context,
+      semanticLabel: 'Résultat de la roue',
       builder: (ctx) {
         final pts = result.prize.points;
         final isJackpot = pts >= 75;
 
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
@@ -229,7 +236,6 @@ class _LuckyWheelWidgetState extends State<LuckyWheelWidget>
                 ),
               ],
             ),
-          ),
         );
       },
     );

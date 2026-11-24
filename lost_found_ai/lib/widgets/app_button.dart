@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_motion.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_typography.dart';
@@ -52,21 +53,32 @@ class AppButton extends StatelessWidget {
       _ => FilledButton(onPressed: action, style: style, child: content),
     };
 
-    return SizedBox(
-      height: height,
-      width: expand ? double.infinity : null,
-      child: button,
+    return AnimatedSwitcher(
+      duration: context.motion(AppMotion.micro),
+      switchInCurve: AppMotion.enter,
+      switchOutCurve: AppMotion.exit,
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
+      child: SizedBox(
+        key: ValueKey(loading ? 'loading' : 'idle'),
+        height: height,
+        width: expand ? double.infinity : null,
+        child: button,
+      ),
     );
   }
 
   Widget _content(BuildContext context, Color foreground) {
     if (loading) {
-      return SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          valueColor: AlwaysStoppedAnimation<Color>(foreground),
+      return Semantics(
+        label: '$label, chargement',
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            valueColor: AlwaysStoppedAnimation<Color>(foreground),
+          ),
         ),
       );
     }

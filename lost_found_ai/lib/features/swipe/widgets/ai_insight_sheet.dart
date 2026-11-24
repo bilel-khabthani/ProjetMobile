@@ -5,6 +5,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/swipe_candidate.dart';
 import '../../../widgets/agreement_signals.dart';
+import '../../../widgets/app_bottom_sheet.dart';
 import '../../../widgets/photo_comparison_card.dart';
 
 /// Ouvre l'analyse IA detaillee d'une carte.
@@ -13,11 +14,11 @@ Future<void> showAiInsightSheet(
   required SwipeCandidate candidate,
   required Future<AiInsight> Function() loadInsight,
 }) {
-  return showModalBottomSheet<void>(
+  return showAppBottomSheet<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
+    showHandle: false,
     backgroundColor: Colors.transparent,
+    semanticLabel: 'Analyse détaillée',
     builder: (_) =>
         _AiInsightSheet(candidate: candidate, loadInsight: loadInsight),
   );

@@ -1,12 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../router.dart';
 import '../theme/app_theme.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/app_transitions.dart';
 
-class MainShell extends StatelessWidget {
+class MainShell extends StatefulWidget {
   const MainShell({super.key, required this.navigationShell});
+
+  final StatefulNavigationShell navigationShell;
+
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  @override
+  Widget build(BuildContext context) {
+    final shell = _MainShellView(navigationShell: widget.navigationShell);
+    final brightness = Theme.of(context).brightness;
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: shell,
+    );
+  }
+}
+
+class _MainShellView extends StatelessWidget {
+  const _MainShellView({required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
@@ -32,7 +67,10 @@ class MainShell extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      body: navigationShell,
+      body: AppStateTransition(
+        stateKey: ValueKey('branch-$selectedIndex'),
+        child: navigationShell,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) =>

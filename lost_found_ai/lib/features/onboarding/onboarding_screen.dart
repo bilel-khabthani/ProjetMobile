@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/router.dart';
+import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/app_button.dart';
@@ -54,8 +55,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       return;
     }
     _controller.nextPage(
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
+      duration: context.motion(AppMotion.long),
+      curve: AppMotion.enter,
     );
   }
 
@@ -87,9 +88,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         TweenAnimationBuilder<double>(
-                          tween: Tween<double>(begin: 0.86, end: 1),
-                          duration: const Duration(milliseconds: 520),
-                          curve: Curves.easeOutBack,
+                          tween: Tween<double>(
+                            begin: context.reduceMotion ? 1 : 0.86,
+                            end: 1,
+                          ),
+                          duration: context.motion(AppMotion.illustration),
+                          curve: AppMotion.pop,
                           builder: (context, scale, child) =>
                               Transform.scale(scale: scale, child: child),
                           child: SceneArt(variant: slide.variant, size: 220),

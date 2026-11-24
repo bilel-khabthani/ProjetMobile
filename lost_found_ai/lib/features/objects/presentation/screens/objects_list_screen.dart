@@ -7,14 +7,26 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/api_client.dart';
 import '../../../../data/models/item.dart';
+import '../../../../widgets/app_bottom_sheet.dart';
+import '../../../../widgets/app_button.dart';
 import '../../../../widgets/app_icon.dart';
+import '../../../../widgets/app_state_view.dart';
 import '../../../../widgets/photo_placeholder.dart';
 import '../../../../widgets/skeleton.dart';
+import '../../../../widgets/status_pill.dart';
 import '../../data/providers/objects_providers.dart';
 
 class ObjectsListScreen extends ConsumerStatefulWidget {
-  const ObjectsListScreen({super.key});
+  const ObjectsListScreen({
+    super.key,
+    this.allowAllTypes = false,
+    this.fallbackType = ItemType.lost,
+  });
+
+  final bool allowAllTypes;
+  final ItemType? fallbackType;
 
   @override
   ConsumerState<ObjectsListScreen> createState() => _ObjectsListScreenState();
@@ -24,25 +36,11 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
   late final TextEditingController _searchController;
   Timer? _debounce;
   ObjectFilter _filter = const ObjectFilter();
-  bool _didInitFilterFromRoute = false;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_didInitFilterFromRoute) return;
-    _didInitFilterFromRoute = true;
-    // GoRouterState relies on an InheritedWidget, so it cannot be read from
-    // initState(). didChangeDependencies is the first safe hook.
-    final typeParam = GoRouterState.of(context).uri.queryParameters['type'];
-    if (typeParam != null) {
-      _filter = _filter.copyWith(type: itemTypeFromApiValue(typeParam));
-    }
   }
 
   @override
@@ -52,24 +50,73 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
     super.dispose();
   }
 
-  void _setSearch(String value) {
+  ItemType? get _routeType {
+    final value = GoRouterState.of(context).uri.queryParameters['type'];
+    return switch (value?.toLowerCase()) {
+      'lost' => ItemType.lost,
+      'found' => ItemType.found,
+      _ => widget.fallbackType,
+    };
+  }
+
+  ObjectFilter get _effectiveFilter {
+    final type = _routeType;
+    return _filter.copyWith(type: type, clearType: type == null);
+  }
+
+  int get _narrowingFilterCount =>
+      (_filter.category != null ? 1 : 0) +
+      (_filter.status != null ? 1 : 0) +
+      (_filter.searchQuery.isNotEmpty ? 1 : 0);
+
+  String get _publishLocation {
+    if (widget.allowAllTypes) return AppRoutes.objectsAdd;
+    final type = switch (_routeType) {
+      ItemType.found => 'found',
+      _ => 'lost',
+    };
+    return '${AppRoutes.publish}?type=$type';
+  }
+
+  String get _publishLabel {
+    if (widget.allowAllTypes) return 'Publier';
+    return _routeType == ItemType.found ? 'Déclarer' : 'Signaler';
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() {});
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
-      setState(() {
-        _filter = value.trim().isEmpty
-            ? _filter.copyWith(searchQuery: '')
-            : _filter.copyWith(searchQuery: value.trim());
-      });
+      _debounce = null;
+      final query = value.trim();
+      if (_filter.searchQuery == query) return;
+      setState(() => _filter = _filter.copyWith(searchQuery: query));
     });
   }
 
+  void _commitPendingSearch() {
+    final timer = _debounce;
+    if (timer == null) return;
+    timer.cancel();
+    _debounce = null;
+    final query = _searchController.text.trim();
+    if (_filter.searchQuery == query) return;
+    setState(() => _filter = _filter.copyWith(searchQuery: query));
+  }
+
   void _setType(ItemType? type) {
-    setState(() {
-      _filter = type == null
-          ? _filter.copyWith(clearType: true)
-          : _filter.copyWith(type: type);
-    });
+    final state = GoRouterState.of(context);
+    final params = Map<String, String>.from(state.uri.queryParameters);
+    if (type == null) {
+      params.remove('type');
+    } else {
+      params['type'] = type.apiValue;
+    }
+    final location = state.uri
+        .replace(queryParameters: params.isEmpty ? null : params)
+        .toString();
+    context.push(location);
   }
 
   void _setCategory(ItemCategory? category) {
@@ -80,201 +127,292 @@ class _ObjectsListScreenState extends ConsumerState<ObjectsListScreen> {
     });
   }
 
+  void _clearSearch() {
+    _debounce?.cancel();
+    _debounce = null;
+    _searchController.clear();
+    setState(() => _filter = _filter.copyWith(searchQuery: ''));
+  }
+
+  void _resetFilters() {
+    _debounce?.cancel();
+    _debounce = null;
+    _searchController.clear();
+    setState(() => _filter = const ObjectFilter());
+  }
+
+  void _applyFilters(ObjectFilter filter) {
+    _commitPendingSearch();
+    setState(() => _filter = filter.copyWith(searchQuery: _filter.searchQuery));
+  }
+
+  void _openFilters() {
+    _commitPendingSearch();
+    showAppBottomSheet<void>(
+      context: context,
+      semanticLabel: 'Filtres du catalogue',
+      builder: (_) => _FilterSheet(
+        filter: _filter,
+        onApply: _applyFilters,
+        onReset: () {
+          Navigator.of(context).pop();
+          _resetFilters();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final objectsAsync = ref.watch(objectsProvider(_filter));
+    final filter = _effectiveFilter;
+    final objectsAsync = ref.watch(objectsProvider(filter));
+    final routeType = _routeType;
+
+    final headline = switch (routeType) {
+      ItemType.lost => 'Chaque objet perdu a une histoire.',
+      ItemType.found => 'Chaque objet trouvé attend son propriétaire.',
+      _ => 'Chaque objet attend sa seconde chance.',
+    };
+    final description = switch (routeType) {
+      ItemType.lost =>
+        'Parcourez les annonces et retrouvez ce qui compte.',
+      ItemType.found =>
+        'Aidez la communauté à réunir les objets et leurs propriétaires.',
+      _ => 'Explorez toutes les annonces de la communauté.',
+    };
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Objets', style: context.typography.titleLarge),
-        actions: [
-          IconButton(
-            tooltip: 'Carte',
-            icon: const Icon(Icons.map_outlined),
-            onPressed: () => context.push(AppRoutes.objectsMap),
-          ),
-          IconButton(
-            tooltip: 'Mes annonces',
-            icon: const Icon(Icons.person_outline_rounded),
-            onPressed: () => context.push(AppRoutes.objectMyList),
-          ),
-          const SizedBox(width: AppSpacing.xs - 4),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: context.colors.primary,
+          onRefresh: () async {
+            ref.invalidate(objectsProvider(filter));
+            try {
+              await ref.read(objectsProvider(filter).future);
+            } catch (error) {
+              if (!mounted || !context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(catalogFriendlyErrorMessage(error))),
+              );
+            }
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.xl,
-              AppSpacing.xs,
-              AppSpacing.xl,
               AppSpacing.sm,
+              AppSpacing.xl,
+              112,
             ),
-            child: Column(
-              children: [
-                _SearchField(
-                  controller: _searchController,
-                  onChanged: _setSearch,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                _TypeFilter(selected: _filter.type, onChanged: _setType),
-                const SizedBox(height: AppSpacing.sm),
-                _CategoryFilter(
-                  selected: _filter.category,
-                  onChanged: _setCategory,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: objectsAsync.when(
-              loading: () => ListView.separated(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                itemCount: 4,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (_, _) => const SkeletonBox(
-                  width: double.infinity,
-                  height: 92,
-                  borderRadius: AppRadius.md,
-                ),
-              ),
-              error: (error, _) => _ErrorState(
-                error: error.toString(),
-                onRetry: () => ref.invalidate(objectsProvider(_filter)),
-              ),
-              data: (objects) {
-                if (objects.isEmpty) {
-                  return _EmptyState(
-                    hasFilters: _filter.hasActiveCriteria,
-                    onClear: () => setState(() {
-                      _searchController.clear();
-                      _filter = const ObjectFilter();
-                    }),
-                  );
-                }
-                return RefreshIndicator(
-                  color: context.colors.primary,
-                  onRefresh: () async {
-                    ref.invalidate(objectsProvider(_filter));
-                    await ref.read(objectsProvider(_filter).future);
-                  },
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.xl,
-                      0,
-                      AppSpacing.xl,
-                      AppSpacing.xxxl,
-                    ),
-                    itemCount: objects.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final object = objects[index];
-                      return _ObjectTile(
-                        object: object,
-                        onTap: () =>
-                            context.push(AppRoutes.objectDetail(object.id)),
-                      );
+            children: [
+              Row(
+                children: [
+                  _CircleButton(
+                    icon: 'alt-arrow-left-linear',
+                    semanticLabel: 'Retour',
+                    onTap: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go(AppRoutes.home);
+                      }
                     },
                   ),
-                );
-              },
-            ),
+                  const Spacer(),
+                  if (widget.allowAllTypes)
+                    TextButton(
+                      onPressed: () => context.push(AppRoutes.myObjects),
+                      child: Text(
+                        'Mes annonces',
+                        style: context.typography.labelLarge,
+                      ),
+                    ),
+                  if (widget.allowAllTypes)
+                    const SizedBox(width: AppSpacing.xs),
+                  _CircleButton(
+                    icon: 'map-linear',
+                    semanticLabel: 'Voir la carte',
+                    onTap: () => context.push(AppRoutes.map),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'VOTRE CATALOGUE',
+                style: context.typography.labelLarge?.copyWith(
+                  color: context.colors.primary,
+                  letterSpacing: 0.7,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(headline, style: context.typography.headlineMedium),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: context.typography.bodyMedium?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              SegmentedButton<ItemType?>(
+                segments: [
+                  if (widget.allowAllTypes)
+                    const ButtonSegment<ItemType?>(
+                      value: null,
+                      label: Text('Tous'),
+                    ),
+                  const ButtonSegment<ItemType?>(
+                    value: ItemType.lost,
+                    label: Text('Perdus'),
+                  ),
+                  const ButtonSegment<ItemType?>(
+                    value: ItemType.found,
+                    label: Text('Trouvés'),
+                  ),
+                ],
+                selected: {routeType},
+                showSelectedIcon: false,
+                multiSelectionEnabled: false,
+                style: SegmentedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                onSelectionChanged: (selection) =>
+                    _setType(selection.isEmpty ? null : selection.first),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: 'Rechercher un objet ou un lieu',
+                  hintText: 'Rechercher un objet, un lieu…',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 21),
+                  suffixIcon: _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Effacer la recherche',
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: _clearSearch,
+                        ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: ItemCategory.values.length + 1,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.xs),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _CategoryChip(
+                        label: 'Toutes',
+                        iconName: 'widget-linear',
+                        selected: _filter.category == null,
+                        onTap: () => _setCategory(null),
+                      );
+                    }
+                    final category = ItemCategory.values[index - 1];
+                    return _CategoryChip(
+                      label: category.label,
+                      iconName: categoryIconName(category),
+                      selected: _filter.category == category,
+                      onTap: () => _setCategory(category),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _FilterBar(
+                filterCount: _narrowingFilterCount,
+                onTap: _openFilters,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              objectsAsync.when(
+                loading: () => const _CatalogSkeleton(),
+                error: (error, _) => AppStateView(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Chargement impossible',
+                  message: catalogFriendlyErrorMessage(error),
+                  actionLabel: 'Réessayer',
+                  onAction: () => ref.invalidate(objectsProvider(filter)),
+                  tone: AppStateTone.error,
+                ),
+                data: (objects) {
+                  if (objects.isEmpty) {
+                    return AppStateView(
+                      icon: Icons.search_off_rounded,
+                      title: _narrowingFilterCount == 0
+                          ? 'Aucune annonce'
+                          : 'Aucun résultat',
+                      message: _narrowingFilterCount == 0
+                          ? 'Soyez le premier à publier dans cette catégorie.'
+                          : 'Essayez d’autres filtres ou une autre recherche.',
+                      actionLabel: _narrowingFilterCount == 0
+                          ? _publishLabel
+                          : 'Réinitialiser',
+                      onAction: _narrowingFilterCount == 0
+                          ? () => context.push(_publishLocation)
+                          : _resetFilters,
+                    );
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _ResultHeader(count: objects.length),
+                      const SizedBox(height: AppSpacing.md),
+                      for (final object in objects) ...[
+                        _ObjectCard(
+                          object: object,
+                          onTap: () =>
+                              context.push(AppRoutes.objectDetail(object.id)),
+                        ),
+                        const SizedBox(height: AppSpacing.sm + 2),
+                      ],
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: context.colors.primary,
         foregroundColor: context.colors.onPrimary,
-        onPressed: () => context.push(AppRoutes.objectAdd),
+        onPressed: () => context.push(_publishLocation),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Publier'),
+        label: Text(_publishLabel),
       ),
     );
   }
 }
 
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller, required this.onChanged});
+class _CircleButton extends StatelessWidget {
+  const _CircleButton({
+    required this.icon,
+    required this.semanticLabel,
+    required this.onTap,
+  });
 
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        hintText: 'Rechercher un objet, un lieu…',
-        prefixIcon: Icon(Icons.search_rounded, size: 21),
-      ),
-    );
-  }
-}
-
-class _TypeFilter extends StatelessWidget {
-  const _TypeFilter({required this.selected, required this.onChanged});
-
-  final ItemType? selected;
-  final ValueChanged<ItemType?> onChanged;
+  final String icon;
+  final String semanticLabel;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<ItemType?>(
-        segments: const [
-          ButtonSegment<ItemType?>(value: null, label: Text('Tous')),
-          ButtonSegment<ItemType?>(value: ItemType.lost, label: Text('Perdus')),
-          ButtonSegment<ItemType?>(
-            value: ItemType.found,
-            label: Text('Trouvés'),
-          ),
-        ],
-        selected: {selected},
-        showSelectedIcon: false,
-        multiSelectionEnabled: false,
-        style: SegmentedButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
-        ),
-        onSelectionChanged: (selection) => onChanged(selection.first),
-      ),
-    );
-  }
-}
-
-class _CategoryFilter extends StatelessWidget {
-  const _CategoryFilter({required this.selected, required this.onChanged});
-
-  final ItemCategory? selected;
-  final ValueChanged<ItemCategory?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _CategoryChip(
-            label: 'Toutes',
-            iconName: 'widget-linear',
-            selected: selected == null,
-            onTap: () => onChanged(null),
-          ),
-          for (final category in ItemCategory.values) ...[
-            const SizedBox(width: AppSpacing.xs),
-            _CategoryChip(
-              label: category.label,
-              iconName: categoryIconName(category),
-              selected: selected == category,
-              onTap: () => onChanged(category),
-            ),
-          ],
-        ],
+    return IconButton(
+      tooltip: semanticLabel,
+      onPressed: onTap,
+      icon: AppIcon(icon, size: 20, color: context.colors.onSurfaceVariant),
+      style: IconButton.styleFrom(
+        backgroundColor: context.colors.surfaceContainerLow,
+        side: BorderSide(color: context.colors.outlineVariant),
+        minimumSize: const Size(48, 48),
       ),
     );
   }
@@ -295,12 +433,14 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilterChip(
+    return ChoiceChip(
       label: Text(label),
       avatar: AppIcon(
         iconName,
         size: 16,
-        color: context.colors.onSurfaceVariant,
+        color: selected
+            ? context.colors.onPrimaryContainer
+            : context.colors.onSurfaceVariant,
       ),
       selected: selected,
       showCheckmark: false,
@@ -313,8 +453,175 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _ObjectTile extends StatelessWidget {
-  const _ObjectTile({required this.object, required this.onTap});
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({required this.filterCount, required this.onTap});
+
+  final int filterCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final suffix = filterCount == 0
+        ? ''
+        : ', $filterCount filtre${filterCount > 1 ? 's' : ''} actif${filterCount > 1 ? 's' : ''}';
+    final label = 'Filtrer et trier les annonces$suffix';
+    return Row(
+      children: [
+        ExcludeSemantics(
+          child: Row(
+            children: [
+              Icon(
+                Icons.tune_rounded,
+                size: 17,
+                color: context.colors.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                filterCount == 0
+                    ? 'Filtrer et trier les annonces'
+                    : '$filterCount filtre${filterCount > 1 ? 's' : ''} actif${filterCount > 1 ? 's' : ''}',
+                style: context.typography.bodyMedium?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              tooltip: label,
+              onPressed: onTap,
+              icon: const Icon(Icons.tune_rounded),
+              style: IconButton.styleFrom(
+                backgroundColor: context.colors.surfaceContainerLow,
+                side: BorderSide(color: context.colors.outlineVariant),
+                minimumSize: const Size(48, 48),
+              ),
+            ),
+            if (filterCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: ExcludeSemantics(
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: context.colors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: context.colors.surface,
+                        width: 2,
+                      ),
+                    ),
+                    child: Text(
+                      '$filterCount',
+                      style: context.typography.labelSmall?.copyWith(
+                        color: context.colors.onPrimary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ResultHeader extends StatelessWidget {
+  const _ResultHeader({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: context.colors.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            size: 17,
+            color: context.colors.onPrimaryContainer,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs + 2),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$count annonce${count > 1 ? 's' : ''} à explorer',
+                style: context.typography.titleMedium,
+              ),
+              Text(
+                'Sélectionne une annonce pour voir les détails',
+                style: context.typography.bodySmall?.copyWith(
+                  color: context.colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CatalogSkeleton extends StatelessWidget {
+  const _CatalogSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(3, (index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm + 2),
+          child: AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SkeletonBox(
+                  width: double.infinity,
+                  height: 148,
+                  borderRadius: 0,
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      SkeletonBox(width: 180, height: 16),
+                      SizedBox(height: 10),
+                      SkeletonBox(width: 130, height: 12),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _ObjectCard extends StatelessWidget {
+  const _ObjectCard({required this.object, required this.onTap});
 
   final LostFoundObject object;
   final VoidCallback onTap;
@@ -322,88 +629,163 @@ class _ObjectTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLost = object.type == ItemType.lost;
-    final color = isLost ? context.colors.primary : context.colors.tertiary;
-    final soft = isLost
-        ? context.colors.primaryContainer
-        : context.colors.tertiaryContainer;
+    final accent = isLost ? context.colors.primary : context.colors.tertiary;
+    final cardLabel = buildObjectCardSemanticsLabel(object);
 
-    return AppCard(
+    return Semantics(
+      label: cardLabel,
+      button: true,
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      child: Row(
+      container: true,
+      child: ExcludeSemantics(
+        child: AppCard(
+          onTap: onTap,
+          padding: EdgeInsets.zero,
+          child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppSpacing.sm),
-            child: SizedBox(
-              width: AppSpacing.huge + 20,
-              height: AppSpacing.huge + 20,
-              child: object.imageUrl != null
-                  ? Image.network(
-                      object.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          ItemArtwork(category: object.category),
-                    )
-                  : ItemArtwork(category: object.category),
-            ),
+          Stack(
+            children: [
+              Hero(
+                tag: 'object-image-${object.id}',
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.lg),
+                  ),
+                  child: SizedBox(
+                    height: 156,
+                    width: double.infinity,
+                    child: object.imageUrl != null
+                        ? Image.network(
+                            object.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => ItemArtwork(
+                              category: object.category,
+                              width: double.infinity,
+                              height: 156,
+                              borderRadius: 0,
+                            ),
+                          )
+                        : ItemArtwork(
+                            category: object.category,
+                            width: double.infinity,
+                            height: 156,
+                            borderRadius: 0,
+                          ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: AppSpacing.sm,
+                left: AppSpacing.sm,
+                child: StatusPill(type: object.type),
+              ),
+              if (object.distanceKm != null)
+                Positioned(
+                  top: AppSpacing.sm,
+                  right: AppSpacing.sm,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: context.colors.scrim.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                    child: Text(
+                      '${object.distanceKm!.toStringAsFixed(1)} km',
+                      style: context.typography.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs,
-                        vertical: 3,
-                      ),
+                      width: 34,
+                      height: 34,
                       decoration: BoxDecoration(
-                        color: soft,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        color: isLost
+                            ? context.colors.primaryContainer
+                            : context.colors.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(11),
                       ),
-                      child: Text(
-                        object.type.shortLabel,
-                        style: context.typography.labelSmall?.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      child: Icon(
+                        categoryIcon(object.category),
+                        size: 17,
+                        color: accent,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.xs + 2),
                     Expanded(
-                      child: Text(
-                        object.formattedDate,
-                        style: context.typography.labelSmall,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            object.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.typography.titleMedium,
+                          ),
+                          Text(
+                            object.placeLabel.isEmpty
+                                ? object.category.label
+                                : object.placeLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.typography.bodySmall?.copyWith(
+                              color: context.colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 15,
+                      color: context.colors.onSurfaceVariant,
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  object.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: context.typography.titleMedium,
-                ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: [
                     Icon(
-                      Icons.place_outlined,
-                      size: 13,
+                      Icons.schedule_rounded,
+                      size: 14,
                       color: context.colors.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 3),
-                    Expanded(
-                      child: Text(
-                        object.placeLabel.isEmpty
-                            ? object.category.label
-                            : object.placeLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.typography.bodySmall,
+                    const SizedBox(width: 5),
+                    Text(
+                      object.formattedDate,
+                      style: context.typography.labelSmall?.copyWith(
+                        color: context.colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Container(
+                      width: 3,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: context.colors.onSurfaceVariant,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      object.status.label,
+                      style: context.typography.labelSmall?.copyWith(
+                        color: context.colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -411,97 +793,169 @@ class _ObjectTile extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: context.colors.onSurfaceVariant,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.hasFilters, required this.onClear});
-
-  final bool hasFilters;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 52,
-              color: context.colors.onSurfaceVariant,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              hasFilters ? 'Aucun résultat' : 'Aucun objet publié',
-              style: context.typography.headlineSmall,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              hasFilters
-                  ? 'Essaie d\'autres filtres ou une autre recherche.'
-                  : 'Sois le premier à publier une annonce.',
-              style: context.typography.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            if (hasFilters) ...[
-              const SizedBox(height: AppSpacing.lg),
-              TextButton(
-                onPressed: onClear,
-                child: const Text('Réinitialiser'),
-              ),
-            ],
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.error, required this.onRetry});
+class _FilterSheet extends StatefulWidget {
+  const _FilterSheet({
+    required this.filter,
+    required this.onApply,
+    required this.onReset,
+  });
 
-  final String error;
-  final VoidCallback onRetry;
+  final ObjectFilter filter;
+  final void Function(ObjectFilter filter) onApply;
+  final VoidCallback onReset;
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late ObjectFilter _filter = widget.filter;
+
+  static const _statusOptions = <ItemStatus?>[
+    null,
+    ItemStatus.matched,
+    ItemStatus.recovered,
+    ItemStatus.closed,
+  ];
+
+  static const _sortOptions = <String, String>{
+    'recent': 'Plus récent',
+    'oldest': 'Plus ancien',
+    'title': 'Titre',
+  };
+
+  String _statusLabel(ItemStatus? status) => switch (status) {
+    null => 'En cours',
+    ItemStatus.active => 'En cours',
+    ItemStatus.matched => 'Correspondance',
+    ItemStatus.disputed => 'En litige',
+    ItemStatus.recovered => 'Récupérés',
+    ItemStatus.closed => 'Clôturées',
+  };
+
+  void _setStatus(ItemStatus? status) {
+    setState(() {
+      _filter = status == null
+          ? _filter.copyWith(clearStatus: true)
+          : _filter.copyWith(status: status);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.sm,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
+      child: SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 48,
-              color: context.colors.error,
-            ),
-            const SizedBox(height: AppSpacing.md),
+            Text('Affiner les résultats', style: context.typography.headlineSmall),
+            const SizedBox(height: 4),
             Text(
-              'Impossible de charger les objets',
-              style: context.typography.headlineSmall,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              error,
-              style: context.typography.bodyMedium,
-              textAlign: TextAlign.center,
+              'Statut et ordre d’affichage des annonces.',
+              style: context.typography.bodyMedium?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextButton(onPressed: onRetry, child: const Text('Réessayer')),
+            Text('Statut', style: context.typography.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                for (final status in _statusOptions)
+                  ChoiceChip(
+                    label: Text(_statusLabel(status)),
+                    selected: _filter.status == status,
+                    showCheckmark: false,
+                    onSelected: (_) => _setStatus(status),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Trier par', style: context.typography.titleMedium),
+            const SizedBox(height: AppSpacing.xs),
+            Column(
+              children: [
+                for (final entry in _sortOptions.entries)
+                  ListTile(
+                    title: Text(entry.value),
+                    selected: entry.key == _filter.sort,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    trailing: Icon(
+                      entry.key == _filter.sort
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: entry.key == _filter.sort
+                          ? context.colors.primary
+                          : context.colors.onSurfaceVariant,
+                    ),
+                    onTap: () =>
+                        setState(() => _filter = _filter.copyWith(sort: entry.key)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: 'Réinitialiser',
+                    variant: AppButtonVariant.secondary,
+                    height: 52,
+                    onPressed: widget.onReset,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: AppButton(
+                    label: 'Appliquer',
+                    height: 52,
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.onApply(_filter);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+@visibleForTesting
+String buildObjectCardSemanticsLabel(LostFoundObject object) {
+  return [
+    object.type == ItemType.lost ? 'Perdu' : 'Trouvé',
+    object.title,
+    object.placeLabel.isEmpty ? object.category.label : object.placeLabel,
+    if (object.distanceKm != null) '${object.distanceKm!.toStringAsFixed(1)} km',
+    object.formattedDate,
+    object.status.label,
+  ].join(', ');
+}
+
+@visibleForTesting
+String catalogFriendlyErrorMessage(Object error) {
+  if (error is ApiException) return error.userMessage;
+  return 'Le catalogue est momentanément indisponible. Vérifiez votre connexion puis réessayez.';
 }

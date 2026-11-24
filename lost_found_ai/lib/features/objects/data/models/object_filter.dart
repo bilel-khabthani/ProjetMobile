@@ -14,6 +14,7 @@ class ObjectFilter {
     this.radiusKm = 10,
     this.limit = 50,
     this.offset = 0,
+    this.sort = 'recent',
   });
 
   final ItemType? type;
@@ -29,6 +30,7 @@ class ObjectFilter {
 
   final int limit;
   final int offset;
+  final String sort;
 
   ObjectFilter copyWith({
     ItemType? type,
@@ -42,6 +44,7 @@ class ObjectFilter {
     double? radiusKm,
     int? limit,
     int? offset,
+    String? sort,
     bool clearType = false,
     bool clearCategory = false,
     bool clearStatus = false,
@@ -58,6 +61,7 @@ class ObjectFilter {
       radiusKm: radiusKm ?? this.radiusKm,
       limit: limit ?? this.limit,
       offset: offset ?? this.offset,
+      sort: sort ?? this.sort,
     );
   }
 
@@ -87,6 +91,7 @@ class ObjectFilter {
       params['with_location'] = 1;
     }
 
+    params['sort'] = sort;
     params['per_page'] = limit;
     params['page'] = offset < limit ? 1 : (offset ~/ limit) + 1;
 
@@ -108,7 +113,8 @@ class ObjectFilter {
           longitude == other.longitude &&
           radiusKm == other.radiusKm &&
           limit == other.limit &&
-          offset == other.offset;
+          offset == other.offset &&
+          sort == other.sort;
 
   @override
   int get hashCode => Object.hash(
@@ -123,6 +129,7 @@ class ObjectFilter {
     radiusKm,
     limit,
     offset,
+    sort,
   );
 }
 

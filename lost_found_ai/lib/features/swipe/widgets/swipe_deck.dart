@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/theme/app_motion.dart';
 import '../../../data/models/swipe_candidate.dart';
 import 'swipe_card.dart';
 
@@ -59,7 +60,7 @@ class _SwipeDeckState extends State<SwipeDeck>
     _fly =
         AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 260),
+          duration: AppMotion.medium,
         )..addListener(() {
           final animation = _animation;
           if (animation == null || !mounted) return;
@@ -104,31 +105,35 @@ class _SwipeDeckState extends State<SwipeDeck>
   /// Declenche le fly-out. Public au sein de la bibliotheque via le controleur.
   void swipe(SwipeDirection direction) {
     if (_flying || widget.candidates.isEmpty) return;
+
+    void decide() {
+      final candidate = widget.candidates.first;
+      if (!mounted) return;
+      setState(() {
+        _drag = Offset.zero;
+        _flying = false;
+      });
+      HapticFeedback.mediumImpact();
+      widget.onDecide(candidate, direction);
+    }
+
+    if (context.reduceMotion) {
+      decide();
+      return;
+    }
+
     final width = _size.width == 0 ? 360.0 : _size.width;
     final target = direction == SwipeDirection.like
         ? Offset(width * 1.3, _drag.dy - 40)
         : Offset(-width * 1.3, _drag.dy - 40);
 
     _flying = true;
-    _animateTo(
-      target,
-      curve: Curves.easeIn,
-      onComplete: () {
-        final candidate = widget.candidates.first;
-        if (!mounted) return;
-        setState(() {
-          _drag = Offset.zero;
-          _flying = false;
-        });
-        HapticFeedback.mediumImpact();
-        widget.onDecide(candidate, direction);
-      },
-    );
+    _animateTo(target, curve: AppMotion.exit, onComplete: decide);
   }
 
   void _animateTo(
     Offset target, {
-    Curve curve = Curves.easeOutBack,
+    Curve curve = AppMotion.pop,
     VoidCallback? onComplete,
   }) {
     _animation = Tween<Offset>(
@@ -195,7 +200,9 @@ class _SwipeDeckState extends State<SwipeDeck>
           behavior: HitTestBehavior.opaque,
           onPanUpdate: _onPanUpdate,
           onPanEnd: _onPanEnd,
-          child: Stack(alignment: Alignment.center, children: cards),
+          child: RepaintBoundary(
+            child: Stack(alignment: Alignment.center, children: cards),
+          ),
         );
       },
     );

@@ -9,10 +9,16 @@ import '../../../widgets/photo_placeholder.dart';
 import '../../../widgets/status_pill.dart';
 
 class MatchCard extends StatelessWidget {
-  const MatchCard({super.key, required this.match, required this.onTap});
+  const MatchCard({
+    super.key,
+    required this.match,
+    required this.onTap,
+    this.heroTag,
+  });
 
   final ItemMatch match;
   final VoidCallback onTap;
+  final String? heroTag;
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +29,14 @@ class MatchCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.sm),
       child: Row(
         children: [
-          PhotoPlaceholder(
-            category: match.foundItemCategory,
-            size: 68,
-            borderRadius: AppRadius.md,
-            showLabel: false,
+          Hero(
+            tag: heroTag ?? 'match-photo-${match.id}',
+            child: PhotoPlaceholder(
+              category: match.foundItemCategory,
+              size: 68,
+              borderRadius: AppRadius.md,
+              showLabel: false,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -97,7 +106,11 @@ class _MatchScore extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = score >= 80 ? scheme.primary : scheme.tertiary;
+    final color = score >= 80
+        ? scheme.scoreHigh
+        : score >= 50
+        ? scheme.scoreMedium
+        : scheme.scoreLow;
     final value = (score / 100).clamp(0.0, 1.0);
     return Column(
       children: [

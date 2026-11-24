@@ -11,6 +11,7 @@ import '../../../../core/router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/item.dart';
+import '../../../../widgets/app_bottom_sheet.dart';
 import '../../../../widgets/app_button.dart';
 import '../../../../widgets/app_icon.dart';
 import '../../../../widgets/photo_placeholder.dart';
@@ -112,8 +113,9 @@ class _ObjectFormScreenState extends ConsumerState<ObjectFormScreen> {
           (_latitude != null && _longitude != null));
 
   Future<void> _pickImage() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showAppBottomSheet<ImageSource>(
       context: context,
+      semanticLabel: 'Choisir une photo',
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
